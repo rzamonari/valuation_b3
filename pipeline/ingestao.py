@@ -48,6 +48,10 @@ class FalhaExtracao(Exception):
 class _ErroDefinitivo(Exception):
     """Erro que não adianta repetir (ex.: HTTP 4xx diferente de 429)."""
 
+    def __init__(self, mensagem, status=None):
+        super().__init__(mensagem)
+        self.status = status
+
 
 # --------------------------------------------------------------------------- utilitários
 
@@ -85,7 +89,7 @@ def _get(url):
     if resposta.status_code == 429 or resposta.status_code >= 500:
         resposta.raise_for_status()
     if resposta.status_code >= 400:
-        raise _ErroDefinitivo(f"HTTP {resposta.status_code}")
+        raise _ErroDefinitivo(f"HTTP {resposta.status_code}", resposta.status_code)
     return resposta
 
 
@@ -221,30 +225,48 @@ def extrair_fundamentus():
     return df
 
 
+def _url_minhareceita(cnpj):
+    # A API exige 14 dígitos; o complemento vale só para a URL, nunca para o valor gravado (M6.1).
+    consulta = cnpj.zfill(14) if cnpj.isdigit() else cnpj
+    return f"{URL_MINHARECEITA}{consulta}"
+
+
 def extrair_minhareceita(cnpjs):
     timestamp = _agora_utc()
 
     def consultar(cnpj):
-        return _com_retry(
-            lambda: _get(f"{URL_MINHARECEITA}{cnpj}").text, f"Minha Receita {cnpj}"
+        url = _url_minhareceita(cnpj)
+        try:
+            return url, _com_retry(lambda: _get(url).text, f"Minha Receita {cnpj}")
+        except _ErroDefinitivo as exc:
+            if exc.status in (400, 404):  # identificador rejeitado pela API (M6.4)
+                return url, None
+            raise
+
+    resultados, falhas = _em_paralelo(
+        consultar, cnpjs, WORKERS_HTTP, "Minha Receita CNPJ"
+    )
+    if falhas:
+        raise FalhaExtracao(
+            f"minhareceitaorg_dadosempresas: {len(falhas)} consultas falharam: {falhas}"
         )
 
-    resultados, _ = _em_paralelo(consultar, cnpjs, WORKERS_HTTP, "Minha Receita CNPJ")
-    if not resultados:
+    rejeitados = [cnpj for cnpj, (_, payload) in resultados if payload is None]
+    if rejeitados:
+        print(f"  {len(rejeitados)} CNPJs rejeitados pela API (HTTP 400/404): {rejeitados}")
+    registros = [
+        {
+            "cnpj": cnpj,
+            "payload_json": payload,
+            "_timestamp_ingestao": timestamp,
+            "_source_origin": url,
+        }
+        for cnpj, (url, payload) in resultados
+        if payload is not None
+    ]
+    if not registros:
         raise FalhaExtracao("minhareceitaorg_dadosempresas: nenhuma consulta concluída")
-
-    return pd.DataFrame(
-        [
-            {
-                "cnpj": cnpj,
-                "payload_json": payload,
-                "_timestamp_ingestao": timestamp,
-                "_source_origin": f"{URL_MINHARECEITA}{cnpj}",
-            }
-            for cnpj, payload in resultados
-        ],
-        dtype=object,
-    )
+    return pd.DataFrame(registros, dtype=object)
 
 
 def extrair_yfinance(tickers):
