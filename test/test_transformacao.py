@@ -130,8 +130,7 @@ def gravar_bronze(con, tabela, linhas):
         )
 
 
-@pytest.fixture
-def con(tmp_path):
+def novo_banco(tmp_path):
     conexao = duckdb.connect(str(tmp_path / "teste.duckdb"))
     gravar_bronze(conexao, "b3_empresas", [linha_b3()])
     gravar_bronze(conexao, "fundamentus_acoes", [linha_fundamentus()])
@@ -141,8 +140,7 @@ def con(tmp_path):
         "minhareceita_empresas",
         [linha_minhareceita(empresa("11111111000111"))],
     )
-    yield conexao
-    conexao.close()
+    return conexao
 
 
 def consultar(con, sql):
@@ -163,7 +161,8 @@ def relatorio_de(relatorio, destino):
 # --------------------------------------------------------------------------- B3
 
 
-def test_b3_datas_identificadores_e_vazios(con):
+def test_b3_datas_identificadores_e_vazios(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con,
         "b3_empresas",
@@ -188,7 +187,8 @@ def test_b3_datas_identificadores_e_vazios(con):
     ]
 
 
-def test_b3_cnpj_completado_com_zeros_a_esquerda(con):
+def test_b3_cnpj_completado_com_zeros_a_esquerda(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con,
         "b3_empresas",
@@ -215,7 +215,8 @@ def test_b3_cnpj_completado_com_zeros_a_esquerda(con):
 @pytest.mark.parametrize(
     "valor", ["33.000.167/0001-01", "123456789012345", " 191", "19A"]
 )
-def test_b3_cnpj_invalido_falha(con, valor):
+def test_b3_cnpj_invalido_falha(tmp_path, valor):
+    con = novo_banco(tmp_path)
     gravar_bronze(con, "b3_empresas", [linha_b3(cnpj=valor)])
     with pytest.raises(t.ErroTransformacao) as erro:
         t.executar(con)
@@ -223,7 +224,8 @@ def test_b3_cnpj_invalido_falha(con, valor):
     assert erro.value.exemplo == repr(valor)
 
 
-def test_minhareceita_cnpj_completado_com_zeros_a_esquerda(con):
+def test_minhareceita_cnpj_completado_com_zeros_a_esquerda(tmp_path):
+    con = novo_banco(tmp_path)
     dados = empresa("191")
     dados["regime_tributario"][0]["cnpj_da_scp"] = "26439940000"
     gravar_bronze(con, "minhareceita_empresas", [linha_minhareceita(dados)])
@@ -242,7 +244,8 @@ def test_minhareceita_cnpj_completado_com_zeros_a_esquerda(con):
     ) == [("00026439940000",), (None,)]
 
 
-def test_minhareceita_cnpj_bronze_e_json_comparados_apos_padronizacao(con):
+def test_minhareceita_cnpj_bronze_e_json_comparados_apos_padronizacao(tmp_path):
+    con = novo_banco(tmp_path)
     # Mesmo CNPJ com e sem zeros à esquerda: não é divergência.
     gravar_bronze(
         con,
@@ -266,7 +269,8 @@ def test_minhareceita_cnpj_bronze_e_json_comparados_apos_padronizacao(con):
 
 
 @pytest.mark.parametrize("valor", ["31/02/2020", "2020-01-01", "", "1/1/2020"])
-def test_b3_data_invalida_falha(con, valor):
+def test_b3_data_invalida_falha(tmp_path, valor):
+    con = novo_banco(tmp_path)
     gravar_bronze(con, "b3_empresas", [linha_b3(dateListing=valor)])
     with pytest.raises(t.ErroTransformacao) as erro:
         t.executar(con)
@@ -277,7 +281,8 @@ def test_b3_data_invalida_falha(con, valor):
 # --------------------------------------------------------------------------- Fundamentus
 
 
-def test_fundamentus_conversao_brasileira(con):
+def test_fundamentus_conversao_brasileira(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con,
         "fundamentus_acoes",
@@ -306,7 +311,8 @@ def test_fundamentus_conversao_brasileira(con):
     ) == [(Decimal("-0.50"), Decimal("0.000"))]
 
 
-def test_fundamentus_precisao_dinamica_por_coluna(con):
+def test_fundamentus_precisao_dinamica_por_coluna(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con,
         "fundamentus_acoes",
@@ -326,7 +332,8 @@ def test_fundamentus_precisao_dinamica_por_coluna(con):
     assert tipos["cotacao"] == "DECIMAL(3,2)"
 
 
-def test_fundamentus_precisao_acima_do_limite_falha(con):
+def test_fundamentus_precisao_acima_do_limite_falha(tmp_path):
+    con = novo_banco(tmp_path)
     gigante = "1" + ".000" * 13 + ",00"  # 40 dígitos significativos
     gravar_bronze(con, "fundamentus_acoes", [linha_fundamentus(Cotação=gigante)])
     with pytest.raises(t.ErroTransformacao) as erro:
@@ -336,7 +343,8 @@ def test_fundamentus_precisao_acima_do_limite_falha(con):
 
 
 @pytest.mark.parametrize("valor", ["abc", "1,2,3", "1.23,4", "12,5 %", "--", " 1,00"])
-def test_fundamentus_valor_invalido_falha_sem_virar_nulo(con, valor):
+def test_fundamentus_valor_invalido_falha_sem_virar_nulo(tmp_path, valor):
+    con = novo_banco(tmp_path)
     gravar_bronze(con, "fundamentus_acoes", [linha_fundamentus(ROE=valor)])
     with pytest.raises(t.ErroTransformacao) as erro:
         t.executar(con)
@@ -344,7 +352,29 @@ def test_fundamentus_valor_invalido_falha_sem_virar_nulo(con, valor):
     assert erro.value.exemplo == repr(valor)
 
 
-def test_fundamentus_limpeza_restrita_a_div_liq(con):
+def test_valor_que_nao_converte_encerra_main_com_codigo_1(tmp_path, monkeypatch):
+    con = novo_banco(tmp_path)
+    t.executar(con)
+    antes = foto(con, "refined", TABELAS_SILVER)
+    # ROE com texto: não pode virar NULL nem alterar a Silver publicada
+    gravar_bronze(con, "fundamentus_acoes", [linha_fundamentus(ROE="abc")])
+
+    class SemFechar:
+        def __getattr__(self, nome):
+            return getattr(con, nome)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(db, "conectar", lambda: SemFechar())
+    with pytest.raises(SystemExit) as saida:
+        t.main()
+    assert saida.value.code == 1
+    assert foto(con, "refined", TABELAS_SILVER) == antes
+
+
+def test_fundamentus_limpeza_restrita_a_div_liq(tmp_path):
+    con = novo_banco(tmp_path)
     # Tabulações/quebras externas só são removidas em Dív.Líq/ Patrim.
     gravar_bronze(
         con, "fundamentus_acoes", [linha_fundamentus(**{"P/L": "\n\t1,00\t"})]
@@ -363,7 +393,8 @@ def test_fundamentus_limpeza_restrita_a_div_liq(con):
     assert erro.value.coluna == "Dív.Líq/ Patrim."
 
 
-def test_fundamentus_marcador_ausente_vira_nulo(con):
+def test_fundamentus_marcador_ausente_vira_nulo(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con,
         "fundamentus_acoes",
@@ -379,7 +410,8 @@ def test_fundamentus_marcador_ausente_vira_nulo(con):
 # --------------------------------------------------------------------------- yfinance
 
 
-def test_yfinance_fuso_horario_e_nulos(con):
+def test_yfinance_fuso_horario_e_nulos(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con,
         "yfinance_cotacoes",
@@ -408,7 +440,8 @@ def test_yfinance_fuso_horario_e_nulos(con):
 @pytest.mark.parametrize(
     "coluna,valor", [("Date", "2026-10-29"), ("Volume", "1.5"), ("Open", "nan")]
 )
-def test_yfinance_valor_invalido_falha(con, coluna, valor):
+def test_yfinance_valor_invalido_falha(tmp_path, coluna, valor):
+    con = novo_banco(tmp_path)
     gravar_bronze(con, "yfinance_cotacoes", [linha_yfinance(**{coluna: valor})])
     with pytest.raises(t.ErroTransformacao) as erro:
         t.executar(con)
@@ -418,7 +451,8 @@ def test_yfinance_valor_invalido_falha(con, coluna, valor):
 # --------------------------------------------------------------------------- duplicidades e chaves
 
 
-def test_duplicatas_identicas_removidas_e_contabilizadas(con):
+def test_duplicatas_identicas_removidas_e_contabilizadas(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con,
         "yfinance_cotacoes",
@@ -438,7 +472,8 @@ def test_duplicatas_identicas_removidas_e_contabilizadas(con):
     )
 
 
-def test_chave_divergente_interrompe(con):
+def test_chave_divergente_interrompe(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con, "yfinance_cotacoes", [linha_yfinance(), linha_yfinance(Close="9.9")]
     )
@@ -449,7 +484,8 @@ def test_chave_divergente_interrompe(con):
     assert "9.9" in erro.value.exemplo and "1.5" in erro.value.exemplo
 
 
-def test_chave_nula_interrompe(con):
+def test_chave_nula_interrompe(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(con, "b3_empresas", [linha_b3(codeCVM=None)])
     with pytest.raises(t.ErroTransformacao) as erro:
         t.executar(con)
@@ -460,7 +496,8 @@ def test_chave_nula_interrompe(con):
 # --------------------------------------------------------------------------- Minha Receita
 
 
-def test_minhareceita_extracao_dos_arrays(con):
+def test_minhareceita_extracao_dos_arrays(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con,
         "minhareceita_empresas",
@@ -532,7 +569,8 @@ def test_minhareceita_extracao_dos_arrays(con):
     )  # inclui propriedades sempre nulas; sem arrays nem payload_json
 
 
-def test_minhareceita_qsa_preserva_ordem_original(con):
+def test_minhareceita_qsa_preserva_ordem_original(tmp_path):
+    con = novo_banco(tmp_path)
     nomes = ["ZECA", "ANA", "MARIA", "BETO"]
     gravar_bronze(
         con,
@@ -597,7 +635,8 @@ def test_minhareceita_qsa_preserva_ordem_original(con):
         ),
     ],
 )
-def test_minhareceita_estrutura_incompativel_falha(con, linha, motivo):
+def test_minhareceita_estrutura_incompativel_falha(tmp_path, linha, motivo):
+    con = novo_banco(tmp_path)
     gravar_bronze(con, "minhareceita_empresas", [linha])
     with pytest.raises(t.ErroTransformacao) as erro:
         t.executar(con)
@@ -605,7 +644,8 @@ def test_minhareceita_estrutura_incompativel_falha(con, linha, motivo):
     assert motivo in erro.value.motivo
 
 
-def test_minhareceita_json_invalido_falha(con):
+def test_minhareceita_json_invalido_falha(tmp_path):
+    con = novo_banco(tmp_path)
     gravar_bronze(
         con,
         "minhareceita_empresas",
@@ -618,7 +658,8 @@ def test_minhareceita_json_invalido_falha(con):
 # --------------------------------------------------------------------------- atomicidade, idempotência e Bronze
 
 
-def test_rollback_quando_qualquer_tabela_falha(con):
+def test_rollback_quando_qualquer_tabela_falha(tmp_path):
+    con = novo_banco(tmp_path)
     t.executar(con)
     antes = foto(con, "refined", TABELAS_SILVER)
     gravar_bronze(
@@ -641,7 +682,8 @@ def test_rollback_quando_qualquer_tabela_falha(con):
     assert foto(con, "refined", TABELAS_SILVER) == antes
 
 
-def test_falha_de_validacao_preserva_versao_anterior(con):
+def test_falha_de_validacao_preserva_versao_anterior(tmp_path):
+    con = novo_banco(tmp_path)
     t.executar(con)
     antes = foto(con, "refined", TABELAS_SILVER)
     gravar_bronze(con, "b3_empresas", [linha_b3(codeCVM="777")])  # mudaria a B3...
@@ -655,7 +697,8 @@ def test_falha_de_validacao_preserva_versao_anterior(con):
     assert foto(con, "refined", TABELAS_SILVER) == antes
 
 
-def test_idempotencia_em_duas_execucoes(con):
+def test_idempotencia_em_duas_execucoes(tmp_path):
+    con = novo_banco(tmp_path)
     primeiro = t.executar(con)
     foto1 = foto(con, "refined", TABELAS_SILVER)
     segundo = t.executar(con)
@@ -668,16 +711,19 @@ def test_idempotencia_em_duas_execucoes(con):
     assert [n for (n,) in tabelas] == sorted(TABELAS_SILVER)
 
 
-def test_bronze_permanece_inalterada(con):
+def test_bronze_permanece_inalterada(tmp_path):
+    con = novo_banco(tmp_path)
     antes = foto(con, "raw", t.TABELAS_BRONZE)
     t.executar(con)
     assert foto(con, "raw", t.TABELAS_BRONZE) == antes
 
 
-def test_bronze_ausente_encerra_com_codigo_1(con, monkeypatch, capsys):
+def test_bronze_ausente_encerra_com_codigo_1(tmp_path, monkeypatch):
+    con = novo_banco(tmp_path)
     con.execute("DROP TABLE raw.fundamentus_acoes")
-    with pytest.raises(t.ErroTransformacao, match="pipeline.ingestao"):
+    with pytest.raises(t.ErroTransformacao, match="pipeline.ingestao") as erro:
         t.executar(con)
+    assert "raw.fundamentus_acoes" in str(erro.value)
 
     class SemFechar:
         def __getattr__(self, nome):
@@ -690,4 +736,7 @@ def test_bronze_ausente_encerra_com_codigo_1(con, monkeypatch, capsys):
     with pytest.raises(SystemExit) as saida:
         t.main()
     assert saida.value.code == 1
-    assert "raw.fundamentus_acoes" in capsys.readouterr().err
+    # nenhuma tabela Silver criada
+    assert consultar(
+        con, "SELECT COUNT(*) FROM duckdb_tables() WHERE schema_name = 'refined'"
+    ) == [(0,)]

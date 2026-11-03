@@ -4,7 +4,7 @@
 --   refined.fundamentus_acoes.preco_lucro    (indicador pronto do Fundamentus)
 --
 -- dividend_yield : percentual na escala 0–100, valor original do Fundamentus.
--- payout         : DERIVADO na Gold, percentual na escala 0–100.
+-- payout         : DERIVADO na Gold, percentual estimado, sem teto artificial.
 --                  Fórmula: payout = dividend_yield * preco_lucro
 --                  Ex.: DY = 6 (6%) e P/L = 10 -> payout = 60 (60%).
 --                  Qualquer componente NULL -> payout NULL (propagação natural do SQL).

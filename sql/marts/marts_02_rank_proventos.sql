@@ -8,11 +8,12 @@
 -- Indicadores:
 --   dividend_yield : pronto do Fundamentus, percentual na escala 0–100.
 --   preco_lucro    : pronto do Fundamentus, múltiplo (vezes).
---   payout         : DERIVADO na Gold, payout ESTIMADO em percentual (escala 0–100).
+--   payout         : DERIVADO na Gold, payout ESTIMADO em percentual.
 --                    Fórmula: payout = dividend_yield * preco_lucro
 --                    Ex.: DY = 6 (6%) e P/L = 10 -> payout = 60 (60%).
+--                    O valor pode exceder 100%; não há teto artificial para esse indicador.
 --
--- Elegibilidade: dividend_yield > 0, preco_lucro > 0 e 0 <= payout <= 100.
+-- Elegibilidade: dividend_yield > 0, preco_lucro > 0 e payout >= 0.
 --
 -- Classificação (DENSE_RANK, nesta ordem): dividend_yield decrescente, payout crescente.
 --
@@ -48,7 +49,6 @@ elegiveis AS (
     WHERE dividend_yield > 0
       AND preco_lucro > 0
       AND payout >= 0
-      AND payout <= 100
 )
 SELECT
     DENSE_RANK() OVER (ORDER BY dividend_yield DESC, payout ASC) AS rank,

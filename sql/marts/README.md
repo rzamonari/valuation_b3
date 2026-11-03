@@ -1,6 +1,6 @@
-# Camada Gold (Marts) — Indicadores Fundamentalistas
+﻿# Camada Gold (Marts) — Indicadores Fundamentalistas
 
-Especificação de origem: `.venv/.specs/sql_indicadores.md` (v1.0).
+Especificação de origem: `.venv/.specs/marts_agregacao_indicadores.md` (v1.0).
 
 ## 1. Objetivo e escopo
 
@@ -17,11 +17,11 @@ registro ou arquivo de ingestão/transformação foi alterado. Nenhuma fonte ext
 |---|---|---|
 | Bronze | `raw` | Dados brutos ingeridos (`pipeline/ingestao.py`) |
 | Silver | `refined` | Dados tipados e deduplicados (`pipeline/transformacao.py`) |
-| Gold | — (consultas em `sql/marts/`) | Indicadores analíticos |
+| Gold | `marts` | Indicadores analíticos: consultas em `sql/marts/`, materializadas por `pipeline/materializacao.py` |
 
-Os marts são consultas `SELECT` puras: não criam objetos persistentes. O projeto não possui
-convenção de schema ou materialização Gold; se for necessário persistir, a estrutura deve ser
-proposta e aprovada antes (spec §9).
+Os arquivos `.sql` continuam sendo consultas `SELECT` puras e a fonte da verdade de cada mart.
+A persistência é feita à parte pelo módulo de materialização (seção 12), sem alterar o texto
+das consultas.
 
 ## 3. Fontes Silver utilizadas
 
@@ -40,21 +40,21 @@ agregado por `ticker` (1:N sobre chave única), sem multiplicação de registros
 
 | Arquivo | Coluna de saída | Origem | Tipo | Unidade | Natureza |
 |---|---|---|---|---|---|
-| `roic.sql` | `roic` | `fundamentus_acoes.roic` | DECIMAL(6,2) | % (0–100) | Pronto |
-| `ev_ebit.sql` | `enterprise_value_ebit` | `fundamentus_acoes.enterprise_value_ebit` | DECIMAL(6,2) | vezes | Pronto |
-| `alavancagem.sql` | `divida_liquida_patrimonio` | `fundamentus_acoes.divida_liquida_patrimonio` | DECIMAL(7,2) | vezes | Pronto |
-| `roe.sql` | `roe` | `fundamentus_acoes.roe` | DECIMAL(9,2) | % (0–100) | Pronto |
-| `preco_lucro.sql` | `preco_lucro` | `fundamentus_acoes.preco_lucro` | DECIMAL(7,2) | vezes | Pronto |
-| `preco_lucro.sql` | `earnings_yield` | `100.0 / preco_lucro` | DOUBLE | % (0–100) | Derivado |
-| `margens.sql` | `margem_ebit`, `margem_liquida`, `margem_bruta` | colunas homônimas | DECIMAL | % (0–100) | Pronto |
-| `crescimento_receita_5_anos.sql` | `crescimento_receita_5_anos` | coluna homônima | DECIMAL(6,2) | % (0–100) | Pronto |
-| `dividend_yield_payout.sql` | `dividend_yield` | `fundamentus_acoes.dividend_yield` | DECIMAL(6,2) | % (0–100) | Pronto |
-| `dividend_yield_payout.sql` | `payout` | `dividend_yield * preco_lucro` | DECIMAL(13,4) | % (0–100) | Derivado |
-| `p_vp.sql` | `preco_valor_patrimonial`, `roe` | colunas homônimas | DECIMAL | vezes / % | Pronto |
-| `p_vp.sql` | `p_vp_por_roe` | `preco_valor_patrimonial / roe` | DOUBLE | vezes por p.p. de ROE | Derivado |
-| `retorno_total_risco.sql` | `cagr` | `fechamento_ajustado` | DOUBLE | % (0–100) | Derivado |
-| `retorno_total_risco.sql` | `volatilidade_anualizada` | `fechamento_ajustado` | DOUBLE | % (0–100) | Derivado |
-| `retorno_total_risco.sql` | `max_drawdown` | `fechamento_ajustado` | DOUBLE | % (0–100, ≤ 0) | Derivado |
+| `marts_roic.sql` | `roic` | `fundamentus_acoes.roic` | DECIMAL(6,2) | % (0–100) | Pronto |
+| `marts_ev_ebit.sql` | `enterprise_value_ebit` | `fundamentus_acoes.enterprise_value_ebit` | DECIMAL(6,2) | vezes | Pronto |
+| `marts_alavancagem.sql` | `divida_liquida_patrimonio` | `fundamentus_acoes.divida_liquida_patrimonio` | DECIMAL(7,2) | vezes | Pronto |
+| `marts_roe.sql` | `roe` | `fundamentus_acoes.roe` | DECIMAL(9,2) | % (0–100) | Pronto |
+| `marts_preco_lucro.sql` | `preco_lucro` | `fundamentus_acoes.preco_lucro` | DECIMAL(7,2) | vezes | Pronto |
+| `marts_preco_lucro.sql` | `earnings_yield` | `100.0 / preco_lucro` | DOUBLE | % (0–100) | Derivado |
+| `marts_margens.sql` | `margem_ebit`, `margem_liquida`, `margem_bruta` | colunas homônimas | DECIMAL | % (0–100) | Pronto |
+| `marts_crescimento_receita_5_anos.sql` | `crescimento_receita_5_anos` | coluna homônima | DECIMAL(6,2) | % (0–100) | Pronto |
+| `marts_dividend_yield_payout.sql` | `dividend_yield` | `fundamentus_acoes.dividend_yield` | DECIMAL(6,2) | % (0–100) | Pronto |
+| `marts_dividend_yield_payout.sql` | `payout` | `dividend_yield * preco_lucro` | DECIMAL(13,4) | % (0–100) | Derivado |
+| `marts_p_vp.sql` | `preco_valor_patrimonial`, `roe` | colunas homônimas | DECIMAL | vezes / % | Pronto |
+| `marts_p_vp.sql` | `p_vp_por_roe` | `preco_valor_patrimonial / roe` | DOUBLE | vezes por p.p. de ROE | Derivado |
+| `marts_retorno_total_risco.sql` | `cagr` | `fechamento_ajustado` | DOUBLE | % (0–100) | Derivado |
+| `marts_retorno_total_risco.sql` | `volatilidade_anualizada` | `fechamento_ajustado` | DOUBLE | % (0–100) | Derivado |
+| `marts_retorno_total_risco.sql` | `max_drawdown` | `fechamento_ajustado` | DOUBLE | % (0–100, ≤ 0) | Derivado |
 
 O mart 10 também expõe colunas de rastreabilidade: `data_inicial`, `data_final`, `anos`,
 `qtd_precos_validos`, `qtd_retornos`, `preco_inicial`, `preco_final`.
@@ -89,7 +89,7 @@ O mart 10 também expõe colunas de rastreabilidade: `data_inicial`, `data_final
 | Dívida líquida/EBITDA | Silver não possui dívida líquida nem EBITDA em valores monetários |
 | Sharpe | Sem taxa livre de risco nem metodologia aprovada |
 | Comparação setorial de margens | `b3_empresas.segmento` é segmento de listagem, não setor econômico |
-| Valor justo por Gordon | Ke e crescimento perpétuo sem parâmetros aprovados |
+| Valor justo por Gordon | Ke e crescimento perpétuo sem parà¢metros aprovados |
 
 ## 8. Dependências
 
@@ -105,10 +105,10 @@ import duckdb
 from pathlib import Path
 
 con = duckdb.connect("fundamentalistas.duckdb", read_only=True)
-df = con.execute(Path("sql/marts/roic.sql").read_text(encoding="utf-8")).df()
+df = con.execute(Path("sql/marts/marts_roic.sql").read_text(encoding="utf-8")).df()
 ```
 
-Ou pela CLI do DuckDB: `duckdb -readonly fundamentalistas.duckdb < sql/marts/roic.sql`.
+Ou pela CLI do DuckDB: `duckdb -readonly fundamentalistas.duckdb < sql/marts/marts_roic.sql`.
 
 ## 10. Validação realizada (2026-11-02, conexão `read_only`)
 
@@ -130,7 +130,64 @@ Ou pela CLI do DuckDB: `duckdb -readonly fundamentalistas.duckdb < sql/marts/roi
   tickers têm `cotacao = 0`. O zero pode representar ausência de dado na origem. Por regra
   (§5.2/§5.3) os zeros foram preservados; tratá-los como NULL exige regra aprovada.
 - **Qualidade das cotações**: 18.350 linhas de 8 tickers têm `fechamento_ajustado < 0` e 1 linha é
-  NULL; são tratadas como inválidas. Há volatilidades extremas (máx. ≈ 2.110% a.a.) que indicam
+  NULL; são tratadas como inválidas. Há volatilidades extremas (máx. ≤ˆ 2.110% a.a.) que indicam
   séries ajustadas anômalas na origem — preservadas, sem filtro não especificado.
 - 160 tickers têm `cagr` e `volatilidade_anualizada` NULL: todos possuem no máximo uma cotação
   válida na Silver, portanto não há intervalo nem retornos para calcular.
+
+## 12. Materialização no schema `marts`
+
+Spec: `.venv/.specs/marts.agregacao.md` (ajuste "Materialização dos resultados na camada Gold").
+
+```
+uv run python -m pipeline.materializacao
+```
+
+Executar depois de `pipeline.transformacao`. Feche a DuckDB UI (`ui.py`) antes, porque o arquivo do
+banco fica bloqueado enquanto ela está aberta. O painel (`app.py`) pode continuar de pé: ele abre
+e fecha a conexão a cada leitura.
+
+O painel lê diretamente estas tabelas (`SELECT * FROM marts."<nome>"`) e não executa os `.sql`
+(spec `dashboard_apresentacao.md` v1.5). Depois de materializar, clique em "Recarregar dados".
+
+**Inventário e nomes.** Cada `sql/marts/<nome>.sql` vira a tabela `marts.<nome>` (ex.:
+`marts_roic.sql` → `marts.marts_roic`). A chave lógica de cada arquivo está declarada em
+`pipeline/materializacao.py` (`MARTS`), conforme o comentário "Grão:" do próprio SQL. Um `.sql`
+novo sem chave declarada, ou uma chave declarada sem `.sql`, interrompe a execução.
+
+| Tabelas | Natureza | Chave lógica | Estratégia |
+|---|---|---|---|
+| `marts_01` … `marts_10_rank_*`, `marts_50_rank_recomendacoes` | fotografia por ticker | `ticker` | substituição integral |
+| `marts_alavancagem`, `marts_crescimento_receita_5_anos`, `marts_dividend_yield_payout`, `marts_ev_ebit`, `marts_margens`, `marts_p_vp`, `marts_preco_lucro`, `marts_roe`, `marts_roic` | fotografia por ticker | `ticker` | substituição integral |
+| `marts_retorno_total_risco`, `marts_painel_indicadores` | fotografia por ticker | `ticker` | substituição integral |
+| `marts_card_01` … `marts_card_05`, `marts_card_02_acoes_semindicacao`, `marts_painel_data_referencia` | agregado de linha única | — (exatamente 1 linha) | substituição integral |
+| `marts_cotacao` | série histórica | `(ticker, data)` | substituição integral |
+
+**Por que a cotação também é substituída por inteiro.** A consulta devolve o histórico completo de
+`refined.yfinance_cotacoes`, sem filtro incremental, e a própria Silver é recriada por inteiro a
+cada transformação. O `fechamento_ajustado` é recalculado retroativamente pelo YFinance a cada
+provento ou desdobramento. Acrescentar só as datas novas deixaria preços antigos desatualizados e
+manteria linhas que já saíram da Silver.
+
+**Fluxo e atomicidade.**
+1. Cada consulta é executada uma vez para uma tabela temporária da conexão. As colunas e os tipos
+   precisam bater com o `DESCRIBE` da consulta, e a chave não pode ter nulos nem duplicatas.
+2. Todas as tabelas `marts.*` são substituídas (`CREATE OR REPLACE TABLE … AS SELECT * FROM
+   <temporária>`) em uma única transação.
+3. Antes do `COMMIT`, cada tabela é comparada com a temporária: quantidade de registros, colunas,
+   tipos, chave e `EXCEPT ALL` nos dois sentidos (multiconjunto, com NULL igual a NULL). Isso
+   cobre valores, nulos e duplicações.
+4. Qualquer falha (erro de SQL, chave, divergência) dispara um `ROLLBACK`. Nesse caso nenhuma
+   tabela Gold muda, o erro informa a etapa, o arquivo e a tabela, e o processo sai com código 1.
+
+Só o schema `marts` é criado ou alterado. Tabelas em `marts` sem `.sql` correspondente não são
+apagadas: aparecem no relatório como órfãs, para decisão manual.
+
+**Validação realizada (2026-11-03, banco real).** 30/30 consultas inventariadas, executadas e
+materializadas, num total de 1.934.482 registros (1.920.774 em `marts_cotacao`). Duas execuções
+seguidas resultaram no mesmo conteúdo, sem duplicações. A contagem e o hash de todas as tabelas
+`raw` e `refined` ficaram idênticos antes e depois. Em uma conexão nova, 29 de 30 tabelas são
+idênticas à consulta reexecutada. A exceção é `marts_retorno_total_risco`: o
+`stddev_samp` da volatilidade, executado em paralelo, varia no último bit entre execuções da
+*própria consulta* (|Δ| ≤ 3e-14 em 3 tickers). Por isso a validação compara a tabela com o resultado
+capturado na mesma execução, e não com uma nova execução.
