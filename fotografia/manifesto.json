@@ -1,11 +1,11 @@
 {
   "formato": 1,
   "data_referencia": "2026-11-02",
-  "gerada_em": "2026-11-04T15:16:33+00:00",
+  "gerada_em": "2026-11-04T16:06:58+00:00",
   "duckdb": "2.0.0",
-  "hash": "563f7980d407d52635b15fe40a228e5f458dd531217e384e9aedbfc6fef2c6b7",
+  "hash": "d7dbdbd310ef62f76eb1712924643b894decafc5fad59dc16f12c6395cc7d8f7",
   "qualidade": {
-    "verificacoes": 75,
+    "verificacoes": 77,
     "avisos": 10
   },
   "tabelas": {
@@ -186,8 +186,8 @@
     "marts_retorno_total_risco": {
       "arquivo": "marts_retorno_total_risco.parquet",
       "registros": 609,
-      "bytes": 22007,
-      "sha256": "809f568fab61f9b8decf806caa0a964cd56cfada3a354f0de67012551c304f7c"
+      "bytes": 22575,
+      "sha256": "6d24d633874267455c976234907df8870107a40d0a5272f0f2beea665af6c17c"
     },
     "marts_roe": {
       "arquivo": "marts_roe.parquet",
