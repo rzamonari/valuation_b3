@@ -368,7 +368,7 @@ regra de domínio. Na base de 02/11/2026: 68 ok, 11 avisos, 0 erros.
 |---|---|
 | `exportar(con, pasta)` | Exige qualidade sem erros; grava cada mart de `MARTS` em `<mart>.parquet` (zstd, ordenado pela chave) e `manifesto.json`; troca a pasta por renomeação (falha preserva a anterior) |
 | `verificar(pasta)` | Confere arquivos e SHA-256 contra o manifesto; `ErroFotografia` se divergir |
-| `conectar(pasta)` | DuckDB em memória com views `marts."<mart>"` sobre os Parquet |
+| `conectar(pasta, nomes=None)` | DuckDB em memória com views `marts."<mart>"` sobre os Parquet (só as de `nomes`, se informado); Parquet ilegível vira `ErroFotografia` |
 | `ler_manifesto(pasta)` | Lê e valida o formato do manifesto |
 | `COLUNAS` / `selecao(nome)` | Marts exportados só com parte das colunas: `marts_cotacao` vai com `ticker`, `data`, `fechamento_ajustado`, `dividendos` e `volume` (o que o painel usa; 26 MB → 10 MB). O banco local segue com a série completa |
 
@@ -391,14 +391,15 @@ Módulo sem dependência de Streamlit (testável e reaproveitável).
 |---|---|
 | `MARTS_CARREGAR` | Cards, marts do painel, 10 rankings, `marts_50` e `marts_retorno_total_risco` |
 | `MARTS_OBRIGATORIOS` | `MARTS_CARREGAR` + `marts_cotacao` |
-| `tabelas_faltando()` | Lista `marts.<nome>` obrigatórias ausentes (ou o arquivo do banco) |
+| `tabelas_faltando()` | Lista `marts.<nome>` obrigatórias ausentes (ou o arquivo do banco); na fotografia, só recalcula os hashes se tamanho ou data de algum arquivo mudou |
 | `ler(nomes)` | `SELECT * FROM marts."<nome>"` para cada nome → `{nome: DataFrame}` |
 | `ler_cotacao(ticker)` | `marts_cotacao` filtrada com `WHERE ticker = ?` (parâmetro vinculado) |
 | `filtrar(df, recomendacoes, segmentos, liquidez_minima)` | Recorte por recomendação, segmento e liquidez mínima |
 | `BancoBloqueado` | Arquivo em uso por outro processo (UI, ingestão, materialização) |
 | `ErroMart(tabela, mensagem)` | Falha ao ler uma tabela |
 
-Cada leitura abre e fecha uma conexão `read_only`. Não há cálculo no painel: **número novo exige
+Cada leitura abre e fecha uma conexão `read_only`; na fotografia, a conexão só cria as views dos
+marts lidos, então a carga da página nunca abre o Parquet de `marts_cotacao`. Não há cálculo no painel: **número novo exige
 mart novo**.
 
 ### Formatação (padrão brasileiro, independente do locale)
@@ -417,7 +418,9 @@ mart novo**.
 `tabela_consolidado`, `tabela_exclusoes` (exclusões por motivo, na ordem das regras), `fig_valor_qualidade` (linhas de referência ROIC 15% e EV/EBIT 10x),
 `fig_ranking_tematico`, `tabela_ranking_tematico`, `fig_radar` (faixa nos 10 rankings),
 `fig_cotacao` (fechamento ajustado + volume + 💰 proventos; preços ≤ 0 ficam fora),
-`html_cartao`, `html_termometro`.
+`html_cartao`, `html_termometro`, `html_metrica` (mini cartão da ficha) e `html_grade` +
+`css_grade` (grade responsiva por largura da área de conteúdo: `GRADE_PULSO` 2/3/6 colunas,
+`GRADE_FICHA` 2/5).
 
 Constantes visuais: `REC` (ícone + rótulo + cor por recomendação, para acessibilidade),
 `FAIXAS`, `INDICADORES`, `RANKINGS`, `LIQUIDEZ_MINIMA` (Todas, R$ 100 mil, R$ 1 mi, R$ 10 mi).
@@ -462,7 +465,7 @@ para uma pasta vazia: nenhum teste toca o banco real, a fotografia versionada ne
 | [test/test_marts.py](test/test_marts.py) | 24 | inventário, dependências entre marts, preparação, publicação e rollback |
 | [test/test_qualidade.py](test/test_qualidade.py) | 23 | pipeline de ponta a ponta + cada tipo de violação (inclusive partição universo/exclusões); código de saída |
 | [test/test_fotografia.py](test/test_fotografia.py) | 22 | exportação, determinismo do hash, portão de qualidade, adulteração, painel sobre a fotografia |
-| [test/test_painel.py](test/test_painel.py) | 26 | leitura, filtros, formatação e gráficos |
+| [test/test_painel.py](test/test_painel.py) | 36 | leitura (inclusive cotação fora da carga da página e hashes da fotografia só com arquivo mudado), filtros, formatação, gráficos e grade responsiva |
 | [test/test_log.py](test/test_log.py) | 4 | destino das mensagens (`stdout`/`stderr`) e configuração idempotente |
 | [test/test_docs_hooks.py](test/test_docs_hooks.py) | 6 | hook do MkDocs: inclusão de documentos e reescrita de links |
 

@@ -328,7 +328,10 @@ def test_ajustado_negativo_com_ticker_sem_calculo_nao_e_erro(con):
 
 
 SALTO_SILVER = f"YFinance: fechamento sem salto > {q.LIMITE_SALTO}x sem evento"
-RISCO_COM_SALTO = "marts_retorno_total_risco: nenhum indicador calculado com salto sem evento na janela"
+RISCO_COM_SALTO = (
+    "marts_retorno_total_risco: nenhum indicador calculado "
+    "com salto sem evento na janela"
+)
 
 
 def _saltar_ultimo_pregao(con, desdobramentos):
