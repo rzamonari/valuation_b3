@@ -16,7 +16,7 @@ registro ou arquivo de ingestão/transformação foi alterado. Nenhuma fonte ext
 | Camada | Schema | Papel |
 |---|---|---|
 | Bronze | `raw` | Dados brutos ingeridos (`pipeline/ingestao.py`) |
-| Silver | `refined` | Dados tipados e deduplicados (`pipeline/transformacao.py`) |
+| Silver | `refined` | Dados tipados e deduplicados (`pipeline/transformacao/`) |
 | Gold | `marts` | Indicadores analíticos: consultas em `sql/marts/`, materializadas por `pipeline/materializacao.py` |
 
 Os arquivos `.sql` continuam sendo consultas `SELECT` puras e a fonte da verdade de cada mart.

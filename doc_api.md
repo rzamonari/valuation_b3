@@ -14,7 +14,7 @@ pipeline de indicadores fundamentalistas de ações da B3 em arquitetura Medalli
 | Camada | Schema | Módulo / artefato | Papel |
 |---|---|---|---|
 | Bronze | `raw` | `pipeline/ingestao.py` | Extração das fontes externas, tudo como `VARCHAR` |
-| Silver | `refined` | `pipeline/transformacao.py` | Tipagem, padronização, deduplicação e validação de chaves |
+| Silver | `refined` | `pipeline/transformacao/` | Tipagem, padronização, deduplicação e validação de chaves |
 | Gold | `marts` | `sql/marts/*.sql` + `pipeline/materializacao.py` | Indicadores, rankings e agregados do painel |
 | Apresentação | — | `painel.py` + `app.py` | Leitura somente leitura dos marts e visualização |
 
@@ -122,6 +122,17 @@ Execução: `uv run python -m pipeline.transformacao`
 
 A Silver padroniza nomes, converte e valida tipos, normaliza JSON, valida chaves e trata
 duplicidades. **Não** faz cálculos financeiros nem preenche dados ausentes.
+
+O pacote é dividido por fonte; as funções abaixo são expostas por `pipeline.transformacao`.
+
+| Módulo | Conteúdo |
+|---|---|
+| `comum` | Tipos (`Conversao`, `Coluna`, `TabelaSql`, `Preparada`), `ErroTransformacao`, deduplicação, validação de chave e o motor de conversão de tabelas Bronze |
+| `b3`, `fundamentus`, `yfinance` | `TABELA`: mapeamento coluna Bronze → coluna/conversão Silver da fonte |
+| `minhareceita` | Contrato JSON (`ESCALARES_EMPRESA`, `ARRAYS_EMPRESA`) e `preparar_minhareceita` |
+| `__init__` | Verificação da Bronze, publicação, relatório, `executar` e `main` |
+
+Para mudar o mapeamento de uma fonte, altere só o módulo dela.
 
 | Função | Descrição |
 |---|---|
