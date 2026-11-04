@@ -349,14 +349,15 @@ Cinco seções: **pulso do mercado** (cartões e termômetro), **ranking de opor
 ## 11. Testes
 
 ```bash
-uv run pytest            # todos os testes
-uv run pytest --cov      # com cobertura (mínimo 60%; app.py e ui.py fora)
-uv run ruff check .      # lint
+uv run pytest                  # todos os testes, sempre com cobertura (mínimo 60%; app.py e ui.py fora)
+uv run ruff check .            # lint
+uv run ruff format . --check   # formatação
 ```
 
 | Arquivo | Cobre |
 |---|---|
 | `test/test_db.py` | Conexão, schema e gravação |
+| `test/test_ingestao.py` | Retry, extração de cada fonte e atomicidade da ingestão (sem rede) |
 | `test/test_transformacao.py` | Conversões, chaves, deduplicação e publicação da Silver |
 | `test/test_sql_marts.py` | Execução e resultados das consultas `.sql` |
 | `test/test_marts.py` | Inventário, validação e atomicidade da materialização |
