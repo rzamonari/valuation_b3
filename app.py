@@ -314,6 +314,8 @@ for inicio in (0, 5):
         st.columns(5), mini[inicio : inicio + 5], strict=False
     ):
         coluna.metric(rotulo, valor, border=True)
+if isinstance(risco.get("motivo_sem_calculo"), str):
+    st.caption(f"Retorno e risco sem cálculo: {risco['motivo_sem_calculo']}.")
 
 c1, c2 = st.columns([2, 3])
 with c1:

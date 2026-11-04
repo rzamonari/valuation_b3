@@ -29,6 +29,10 @@ Execução: uv run python -m pipeline.qualidade   (depois da materialização; s
      Também AVISO: mais de LIMITE_NAO_IDENTIFICADO exclusões com motivo "Não identificado"
      (negociadas, mas sem emissora no cadastro da B3): o normal é a exclusão ter causa
      conhecida; o aumento pede revisar a classificação ou o cadastro da B3.
+   - Fechamento ajustado ≤ 0 (defeito do ajuste retroativo do Yahoo, provento ≥ fechamento
+     anterior): AVISO na Silver, que preserva o dado como veio; ERRO no mart de retorno e
+     risco se algum indicador for calculado com preço ≤ 0 na janela de 5 anos (o mart deixa
+     o ticker sem cálculo, com motivo_sem_calculo).
    NULL não viola regra de domínio: NOT (NULL) não seleciona a linha (nulos preservados).
 4. Tabela ausente ou consulta inválida é ERRO, qualquer que seja a severidade declarada.
 """
@@ -88,6 +92,8 @@ RANKINGS = (
 RECOMENDACOES = "marts.marts_50_rank_recomendacoes"
 EXCLUSOES = "marts.marts_exclusoes_universo"
 EXCLUSOES_MOTIVO = "marts.marts_painel_exclusoes_motivo"
+RISCO = "marts.marts_retorno_total_risco"
+INDICADORES_RISCO = ("cagr", "volatilidade_anualizada", "max_drawdown")
 MOTIVOS_EXCLUSAO = (
     "Fracionário",
     "BDR",
@@ -496,6 +502,31 @@ def _dominio_marts():
             f"SELECT COUNT(*) AS quantidade, {LIMITE_NAO_IDENTIFICADO} AS limite "
             f"FROM {EXCLUSOES} WHERE motivo = '{NAO_IDENTIFICADO}' "
             f"HAVING COUNT(*) > {LIMITE_NAO_IDENTIFICADO}",
+        ),
+        # Independe da regra do mart: a janela e os preços vêm direto da Silver.
+        Verificacao(
+            "marts_retorno_total_risco: nenhum indicador calculado com "
+            "fechamento ajustado ≤ 0 na janela",
+            DOMINIO_MARTS,
+            ERRO,
+            "SELECT r.ticker, COUNT(*) AS precos_nao_positivos "
+            f"FROM {RISCO} r "
+            "JOIN (SELECT ticker, MAX(data) AS fim FROM refined.yfinance_cotacoes "
+            "GROUP BY ticker) l ON l.ticker = r.ticker "
+            "JOIN refined.yfinance_cotacoes c ON c.ticker = r.ticker "
+            "AND c.data >= l.fim - INTERVAL 5 YEAR "
+            "WHERE c.fechamento_ajustado <= 0 AND ("
+            + " OR ".join(f"r.{c} IS NOT NULL" for c in INDICADORES_RISCO)
+            + ") GROUP BY r.ticker",
+        ),
+        _regra(
+            "marts_retorno_total_risco: ticker sem cálculo não tem indicador",
+            DOMINIO_MARTS,
+            ERRO,
+            RISCO,
+            "motivo_sem_calculo IS NULL OR "
+            + " AND ".join(f"{c} IS NULL" for c in INDICADORES_RISCO),
+            ["ticker", "motivo_sem_calculo", *INDICADORES_RISCO],
         ),
         _regra(
             "marts_painel_data_referencia: data informada",

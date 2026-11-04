@@ -482,3 +482,137 @@ def test_contagem_por_motivo_mostra_zero_sem_exclusoes(tmp_path):
     linhas = executar_mart(con, "marts_painel_exclusoes_motivo")
     assert len(linhas) == 6
     assert {linha["quantidade"] for linha in linhas} == {0}
+
+
+# ------------------------------------------------------------- marts_retorno_total_risco
+
+
+def banco_cotacoes(tmp_path, cotacoes):
+    """cotacoes: (ticker, data, fechamento, fechamento_ajustado, dividendos)."""
+    con = duckdb.connect(str(tmp_path / "teste.duckdb"))
+    con.execute("CREATE SCHEMA refined")
+    con.execute(
+        "CREATE TABLE refined.yfinance_cotacoes (ticker VARCHAR, data TIMESTAMPTZ, "
+        "fechamento DOUBLE, fechamento_ajustado DOUBLE, dividendos DOUBLE)"
+    )
+    con.executemany(
+        "INSERT INTO refined.yfinance_cotacoes VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?)",
+        cotacoes,
+    )
+    return con
+
+
+def serie(ticker, *pontos):
+    """pontos: (data, fechamento, fechamento_ajustado[, dividendos])."""
+    return [(ticker, d, f, a, p[0] if p else 0.0) for d, f, a, *p in pontos]
+
+
+def risco_por_ticker(con):
+    return {
+        linha["ticker"]: linha
+        for linha in executar_mart(con, "marts_retorno_total_risco")
+    }
+
+
+def test_risco_calcula_serie_valida_sem_motivo(tmp_path):
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "BOAS3",
+            ("2025-01-02", 100, 100),
+            ("2025-06-02", 50, 50),
+            ("2026-01-02", 80, 80, 5.0),
+        ),
+    )
+    linha = risco_por_ticker(con)["BOAS3"]
+    assert linha["motivo_sem_calculo"] is None
+    assert linha["max_drawdown"] == -50
+    assert linha["cagr"] < 0
+    assert linha["volatilidade_anualizada"] > 0
+    assert (linha["preco_inicial"], linha["preco_final"]) == (100, 80)
+
+
+def test_risco_fica_sem_calculo_com_ajustado_negativo_na_janela(tmp_path):
+    # provento de 12 com fechamento anterior 10: fator 1 - 12/10 < 0 inverte o passado
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "RUIM3",
+            ("2025-01-02", 10, -2),
+            ("2025-06-02", 10, -2),
+            ("2025-06-03", 10, 10, 12.0),
+            ("2026-01-02", 12, 12),
+        ),
+    )
+    linha = risco_por_ticker(con)["RUIM3"]
+    assert linha["motivo_sem_calculo"].startswith("Ajuste retroativo inválido")
+    for coluna in (
+        "cagr",
+        "volatilidade_anualizada",
+        "max_drawdown",
+        "preco_inicial",
+        "preco_final",
+    ):
+        assert linha[coluna] is None
+    # rastreio da janela preservado: só os preços > 0 contam como válidos
+    assert linha["qtd_precos_validos"] == 2
+    assert str(linha["data_inicial"])[:10] == "2025-06-03"
+
+
+def test_risco_fica_sem_calculo_com_provento_acima_do_preco_no_inicio_da_janela(
+    tmp_path,
+):
+    # o pregão anterior (negativo) está fora da janela; o provento do 1º dia ainda conta
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "BORD3",
+            ("2021-01-01", 10, -1),
+            ("2021-01-04", 10, 5, 15.0),
+            ("2026-01-04", 12, 6),
+        ),
+    )
+    assert risco_por_ticker(con)["BORD3"]["motivo_sem_calculo"] is not None
+
+
+def test_risco_ignora_defeito_anterior_a_janela(tmp_path):
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "ANTI3",
+            ("2015-01-02", 10, -5),
+            ("2015-01-05", 10, 4, 20.0),
+            ("2025-01-02", 10, 10),
+            ("2026-01-02", 11, 11),
+        ),
+    )
+    linha = risco_por_ticker(con)["ANTI3"]
+    assert linha["motivo_sem_calculo"] is None
+    assert linha["cagr"] is not None
+
+
+def test_risco_calcula_com_provento_grande_abaixo_do_fechamento_anterior(tmp_path):
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "GRAN3",
+            ("2025-01-02", 10, 1),
+            ("2025-01-03", 1, 1, 9.0),
+            ("2026-01-02", 2, 2),
+        ),
+    )
+    linha = risco_por_ticker(con)["GRAN3"]
+    assert linha["motivo_sem_calculo"] is None
+    assert linha["max_drawdown"] == 0
+
+
+def test_risco_sem_calculo_nao_contamina_outro_ticker(tmp_path):
+    con = banco_cotacoes(
+        tmp_path,
+        serie("RUIM3", ("2025-01-02", 10, -2), ("2025-01-03", 10, 10, 12.0))
+        + serie("BOAS3", ("2025-01-02", 10, 10), ("2025-01-03", 11, 11)),
+    )
+    linhas = risco_por_ticker(con)
+    assert linhas["RUIM3"]["cagr"] is None
+    assert linhas["BOAS3"]["cagr"] is not None
+    assert linhas["BOAS3"]["motivo_sem_calculo"] is None

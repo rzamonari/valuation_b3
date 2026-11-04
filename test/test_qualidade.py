@@ -296,6 +296,46 @@ def test_percentual_fora_da_faixa_plausivel_e_aviso_sem_bloquear(con):
     assert q.erros(resultados) == []
 
 
+RISCO_COM_PRECO_NAO_POSITIVO = (
+    "marts_retorno_total_risco: nenhum indicador calculado com fechamento ajustado ≤ 0 "
+    "na janela"
+)
+
+
+def test_ajustado_negativo_e_aviso_na_silver_e_erro_se_o_mart_calcula(con):
+    con.execute(
+        "UPDATE refined.yfinance_cotacoes SET fechamento_ajustado = -1 "
+        "WHERE data = (SELECT MIN(data) FROM refined.yfinance_cotacoes)"
+    )
+    resultados = por_nome(q.executar(con))
+    assert resultados["YFinance: fechamento ajustado > 0"].status == "AVISO"
+    r = resultados[RISCO_COM_PRECO_NAO_POSITIVO]
+    assert r.status == "ERRO"
+    assert r.exemplos == (("BOAS3", 1),)
+
+
+def test_ajustado_negativo_com_ticker_sem_calculo_nao_e_erro(con):
+    con.execute(
+        "UPDATE refined.yfinance_cotacoes SET fechamento_ajustado = -1 "
+        "WHERE data = (SELECT MIN(data) FROM refined.yfinance_cotacoes)"
+    )
+    m.executar(con)
+    assert por_nome(q.executar(con))[RISCO_COM_PRECO_NAO_POSITIVO].ok
+    linha = con.execute(
+        "SELECT cagr, motivo_sem_calculo FROM marts.marts_retorno_total_risco"
+    ).fetchone()
+    assert linha[0] is None and linha[1] is not None
+
+
+def test_ticker_sem_calculo_com_indicador_e_erro(con):
+    con.execute(
+        "UPDATE marts.marts_retorno_total_risco SET motivo_sem_calculo = 'x' "
+        "WHERE cagr IS NOT NULL"
+    )
+    falhas = {r.verificacao.nome for r in q.erros(q.executar(con))}
+    assert "marts_retorno_total_risco: ticker sem cálculo não tem indicador" in falhas
+
+
 def test_nulo_nao_viola_regra_de_dominio(con):
     con.execute("UPDATE refined.fundamentus_acoes SET dividend_yield = NULL")
     r = por_nome(q.executar(con))["Fundamentus: dividend yield não negativo"]
