@@ -70,14 +70,32 @@ está em uso e, na fotografia, a data de referência e o início do hash.
 $env:VALUATIONB3_FONTE = "fotografia"; uv run streamlit run app.py
 ```
 
-Publicação no [Streamlit Community Cloud](https://share.streamlit.io): **Create app** → repositório
+O painel está publicado em
+[valuationb3-zamonari.streamlit.app](https://valuationb3-zamonari.streamlit.app/).
+
+Configuração no [Streamlit Community Cloud](https://share.streamlit.io): repositório
 `rzamonari/valuation_b3`, branch `main`, arquivo principal `app.py`, Python 3.13 em
-**Advanced settings**. As dependências vêm de `requirements.txt`, exportado do `uv.lock`
-(o CI falha se os dois divergirem):
+**Advanced settings**, sem secrets. No Cloud não há `fundamentalistas.duckdb` (o banco não é
+versionado), então o painel lê a fotografia sem precisar de `VALUATIONB3_FONTE`. As dependências
+vêm do `uv.lock` / `requirements.txt`, exportado dele (o CI falha se os dois divergirem):
 
 ```powershell
 uv export --no-dev --no-hashes --no-emit-project --locked -o requirements.txt
 ```
+
+### Atualizar a fotografia publicada
+
+Gerar → verificar → commit → o Cloud faz o redeploy sozinho a cada push na `main`:
+
+```powershell
+uv run python -m pipeline.fotografia              # gerar (exige a qualidade sem erros)
+uv run python -m pipeline.fotografia --verificar  # verificar os hashes do manifesto
+git add fotografia/
+git commit -m "data: fotografia de <data de referência>"
+git push origin main
+```
+
+Confira no cabeçalho do painel publicado a nova data de referência e o início do hash.
 
 ## Ferramentas auxiliares
 

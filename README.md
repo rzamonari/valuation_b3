@@ -1,5 +1,6 @@
 # B3 Valuation
 
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://valuationb3-zamonari.streamlit.app/)
 [![CI](https://github.com/rzamonari/valuation_b3/actions/workflows/ci.yml/badge.svg)](https://github.com/rzamonari/valuation_b3/actions/workflows/ci.yml)
 
 Pipeline de dados que consolida indicadores fundamentalistas das ações da B3 a partir de quatro
@@ -8,6 +9,13 @@ tudo num painel Streamlit somente leitura.
 
 > Os sinais de Compra/Manter/Venda são **relativos e mecânicos**, derivados de 10 rankings sobre
 > uma fotografia de dados. **Não constituem recomendação de investimento.**
+
+## Acessos
+
+| | |
+|---|---|
+| **Painel** | [valuationb3-zamonari.streamlit.app](https://valuationb3-zamonari.streamlit.app/) — Streamlit Community Cloud, sobre a fotografia versionada |
+| **Documentação** | [docs/](docs/) — instalação e uso, arquitetura, decisões, specs e referência dos marts (`uv run mkdocs serve` para navegar localmente) |
 
 ## Objetivo
 
@@ -90,19 +98,36 @@ uv run python -m pipeline.fotografia --verificar   # integridade da fotografia
 uv run mkdocs serve                                # documentação em http://127.0.0.1:8000
 ```
 
-### Publicar no Streamlit Community Cloud
+### Painel publicado no Streamlit Community Cloud
 
-1. Atualize e versione a fotografia: `uv run python -m pipeline.fotografia` e commit de `fotografia/`.
-2. Em [share.streamlit.io](https://share.streamlit.io), **Create app**: repositório
-   `rzamonari/valuation_b3`, branch `main`, arquivo `app.py`; em **Advanced settings**, Python 3.13.
-3. As dependências vêm de [requirements.txt](requirements.txt), exportado do `uv.lock`
-   (`uv export --no-dev --no-hashes --no-emit-project --locked -o requirements.txt`); o CI falha
-   se os dois divergirem.
+O [painel publicado](https://valuationb3-zamonari.streamlit.app/) roda a partir da branch `main`
+(arquivo `app.py`, Python 3.13) e lê só a pasta `fotografia/`: o banco `fundamentalistas.duckdb`
+não é versionado (passa do limite de 100 MB do GitHub) nem é necessário no Cloud. As dependências
+vêm do `uv.lock` / [requirements.txt](requirements.txt), exportado dele
+(`uv export --no-dev --no-hashes --no-emit-project --locked -o requirements.txt`); o CI falha se
+os dois divergirem.
+
+**Atualizar os dados publicados:** gerar → verificar → commit → o Cloud faz o redeploy.
+
+```powershell
+uv run python -m pipeline.ingestao        # dados novos das 4 fontes
+uv run python -m pipeline.transformacao
+uv run python -m pipeline.materializacao
+uv run python -m pipeline.fotografia      # gerar: exige a qualidade sem erros
+uv run python -m pipeline.fotografia --verificar   # verificar: hashes do manifesto
+git add fotografia/
+git commit -m "data: fotografia de <data de referência>"
+git push origin main                      # o Cloud detecta o push e refaz o deploy
+```
+
+Depois do redeploy, o cabeçalho do painel mostra a nova data de referência e o início do novo
+hash. Cada fotografia acrescenta cerca de 26 MB ao histórico do git (quase tudo `marts_cotacao`).
 
 ## Painel
 
-Capturas sobre a fotografia de 02/11/2026 (hash `8cb85eb7125b`), a mesma que o Streamlit Cloud
-publica.
+Capturas sobre a fotografia de 02/11/2026 (hash `8cb85eb7125b`). O
+[painel publicado](https://valuationb3-zamonari.streamlit.app/) mostra a fotografia mais recente da
+`main`.
 
 **Pulso do mercado:** contagem por recomendação e termômetro. O cabeçalho mostra a fonte, a data
 de referência e o hash da fotografia.
