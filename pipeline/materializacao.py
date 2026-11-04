@@ -38,7 +38,7 @@ Spec: docs/specs/marts.agregacao.md (ajuste "Materialização dos resultados na 
 """
 
 import sys
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -327,10 +327,8 @@ def publicar(con, preparadas):
                 _validar_publicada(con, p)
         con.commit()
     except Exception as exc:
-        try:
+        with suppress(duckdb.Error):  # a transação já foi abortada pelo próprio DuckDB
             con.rollback()
-        except duckdb.Error:
-            pass  # a transação já foi abortada pelo próprio DuckDB
         if isinstance(exc, ErroMaterializacao):
             exc.motivo = (
                 f"{exc.motivo} — rollback executado: nenhuma tabela Gold foi alterada"

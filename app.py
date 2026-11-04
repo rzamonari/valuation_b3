@@ -164,7 +164,7 @@ cartoes = [
     ),
     p.html_termometro(d["marts_card_05_termometro_mercado"], compra, manter, venda),
 ]
-for coluna, html in zip(st.columns(6), cartoes):
+for coluna, html in zip(st.columns(6), cartoes, strict=True):
     coluna.markdown(html, unsafe_allow_html=True)
 
 # --------------------------------------------------------------------------------------------
@@ -226,7 +226,9 @@ else:
 # Faixa 4 — Rankings temáticos
 # --------------------------------------------------------------------------------------------
 secao("🧭", "Rankings temáticos", "Escolha uma estratégia e veja quem lidera")
-for aba, ranking in zip(st.tabs([r["aba"] for r in p.RANKINGS]), p.RANKINGS):
+for aba, ranking in zip(
+    st.tabs([r["aba"] for r in p.RANKINGS]), p.RANKINGS, strict=True
+):
     with aba:
         st.caption(ranking["frase"])
         df_rank = d[ranking["mart"]]
@@ -255,7 +257,9 @@ if lista.empty:
     st.info(SEM_LINHAS)
     st.stop()
 
-rotulos = {t: f"{t} · {e}" for t, e in zip(lista["ticker"], lista["empresa"])}
+rotulos = {
+    t: f"{t} · {e}" for t, e in zip(lista["ticker"], lista["empresa"], strict=True)
+}
 ticker = st.selectbox("Ação", list(rotulos), format_func=rotulos.get)
 linha = lista[lista["ticker"] == ticker].iloc[0]
 indic = ind[ind["ticker"] == ticker].iloc[0]
@@ -284,7 +288,9 @@ mini = [
     ("Máximo drawdown", p.pct(risco.get("max_drawdown"))),
 ]
 for inicio in (0, 5):
-    for coluna, (rotulo, valor) in zip(st.columns(5), mini[inicio : inicio + 5]):
+    for coluna, (rotulo, valor) in zip(
+        st.columns(5), mini[inicio : inicio + 5], strict=True
+    ):
         coluna.metric(rotulo, valor, border=True)
 
 c1, c2 = st.columns([2, 3])

@@ -258,7 +258,9 @@ def test_tabela_ranking_tematico_ordena_por_rank_e_formata():
 
 def test_radar_desenha_um_ponto_por_ranking():
     faixas = ["Superior", "Inferior", "Intermediário", "Não elegível", "Superior"] * 2
-    linha = pd.Series({"recomendacao": "Compra", **dict(zip(p.FAIXA_COLUNAS, faixas))})
+    linha = pd.Series(
+        {"recomendacao": "Compra", **dict(zip(p.FAIXA_COLUNAS, faixas, strict=True))}
+    )
     radar = p.fig_radar(linha).data[0]
     # o polígono repete o primeiro ponto para fechar: 10 rankings distintos
     assert len(set(radar.theta)) == 10

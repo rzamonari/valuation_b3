@@ -342,7 +342,9 @@ def _extrair_tudo():
 
 
 def _imprimir_relatorio(contagens):
-    fmt = lambda n: f"{n:,}".replace(",", ".")
+    def fmt(n):
+        return f"{n:,}".replace(",", ".")
+
     largura = 33
     total = sum(contagens.values())
     numeros = max(len(fmt(total)), 15)

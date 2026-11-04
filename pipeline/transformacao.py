@@ -802,7 +802,7 @@ import json
 import re
 import sys
 import uuid
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -1191,7 +1191,7 @@ def _contar(con, tabela):
 def _registros(con, sql, parametros=None):
     cursor = con.execute(sql, parametros or [])
     nomes = [d[0] for d in cursor.description]
-    return [dict(zip(nomes, linha)) for linha in cursor.fetchall()]
+    return [dict(zip(nomes, linha, strict=True)) for linha in cursor.fetchall()]
 
 
 def _formatar_registros(registros):
@@ -1684,10 +1684,8 @@ def publicar(con, preparadas):
             )
         con.commit()
     except Exception as exc:
-        try:
+        with suppress(duckdb.Error):  # a transação já foi abortada pelo próprio DuckDB
             con.rollback()
-        except duckdb.Error:
-            pass  # a transação já foi abortada pelo próprio DuckDB
         raise ErroTransformacao(
             "publicação",
             f"{exc} — rollback executado: nenhuma tabela Silver foi alterada",
@@ -1723,7 +1721,7 @@ def _coletar_relatorio(con, preparadas):
                 "duplicatas": p.duplicatas,
                 "gravados": contagens[0],
                 "processados": p.antes_dedup,
-                "nulos": dict(zip(colunas, contagens[1:])),
+                "nulos": dict(zip(colunas, contagens[1:], strict=True)),
             }
         )
     return relatorio
@@ -1732,9 +1730,10 @@ def _coletar_relatorio(con, preparadas):
 def _imprimir_relatorio(relatorio):
     largura = 44
     numeros = max([len(_fmt(r["gravados"])) for r in relatorio] + [12])
-    linha = lambda rotulo, n, recuo=2: print(
-        f"{' ' * recuo}{rotulo:<{largura - recuo}}{_fmt(n):>{numeros}}"
-    )
+
+    def linha(rotulo, n, recuo=2):
+        print(f"{' ' * recuo}{rotulo:<{largura - recuo}}{_fmt(n):>{numeros}}")
+
     for r in relatorio:
         print()
         print(r["tabela"])

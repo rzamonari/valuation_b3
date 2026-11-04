@@ -67,7 +67,7 @@ def executar_mart(con, nome):
     texto = (PASTA_MARTS / f"{nome}.sql").read_text(encoding="utf-8-sig").strip()
     cursor = con.execute(texto.removesuffix(";"))
     colunas = [d[0] for d in cursor.description]
-    return [dict(zip(colunas, linha)) for linha in cursor.fetchall()]
+    return [dict(zip(colunas, linha, strict=True)) for linha in cursor.fetchall()]
 
 
 def por_ticker(linhas, coluna):
