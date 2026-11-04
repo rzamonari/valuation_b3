@@ -129,7 +129,8 @@ exportado só com as colunas que o painel usa).
 
 ## Painel
 
-Capturas sobre a fotografia de 02/11/2026 (hash `8cb85eb7125b`). O
+Capturas em 1440 px sobre a fotografia de 02/11/2026 (hash `5f9738f3667b`, igual ao
+`fotografia/manifesto.json`). O
 [painel publicado](https://valuationb3-zamonari.streamlit.app/) mostra a fotografia mais recente da
 `main`.
 
