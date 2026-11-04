@@ -811,6 +811,7 @@ import duckdb
 import pyarrow as pa
 
 from pipeline import db
+from pipeline.db import _ident
 
 SCHEMA_ORIGEM = "raw"
 SCHEMA_DESTINO = "refined"
@@ -1145,10 +1146,6 @@ class Preparada:
 
 
 # --------------------------------------------------------------------------- utilitários
-
-
-def _ident(nome):
-    return db._ident(nome)
 
 
 def _bronze(tabela):

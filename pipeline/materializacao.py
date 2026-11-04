@@ -45,6 +45,7 @@ from pathlib import Path
 import duckdb
 
 from pipeline import db
+from pipeline.db import _ident
 
 SCHEMA_DESTINO = "marts"
 PASTA_MARTS = Path(__file__).resolve().parent.parent / "sql" / "marts"
@@ -132,10 +133,6 @@ class Preparada:
 
 
 # --------------------------------------------------------------------------- utilitários
-
-
-def _ident(nome):
-    return db._ident(nome)
 
 
 def _gold(nome):
