@@ -110,6 +110,12 @@ uv run ruff check . --fix
 uv run ruff format .
 uv run pytest                             # sempre com cobertura (addopts = --cov)
 uv run mkdocs serve                       # documentação em http://127.0.0.1:8000
+
+# atalhos taskipy ([tool.taskipy.tasks] no pyproject.toml; lista: uv run task --list)
+uv run task test     # pytest com cobertura
+uv run task lint     # ruff check . && ruff format . --check
+uv run task format   # ruff check . --fix && ruff format .
+uv run task docs     # mkdocs serve
 ```
 
 ---

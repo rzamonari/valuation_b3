@@ -19,6 +19,7 @@ dev = [
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.3",
+    "taskipy>=1.14.1",
 ]
 
 [tool.pytest.ini_options]
@@ -44,3 +45,9 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 # O formatter mantém o código em 88 colunas; docstrings, comentários e SQL em strings
 # seguem a margem de 100 colunas já usada no projeto.
 max-line-length = 100
+
+[tool.taskipy.tasks]
+test = { cmd = "pytest", help = "testes com cobertura (fail_under 60)" }
+lint = { cmd = "ruff check . && ruff format . --check", help = "lint e verificação de formatação" }
+format = { cmd = "ruff check . --fix && ruff format .", help = "corrige lint (inclui imports) e formata" }
+docs = { cmd = "mkdocs serve", help = "documentação em http://127.0.0.1:8000" }
