@@ -30,7 +30,7 @@ resumo AS (
     SELECT
         MAX(quantidade)                                            AS maximo,
         COUNT(*) FILTER (WHERE quantidade = (SELECT MAX(quantidade) FROM contagem)) AS qtd_no_maximo,
-        SUM(quantidade)                                            AS total
+        CAST(SUM(quantidade) AS BIGINT)                            AS total  -- SUM daria HUGEINT, sem equivalente em Parquet
     FROM contagem
 )
 SELECT
