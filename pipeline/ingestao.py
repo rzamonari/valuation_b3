@@ -136,7 +136,7 @@ def _em_paralelo(funcao, itens, workers, rotulo):
 
 
 def validar_fontes():
-    """Confirma que a página oficial da B3 responde e que o app de listados (iframe dela) está no ar.
+    """Confirma que a página oficial da B3 e o app de listados (iframe dela) estão no ar.
 
     O conteúdo da página oficial não é exigido: o CDN da B3 devolve com frequência HTTP 200
     com uma página "Erro | B3" no lugar do iframe, sem relação com indisponibilidade da listagem.
@@ -186,7 +186,10 @@ def identificar_cnpjs(df_b3):
 
 
 def identificar_tickers(df_b3):
-    """Tickers negociáveis via GetDetail (otherCodes) de cada codeCVM; os detalhes não são persistidos."""
+    """Tickers negociáveis via GetDetail (otherCodes) de cada codeCVM.
+
+    Os detalhes não são persistidos.
+    """
     codigos_cvm = list(dict.fromkeys(c for c in df_b3["codeCVM"] if c is not None))
 
     def detalhe(codigo_cvm):
@@ -342,7 +345,10 @@ def _extrair_tudo():
 
 
 def _imprimir_relatorio(contagens):
-    fmt = lambda n: f"{n:,}".replace(",", ".")
+
+    def fmt(n):
+        return f"{n:,}".replace(",", ".")
+
     largura = 33
     total = sum(contagens.values())
     numeros = max(len(fmt(total)), 15)

@@ -675,7 +675,7 @@ def fig_ranking_tematico(df, ranking, n=15):
                 textposition="outside",
                 cliponaxis=False,
                 textfont={"color": TEXTO},
-                customdata=list(zip(*dados)),
+                customdata=list(zip(*dados, strict=False)),
                 hovertemplate=(
                     f"<b>%{{y}}</b> · %{{customdata[0]}}<br>Rank %{{customdata[1]}}"
                     f"<br>{rotulo}: %{{text}}{dica}<extra></extra>"

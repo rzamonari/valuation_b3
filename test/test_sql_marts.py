@@ -47,7 +47,8 @@ def novo_banco(tmp_path, acoes, emissoras, receita=()):
     )
     for codigo, cnpj in emissoras:
         con.execute(
-            "INSERT INTO refined.b3_empresas VALUES (?, ?, ?, ?, 'Novo Mercado', 'Bovespa', 'Ativo')",
+            "INSERT INTO refined.b3_empresas VALUES (?, ?, ?, ?, 'Novo Mercado', 'Bovespa', "
+            "'Ativo')",
             [codigo, cnpj, f"{codigo} SA", f"{codigo} S.A."],
         )
     con.execute(
@@ -67,7 +68,7 @@ def executar_mart(con, nome):
     texto = (PASTA_MARTS / f"{nome}.sql").read_text(encoding="utf-8-sig").strip()
     cursor = con.execute(texto.removesuffix(";"))
     colunas = [d[0] for d in cursor.description]
-    return [dict(zip(colunas, linha)) for linha in cursor.fetchall()]
+    return [dict(zip(colunas, linha, strict=False)) for linha in cursor.fetchall()]
 
 
 def por_ticker(linhas, coluna):
@@ -154,7 +155,7 @@ def test_rank_valor_mantem_ticker_sem_minha_receita_com_atividade_nula(tmp_path)
     assert atividade == {"COMR3": "Fabricação de aço", "SEMR3": None}
 
 
-# --------------------------------------------------------------------------- marts_03_rank_eficiencia
+# ---------------------------------------------------------------- marts_03_rank_eficiencia
 
 
 def test_rank_eficiencia_deixa_fora_margem_nao_positiva(tmp_path):
@@ -197,7 +198,7 @@ def test_rank_eficiencia_desempata_margem_ebit_pela_margem_liquida(tmp_path):
     assert por_ticker(linhas, "rank") == {"CCCC3": 1, "BBBB3": 2, "AAAA3": 3}
 
 
-# --------------------------------------------------------------------------- marts_50_rank_recomendacoes
+# ------------------------------------------------------------- marts_50_rank_recomendacoes
 
 # Elegível nos 10 rankings (02: DY > 0, P/L > 0, payout ≥ 0; 04 e 09: DL/PL ≤ 1,5;
 # 06: P/VP > 0; 07: crescimento informado e ROIC > 10).

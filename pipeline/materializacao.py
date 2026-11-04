@@ -37,6 +37,7 @@ Spec: docs/specs/marts_materializacao.md (ajuste "Materialização dos resultado
    sem .sql correspondente não são apagadas: aparecem no relatório como órfãs para decisão manual.
 """
 
+import contextlib
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -328,10 +329,9 @@ def publicar(con, preparadas):
                 _validar_publicada(con, p)
         con.commit()
     except Exception as exc:
-        try:
+        # a transação pode já ter sido abortada pelo próprio DuckDB
+        with contextlib.suppress(duckdb.Error):
             con.rollback()
-        except duckdb.Error:
-            pass  # a transação já foi abortada pelo próprio DuckDB
         if isinstance(exc, ErroMaterializacao):
             exc.motivo = (
                 f"{exc.motivo} — rollback executado: nenhuma tabela Gold foi alterada"

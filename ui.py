@@ -17,7 +17,8 @@ def main():
         print(con.execute("CALL start_ui()").fetchall()[0][0])
         print("Banco aberto na DuckDB UI. Pressione Ctrl+C para encerrar.")
         print(
-            "Encerre a UI antes de rodar a ingestão: o arquivo fica em uso enquanto ela está aberta."
+            "Encerre a UI antes de rodar a ingestão: o arquivo fica em uso enquanto ela "
+            "está aberta."
         )
         while True:
             time.sleep(1)
