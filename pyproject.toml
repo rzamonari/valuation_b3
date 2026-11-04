@@ -23,6 +23,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["test"]
 pythonpath = ["."]
+addopts = "--cov"
 
 [tool.coverage.run]
 source = ["."]
