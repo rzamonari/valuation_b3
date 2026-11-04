@@ -25,6 +25,7 @@ INDICADORES = [
     "divida_liquida_patrimonio",
     "preco_valor_patrimonial",
     "crescimento_receita_5_anos",
+    "patrimonio_liquido",
 ]
 
 
@@ -410,3 +411,74 @@ def test_painel_indicadores_repete_a_recomendacao_de_marts_50(tmp_path):
     painel = executar_mart(con, "marts_painel_indicadores")
     assert por_ticker(painel, "recomendacao") == por_ticker(marts_50, "recomendacao")
     assert por_ticker(painel, "saldo") == por_ticker(marts_50, "saldo")
+
+
+# --------------------------------------------------------------- marts_exclusoes_universo
+
+
+def acoes_excluidas():
+    """Um ticker por motivo, todos sem emissora na B3, mais um ticker no universo."""
+    return [
+        {"ticker": "COMB3", "liquidez_2_meses": 100},  # emissora COMB cadastrada
+        {"ticker": "FRAC3F", "liquidez_2_meses": 50},  # fracionário, mesmo negociado
+        {"ticker": "BDRX34", "liquidez_2_meses": 10},  # BDR, mesmo negociado
+        {"ticker": "UNIT11"},  # unit, liquidez ausente
+        {"ticker": "PREG3", "liquidez_2_meses": 20, "cotacao": 5},  # negociado
+        {"ticker": "PREG4", "liquidez_2_meses": 0},  # mesma emissora, sem negociação
+        {"ticker": "VELH6", "liquidez_2_meses": 0},
+        {"ticker": "RECB12", "liquidez_2_meses": 0},
+    ]
+
+
+def test_exclusoes_sao_o_complemento_do_universo_com_motivo_por_sufixo(tmp_path):
+    con = novo_banco(tmp_path, acoes_excluidas(), [("COMB", "1")])
+    linhas = executar_mart(con, "marts_exclusoes_universo")
+    assert por_ticker(linhas, "motivo") == {
+        "FRAC3F": "Fracionário",
+        "BDRX34": "BDR",
+        "UNIT11": "Unit",
+        "PREG3": "Não identificado",
+        "PREG4": "Deslistada ou cancelada",
+        "VELH6": "Deslistada ou cancelada",
+        "RECB12": "Outro código",
+    }
+    assert por_ticker(linhas, "emissora")["RECB12"] == "RECB"
+
+
+def test_exclusoes_preservam_indicadores_e_explicam_a_negociacao(tmp_path):
+    con = novo_banco(tmp_path, acoes_excluidas(), [("COMB", "1")])
+    linhas = executar_mart(con, "marts_exclusoes_universo")
+    assert por_ticker(linhas, "cotacao")["PREG3"] == 5
+    assert por_ticker(linhas, "cotacao")["PREG4"] is None  # NULL não vira zero
+    detalhe = por_ticker(linhas, "detalhe")
+    assert detalhe["PREG3"].endswith("negociado nos últimos 2 meses")
+    assert detalhe["PREG4"].endswith("sem negociação nos últimos 2 meses")
+    assert "Emissora PREG ausente" in detalhe["PREG4"]
+
+
+def test_sem_exclusao_quando_toda_emissora_esta_na_b3(tmp_path):
+    acoes = [{"ticker": "COMB3"}, {"ticker": "COMB4"}]
+    con = novo_banco(tmp_path, acoes, [("COMB", "1")])
+    assert executar_mart(con, "marts_exclusoes_universo") == []
+
+
+def test_contagem_por_motivo_lista_todas_as_categorias(tmp_path):
+    con = novo_banco(tmp_path, acoes_excluidas(), [("COMB", "1")])
+    linhas = executar_mart(con, "marts_painel_exclusoes_motivo")
+    assert [linha["motivo"] for linha in linhas] == [
+        "Fracionário",
+        "BDR",
+        "Unit",
+        "Não identificado",
+        "Deslistada ou cancelada",
+        "Outro código",
+    ]
+    assert [linha["quantidade"] for linha in linhas] == [1, 1, 1, 1, 2, 1]
+    assert [linha["quantidade_negociada"] for linha in linhas] == [1, 1, 0, 1, 0, 0]
+
+
+def test_contagem_por_motivo_mostra_zero_sem_exclusoes(tmp_path):
+    con = novo_banco(tmp_path, [{"ticker": "COMB3"}], [("COMB", "1")])
+    linhas = executar_mart(con, "marts_painel_exclusoes_motivo")
+    assert len(linhas) == 6
+    assert {linha["quantidade"] for linha in linhas} == {0}

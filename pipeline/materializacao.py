@@ -18,6 +18,7 @@ Spec: docs/specs/marts_materializacao.md (ajuste "Materialização dos resultado
    - Fotografia por ticker (indicadores, rankings, recomendações, painel): o resultado vale para
      a data de referência atual da Silver; linhas de execuções anteriores seriam obsoletas.
    - Agregado de linha única (cards, termômetro, data de referência): idem, sempre uma linha.
+   - Agregado por categoria (exclusões por motivo): idem, uma linha por categoria fechada.
    - Série histórica (marts_cotacao): a consulta devolve o histórico inteiro de
      refined.yfinance_cotacoes, sem filtro incremental, e a própria Silver é substituída por
      inteiro a cada transformação. O fechamento ajustado é recalculado retroativamente pelo
@@ -69,6 +70,7 @@ _COMENTARIO = re.compile(r"--[^\n]*")
 
 FOTOGRAFIA = "fotografia por ticker"
 LINHA_UNICA = "agregado de linha única"
+AGREGADO = "agregado por categoria"
 SERIE = "série histórica"
 ESTRATEGIA = "substituição integral"
 
@@ -104,9 +106,11 @@ MARTS = [
     Mart("marts_crescimento_receita_5_anos", ("ticker",), FOTOGRAFIA),
     Mart("marts_dividend_yield_payout", ("ticker",), FOTOGRAFIA),
     Mart("marts_ev_ebit", ("ticker",), FOTOGRAFIA),
+    Mart("marts_exclusoes_universo", ("ticker",), FOTOGRAFIA),
     Mart("marts_margens", ("ticker",), FOTOGRAFIA),
     Mart("marts_p_vp", ("ticker",), FOTOGRAFIA),
     Mart("marts_painel_data_referencia", (), LINHA_UNICA),
+    Mart("marts_painel_exclusoes_motivo", ("motivo",), AGREGADO),
     Mart("marts_painel_indicadores", ("ticker",), FOTOGRAFIA),
     Mart("marts_preco_lucro", ("ticker",), FOTOGRAFIA),
     Mart("marts_retorno_total_risco", ("ticker",), FOTOGRAFIA),
