@@ -1,9 +1,9 @@
 {
   "formato": 1,
   "data_referencia": "2026-11-02",
-  "gerada_em": "2026-11-04T16:06:58+00:00",
+  "gerada_em": "2026-11-04T16:42:13+00:00",
   "duckdb": "2.0.0",
-  "hash": "d7dbdbd310ef62f76eb1712924643b894decafc5fad59dc16f12c6395cc7d8f7",
+  "hash": "83c0195587384ceef42c4d5abfee804a2f8db5f86d5eb1ca4057445cbaf7118f",
   "qualidade": {
     "verificacoes": 77,
     "avisos": 10
@@ -118,10 +118,17 @@
       "sha256": "e94ade32d9c58bb470a1208edf448dc8e2dabfe769c11eedee0cd290beb2e5ee"
     },
     "marts_cotacao": {
+      "colunas": [
+        "ticker",
+        "data",
+        "fechamento_ajustado",
+        "dividendos",
+        "volume"
+      ],
       "arquivo": "marts_cotacao.parquet",
       "registros": 1920774,
-      "bytes": 26399755,
-      "sha256": "0d74df7ddd034991a83057128e1b046f9e0069faca78f1d237489fc57765821f"
+      "bytes": 10206683,
+      "sha256": "bf5f631eb3c36f8ec3401985e016ec469b3640afb851c543d8438e132502e8a5"
     },
     "marts_crescimento_receita_5_anos": {
       "arquivo": "marts_crescimento_receita_5_anos.parquet",
