@@ -1,4 +1,7 @@
-"""Testes da materialização Gold. Usam banco DuckDB e pasta SQL temporários: o banco real não é tocado."""
+"""Testes da materialização Gold.
+
+Usam banco DuckDB e pasta SQL temporários: o banco real não é tocado.
+"""
 
 import duckdb
 import pytest
@@ -7,9 +10,15 @@ from pipeline import db
 from pipeline import materializacao as m
 
 SQL = {
-    "marts_roic": "-- Grão: uma linha por ticker.\nSELECT ticker, roic FROM refined.fundamentus_acoes ORDER BY ticker;",
+    "marts_roic": (
+        "-- Grão: uma linha por ticker.\n"
+        "SELECT ticker, roic FROM refined.fundamentus_acoes ORDER BY ticker;"
+    ),
     "marts_card": "SELECT COUNT(*) AS quantidade FROM refined.fundamentus_acoes;",
-    "marts_cotacao": "SELECT ticker, data, fechamento FROM refined.yfinance_cotacoes ORDER BY ticker, data;",
+    "marts_cotacao": (
+        "SELECT ticker, data, fechamento FROM refined.yfinance_cotacoes "
+        "ORDER BY ticker, data;"
+    ),
 }
 MARTS = [
     m.Mart("marts_roic", ("ticker",), m.FOTOGRAFIA),
@@ -37,10 +46,12 @@ def novo_banco(tmp_path):
         "CREATE TABLE refined.fundamentus_acoes (ticker VARCHAR, roic DECIMAL(6,2))"
     )
     conexao.execute(
-        "INSERT INTO refined.fundamentus_acoes VALUES ('AAAA3', 10.5), ('BBBB4', NULL), ('CCCC3', -2.25)"
+        "INSERT INTO refined.fundamentus_acoes VALUES ('AAAA3', 10.5), ('BBBB4', NULL), "
+        "('CCCC3', -2.25)"
     )
     conexao.execute(
-        "CREATE TABLE refined.yfinance_cotacoes (ticker VARCHAR, data TIMESTAMPTZ, fechamento DOUBLE)"
+        "CREATE TABLE refined.yfinance_cotacoes (ticker VARCHAR, data TIMESTAMPTZ, "
+        "fechamento DOUBLE)"
     )
     conexao.execute(
         "INSERT INTO refined.yfinance_cotacoes VALUES "

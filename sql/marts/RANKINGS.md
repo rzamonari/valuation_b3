@@ -1,6 +1,6 @@
 ﻿# Camada Gold (Marts) — Rankings Fundamentalistas
 
-Especificação de origem: `.venv/.specs/marts_agregacao_rank.md`.
+Especificação de origem: `docs/specs/marts_sql_rank.md`.
 
 Dez consultas `SELECT` independentes (DuckDB), somente leitura da Silver (`refined`). Nenhuma
 tabela, coluna ou registro de `raw`/`refined` foi alterado. As próprias consultas não criam
@@ -49,7 +49,7 @@ Receita. 454 tickers do Fundamentus não têm emissora correspondente na B3 e fi
 | Arquivo | Indicadores | Elegibilidade | Classificação (`DENSE_RANK`) | Linhas |
 |---|---|---|---|---|
 | `marts_01_rank_valor.sql` | ROIC, EV/EBIT | ambos > 0 | soma de rank ROIC ↓ e rank EV/EBIT ↑, soma ↑ | 387 |
-| `marts_02_rank_proventos.sql` | DY, P/L, payout | DY > 0, P/L > 0, 0 ≤ payout ≤ 100 | DY ↓, payout ↑ | 200 |
+| `marts_02_rank_proventos.sql` | DY, P/L, payout | DY > 0, P/L > 0, payout ≥ 0 | DY ↓, payout ↑ | 256 |
 | `marts_03_rank_eficiencia.sql` | Margem EBIT, margem líquida | ambas > 0 | margem EBIT ↓, margem líquida ↓ | 335 |
 | `marts_04_rank_retorno.sql` | ROE, DL/PL | ROE > 0, DL/PL não nula e ≤ 1,5 | ROE ↓, DL/PL ↑ | 367 |
 | `marts_05_rank_pechincha.sql` | P/L, EV/EBIT | ambos > 0 | soma de rank P/L ↑ e rank EV/EBIT ↑, soma ↑ | 336 |
@@ -73,13 +73,14 @@ Empates recebem o mesmo rank (`DENSE_RANK`); a saída é desempatada visualmente
 1. O **Rank Valor** é uma versão simplificada da Magic Formula, não a metodologia original de
    Joel Greenblatt.
 2. O **Rank Proventos** usa payout estimado e não comprova a sustentabilidade futura dos
-   dividendos, a recorrência dos pagamentos nem a geração de caixa.
+   dividendos, a recorrência dos pagamentos nem a geração de caixa. Não há teto de payout: na
+   fotografia de 02/11/2026, 56 dos 256 elegíveis têm payout estimado acima de 100%.
 3. O **Rank Operacional** não contempla geração de caixa operacional: o dado não existe na Silver
    e o EBITDA não é usado como substituto.
 4. Não há cálculo de **Dívida Líquida/EBITDA** nesta entrega.
 5. O **Rank Seguro** não representa análise completa de solvência ou risco de crédito.
 6. Os rankings individuais são **classificações relativas entre empresas elegíveis**.
-7. As recomendações de `marts_50_rank_recomendacoes.sql` (seção 4) são um **sinal relativo e mecà¢nico** derivado
+7. As recomendações de `marts_50_rank_recomendacoes.sql` (seção 4) são um **sinal relativo e mecânico** derivado
    dos 10 rankings sobre uma única fotografia do Fundamentus. Não consideram preço-alvo, valor
    intrínseco, histórico, governança, contexto setorial nem o perfil do investidor, e **não
    constituem recomendação de investimento**.
@@ -106,28 +107,28 @@ Consolida os 10 rankings em `Compra`, `Manter` ou `Venda` por ticker (spec §7).
    |---|---|---|
    | Superior | `(rank - 1) * 3 < max_rank - 1` (terço melhor) | +1 |
    | Intermediário | terço do meio | 0 |
-   | Inferior | `(rank - 1) * 3 > 2 * (max_rank - 1)` (terço pior) | âˆ’1 |
-   | Não elegível | reprovado na elegibilidade do ranking | âˆ’1 |
+   | Inferior | `(rank - 1) * 3 > 2 * (max_rank - 1)` (terço pior) | −1 |
+   | Não elegível | reprovado na elegibilidade do ranking | −1 |
 
    Não elegível conta como pior classificação: a elegibilidade exclui justamente os casos
    desfavoráveis (rentabilidade ou múltiplos não positivos, DL/PL > 1,5, sem dividendos etc.).
-3. **Saldo** = superiores âˆ’ inferiores âˆ’ não elegíveis (âˆ’10 a +10, pesos iguais).
+3. **Saldo** = superiores − inferiores − não elegíveis (−10 a +10, pesos iguais).
    `saldo > 0` → **Compra**, `saldo = 0` → **Manter**, `saldo < 0` → **Venda**.
 4. **Saída**: somente tickers com `liquidez_2_meses > 0`, ordenados por `saldo` ↓ e
    `qtd_superior` ↓ (`posicao`), o que coloca Compra no topo, Manter no meio e Venda no fim.
    As colunas `faixa_*` mostram a faixa em cada ranking, para auditoria.
 
-Validação (2026-11-02): 391 linhas = 391 tickers negociados (150 sem liquidez ficam fora); os 10
+Validação (2026-11-04, data de referência 02/11/2026): 391 linhas = 391 tickers negociados (150 sem liquidez ficam fora); os 10
 ranks reproduzidos coincidem 100% com os arquivos individuais; faixas somam 10 em todas as linhas.
 
 | Recomendação | Tickers | Saldo |
 |---|---|---|
-| Compra | 89 | +1 a +10 |
-| Manter | 22 | 0 |
-| Venda | 280 | âˆ’10 a âˆ’1 |
+| Compra | 95 | +1 a +10 |
+| Manter | 20 | 0 |
+| Venda | 276 | −10 a −1 |
 
-A predominà¢ncia de Venda decorre de a maioria das empresas ser reprovada na elegibilidade de vários
-rankings (ex.: Proventos tem apenas 200 elegíveis entre os 541 tickers da consulta-base).
+A predominância de Venda decorre de a maioria das empresas ser reprovada na elegibilidade de vários
+rankings (ex.: Proventos tem apenas 256 elegíveis entre os 541 tickers da consulta-base).
 
 ## 5. Execução
 
@@ -136,5 +137,7 @@ import duckdb
 from pathlib import Path
 
 con = duckdb.connect("fundamentalistas.duckdb", read_only=True)
-df = con.execute(Path("sql/marts/marts_01_rank_valor.sql").read_text(encoding="utf-8")).df()
+df = con.execute(
+    Path("sql/marts/marts_01_rank_valor.sql").read_text(encoding="utf-8")
+).df()
 ```

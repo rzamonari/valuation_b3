@@ -1,6 +1,6 @@
 ﻿# Camada Gold (Marts) — Indicadores Fundamentalistas
 
-Especificação de origem: `.venv/.specs/marts_agregacao_indicadores.md` (v1.0).
+Especificação de origem: `docs/specs/marts_sql_indicadores.md` (v1.0).
 
 ## 1. Objetivo e escopo
 
@@ -16,7 +16,7 @@ registro ou arquivo de ingestão/transformação foi alterado. Nenhuma fonte ext
 | Camada | Schema | Papel |
 |---|---|---|
 | Bronze | `raw` | Dados brutos ingeridos (`pipeline/ingestao.py`) |
-| Silver | `refined` | Dados tipados e deduplicados (`pipeline/transformacao.py`) |
+| Silver | `refined` | Dados tipados e deduplicados (`pipeline/transformacao/`) |
 | Gold | `marts` | Indicadores analíticos: consultas em `sql/marts/`, materializadas por `pipeline/materializacao.py` |
 
 Os arquivos `.sql` continuam sendo consultas `SELECT` puras e a fonte da verdade de cada mart.
@@ -89,7 +89,7 @@ O mart 10 também expõe colunas de rastreabilidade: `data_inicial`, `data_final
 | Dívida líquida/EBITDA | Silver não possui dívida líquida nem EBITDA em valores monetários |
 | Sharpe | Sem taxa livre de risco nem metodologia aprovada |
 | Comparação setorial de margens | `b3_empresas.segmento` é segmento de listagem, não setor econômico |
-| Valor justo por Gordon | Ke e crescimento perpétuo sem parà¢metros aprovados |
+| Valor justo por Gordon | Ke e crescimento perpétuo sem parâmetros aprovados |
 
 ## 8. Dependências
 
@@ -130,14 +130,14 @@ Ou pela CLI do DuckDB: `duckdb -readonly fundamentalistas.duckdb < sql/marts/mar
   tickers têm `cotacao = 0`. O zero pode representar ausência de dado na origem. Por regra
   (§5.2/§5.3) os zeros foram preservados; tratá-los como NULL exige regra aprovada.
 - **Qualidade das cotações**: 18.350 linhas de 8 tickers têm `fechamento_ajustado < 0` e 1 linha é
-  NULL; são tratadas como inválidas. Há volatilidades extremas (máx. ≤ˆ 2.110% a.a.) que indicam
+  NULL; são tratadas como inválidas. Há volatilidades extremas (máx. ≈ 2.110% a.a.) que indicam
   séries ajustadas anômalas na origem — preservadas, sem filtro não especificado.
 - 160 tickers têm `cagr` e `volatilidade_anualizada` NULL: todos possuem no máximo uma cotação
   válida na Silver, portanto não há intervalo nem retornos para calcular.
 
 ## 12. Materialização no schema `marts`
 
-Spec: `.venv/.specs/marts.agregacao.md` (ajuste "Materialização dos resultados na camada Gold").
+Spec: `docs/specs/marts_materializacao.md` (ajuste "Materialização dos resultados na camada Gold").
 
 ```
 uv run python -m pipeline.materializacao

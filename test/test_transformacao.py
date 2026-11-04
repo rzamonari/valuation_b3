@@ -1,6 +1,9 @@
 """Testes da camada Refined (Silver). Usam bancos DuckDB temporários: a Bronze real não é tocada."""
 
 import json
+import os
+import subprocess
+import sys
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
@@ -179,7 +182,8 @@ def test_b3_datas_identificadores_e_vazios(tmp_path):
     t.executar(con)
     linhas = consultar(
         con,
-        "SELECT codigo_cvm, cnpj, data_listagem, tipo_bdr FROM refined.b3_empresas ORDER BY codigo_cvm",
+        "SELECT codigo_cvm, cnpj, data_listagem, tipo_bdr FROM refined.b3_empresas ORDER BY "
+        "codigo_cvm",
     )
     assert linhas == [
         ("0050110", "00012345000100", date(1910, 8, 8), None),
@@ -259,7 +263,8 @@ def test_minhareceita_cnpj_bronze_e_json_comparados_apos_padronizacao(tmp_path):
     tipos = dict(
         consultar(
             con,
-            "SELECT column_name, data_type FROM duckdb_columns() WHERE table_name = 'b3_empresas' AND schema_name = 'refined'",
+            "SELECT column_name, data_type FROM duckdb_columns() WHERE table_name = "
+            "'b3_empresas' AND schema_name = 'refined'",
         )
     )
     assert (
@@ -294,7 +299,8 @@ def test_fundamentus_conversao_brasileira(tmp_path):
     t.executar(con)
     linha = consultar(
         con,
-        "SELECT patrimonio_liquido, dividend_yield, margem_bruta, preco_vendas, divida_liquida_patrimonio, cotacao "
+        "SELECT patrimonio_liquido, dividend_yield, margem_bruta, preco_vendas, "
+        "divida_liquida_patrimonio, cotacao "
         "FROM refined.fundamentus_acoes WHERE ticker = 'ABCD3'",
     )[0]
     assert linha == (
@@ -322,7 +328,8 @@ def test_fundamentus_precisao_dinamica_por_coluna(tmp_path):
     tipos = dict(
         consultar(
             con,
-            "SELECT column_name, data_type FROM duckdb_columns() WHERE schema_name = 'refined' AND table_name = 'fundamentus_acoes'",
+            "SELECT column_name, data_type FROM duckdb_columns() WHERE schema_name = "
+            "'refined' AND table_name = 'fundamentus_acoes'",
         )
     )
     assert tipos["patrimonio_liquido"] == "DECIMAL(12,2)"
@@ -425,7 +432,8 @@ def test_yfinance_fuso_horario_e_nulos(tmp_path):
     t.executar(con)
     linhas = consultar(
         con,
-        "SELECT data AT TIME ZONE 'UTC', ganhos_capital, dividendos, volume FROM refined.yfinance_cotacoes ORDER BY data",
+        "SELECT data AT TIME ZONE 'UTC', ganhos_capital, dividendos, volume FROM "
+        "refined.yfinance_cotacoes ORDER BY data",
     )
     assert linhas == [
         (datetime(2000, 1, 3, 2, 0), None, 0.0, 100),
@@ -525,14 +533,16 @@ def test_minhareceita_extracao_dos_arrays(tmp_path):
     ]
     assert consultar(
         con,
-        "SELECT cnpj, sequencia_regime, ano, forma_de_tributacao FROM refined.minhareceita_regime_tributario ORDER BY ALL",
+        "SELECT cnpj, sequencia_regime, ano, forma_de_tributacao FROM "
+        "refined.minhareceita_regime_tributario ORDER BY ALL",
     ) == [
         ("11111111000111", 1, 2023, "LUCRO REAL"),
         ("11111111000111", 2, 2023, "LUCRO PRESUMIDO"),
     ]
     assert consultar(
         con,
-        "SELECT cnpj, codigo_cnae, descricao, _source_origin FROM refined.minhareceita_cnaes_secundarios",
+        "SELECT cnpj, codigo_cnae, descricao, _source_origin FROM "
+        "refined.minhareceita_cnaes_secundarios",
     ) == [
         (
             "11111111000111",
@@ -547,7 +557,8 @@ def test_minhareceita_extracao_dos_arrays(tmp_path):
 
     empresas = consultar(
         con,
-        "SELECT cnpj, email, pais, capital_social, opcao_pelo_mei, data_inicio_atividade FROM refined.minhareceita_empresas ORDER BY cnpj",
+        "SELECT cnpj, email, pais, capital_social, opcao_pelo_mei, data_inicio_atividade "
+        "FROM refined.minhareceita_empresas ORDER BY cnpj",
     )
     assert empresas[0] == (
         "11111111000111",
@@ -561,7 +572,8 @@ def test_minhareceita_extracao_dos_arrays(tmp_path):
         c
         for (c,) in consultar(
             con,
-            "SELECT column_name FROM duckdb_columns() WHERE schema_name = 'refined' AND table_name = 'minhareceita_empresas'",
+            "SELECT column_name FROM duckdb_columns() WHERE schema_name = 'refined' AND "
+            "table_name = 'minhareceita_empresas'",
         )
     ]
     assert colunas == list(t.ESCALARES_EMPRESA) + list(
@@ -655,7 +667,7 @@ def test_minhareceita_json_invalido_falha(tmp_path):
         t.executar(con)
 
 
-# --------------------------------------------------------------------------- atomicidade, idempotência e Bronze
+# ------------------------------------------------------- atomicidade, idempotência e Bronze
 
 
 def test_rollback_quando_qualquer_tabela_falha(tmp_path):
@@ -740,3 +752,21 @@ def test_bronze_ausente_encerra_com_codigo_1(tmp_path, monkeypatch):
     assert consultar(
         con, "SELECT COUNT(*) FROM duckdb_tables() WHERE schema_name = 'refined'"
     ) == [(0,)]
+
+
+def test_comando_publica_e_imprime_o_relatorio(tmp_path):
+    # Executa como o usuário (python -m): sob -m o módulo se chama __main__, e o relatório
+    # precisa continuar saindo no stdout.
+    novo_banco(tmp_path).close()
+    ambiente = os.environ | {db.VARIAVEL_DB: str(tmp_path / "teste.duckdb")}
+    processo = subprocess.run(
+        [sys.executable, "-m", "pipeline.transformacao"],
+        cwd=db._RAIZ,
+        env=ambiente,
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert processo.returncode == 0, processo.stderr
+    assert "TOTAL GRAVADO NAS SETE TABELAS" in processo.stdout
+    assert processo.stderr == ""
