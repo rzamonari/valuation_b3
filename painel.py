@@ -45,6 +45,11 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
      EV/EBIT 10 (convenção de mercado aprovada pelo usuário, P3).
    - Cotação: preços nulos ou <= 0 ficam fora do desenho. Motivo: a Silver tem preços ajustados
      negativos em alguns tickers.
+   - Responsivo (v1.7): cartões do pulso e mini cartões da ficha em grade CSS que muda o número
+     de colunas pela largura da área de conteúdo (GRADE_PULSO, GRADE_FICHA); pares de colunas
+     quebram em linhas abaixo de 22rem por coluna; quebra de linha só entre palavras e número
+     sem quebra. Motivo: st.columns não empilha com a barra lateral aberta e espremia os
+     cartões até partir palavras ("Ações analisa das") e números.
 
 5. FORMATO: milhar com ponto e decimal com vírgula, sem locale do sistema (o resultado não pode
    depender da máquina). pct() não multiplica por 100: os percentuais já estão em 0–100.
@@ -57,7 +62,10 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
 
 7. CACHE E ERRO (app.py): st.cache_data; tabela faltando (orienta rodar a materialização),
    banco bloqueado ou erro de leitura -> st.error + st.stop(). A checagem de tabelas fica fora
-   do cache para "Recarregar dados" enxergar uma materialização recém-feita.
+   do cache para "Recarregar dados" enxergar uma materialização recém-feita; na fotografia, os
+   hashes só são recalculados quando tamanho ou data de algum arquivo muda.
+   marts_cotacao (~1,9 milhão de linhas) nunca entra na carga da página: só ler_cotacao(ticker)
+   a abre, com view apenas desse mart, em st.cache_data por ticker.
 
 8. APARÊNCIA: Modo Escuro Profissional (paleta abaixo, espelhada em .streamlit/config.toml).
    Motivo: análise intensiva; fundo escuro reduz a fadiga visual e destaca números e séries.
@@ -189,13 +197,41 @@ def mensagem_faltando():
     return MSG_FOTOGRAFIA if fonte() == FOTOGRAFIA else MSG_MATERIALIZAR
 
 
-def tabelas_faltando():
-    """Banco ou tabelas marts obrigatórias que não existem (rótulos marts.<nome>)."""
-    if fonte() == FOTOGRAFIA:
+# Assinatura dos arquivos (caminho, tamanho, mtime) -> manifesto já conferido.
+_FOTOGRAFIA_VERIFICADA = {}
+
+
+def _assinatura(pasta):
+    if not pasta.is_dir():
+        return (str(pasta),)
+    return (str(pasta.resolve()),) + tuple(
+        (a.name, a.stat().st_size, a.stat().st_mtime_ns)
+        for a in sorted(pasta.iterdir())
+        if a.is_file()
+    )
+
+
+def _verificar_fotografia():
+    """fotografia.verificar() só quando algum arquivo mudou desde a última conferência.
+
+    Motivo: o SHA-256 lê os ~27 MB da pasta (10 MB só da cotação) e tabelas_faltando() roda a
+    cada interação; com os arquivos intactos, o resultado é o mesmo.
+    """
+    assinatura = _assinatura(PASTA_FOTOGRAFIA)
+    if assinatura not in _FOTOGRAFIA_VERIFICADA:
         try:
             manifesto = fotografia.verificar(PASTA_FOTOGRAFIA)
         except fotografia.ErroFotografia as erro:
             raise FotografiaInvalida(str(erro)) from erro
+        _FOTOGRAFIA_VERIFICADA.clear()
+        _FOTOGRAFIA_VERIFICADA[assinatura] = manifesto
+    return _FOTOGRAFIA_VERIFICADA[assinatura]
+
+
+def tabelas_faltando():
+    """Banco ou tabelas marts obrigatórias que não existem (rótulos marts.<nome>)."""
+    if fonte() == FOTOGRAFIA:
+        manifesto = _verificar_fotografia()
         return [_rotulo(n) for n in MARTS_OBRIGATORIOS if n not in manifesto["tabelas"]]
     if not ARQUIVO_DB.exists():
         return [ARQUIVO_DB.name]
@@ -213,10 +249,10 @@ def tabelas_faltando():
     return [_rotulo(n) for n in MARTS_OBRIGATORIOS if n not in existentes]
 
 
-def _conectar():
+def _conectar(nomes=None):
     if fonte() == FOTOGRAFIA:
         try:
-            return fotografia.conectar(PASTA_FOTOGRAFIA)
+            return fotografia.conectar(PASTA_FOTOGRAFIA, nomes)
         except fotografia.ErroFotografia as erro:
             raise FotografiaInvalida(str(erro)) from erro
     try:
@@ -228,7 +264,7 @@ def _conectar():
 
 def ler(nomes):
     """Lê cada tabela marts.<nome> inteira e devolve {nome: DataFrame}."""
-    con = _conectar()
+    con = _conectar(nomes)
     try:
         resultado = {}
         for nome in nomes:
@@ -244,7 +280,7 @@ def ler(nomes):
 def ler_cotacao(ticker):
     """Histórico de um ticker: marts.marts_cotacao filtrada no banco por parâmetro vinculado."""
     sql = f"SELECT * FROM {_tabela(MART_COTACAO)} WHERE ticker = ?"
-    con = _conectar()
+    con = _conectar([MART_COTACAO])
     try:
         try:
             return con.execute(sql, [ticker]).df()
@@ -529,7 +565,9 @@ pio.templates["b3"] = go.layout.Template(
             "title": {"text": ""},
             "font": {"color": TEXTO},
         },
+        # automargin: a margem cresce até caber o rótulo (ticker, R$) em vez de cortá-lo.
         xaxis={
+            "automargin": True,
             "showgrid": False,
             "zeroline": False,
             "linecolor": BORDA,
@@ -537,6 +575,7 @@ pio.templates["b3"] = go.layout.Template(
             "title": {"font": {"color": TEXTO_2}},
         },
         yaxis={
+            "automargin": True,
             "showgrid": True,
             "gridcolor": BORDA,
             "zeroline": False,
@@ -563,19 +602,73 @@ def _layout(fig, titulo, altura):
 # --------------------------------------------------------------------------------------------
 # Cartões (HTML)
 # --------------------------------------------------------------------------------------------
+# Grades responsivas: (largura mínima da área de conteúdo em rem, colunas). A largura é a do
+# contêiner (container query), não a da janela: a barra lateral aberta também estreita a área.
+# Pulso: 6 lado a lado (1440 px), 3 × 2 (tablet ou janela média), 2 × 3 (celular).
+# Ficha: 10 métricas em 5 × 2 ou 2 × 5, sem linha incompleta.
+GRADE_PULSO = ((0, 2), (30, 3), (54, 6))
+GRADE_FICHA = ((0, 2), (40, 5))
+
+
+def css_grade(nome, grade):
+    """Regras CSS da grade .b3-grade-<nome>: a menor faixa é a base, as outras, @container."""
+    regras = []
+    for minimo, colunas in sorted(grade):
+        regra = f".b3-grade-{nome} {{grid-template-columns:repeat({colunas}, minmax(0, 1fr));}}"
+        regras.append(
+            regra if minimo == 0 else f"@container (min-width: {minimo}rem) {{{regra}}}"
+        )
+    return "\n".join(regras)
+
+
+def html_grade(nome, itens):
+    """Itens HTML (cartões, métricas) numa grade .b3-grade-<nome>, na ordem recebida."""
+    return (
+        f'<div class="b3-envelope"><div class="b3-grade b3-grade-{nome}">'
+        f"{''.join(itens)}</div></div>"
+    )
+
+
+# Pares de st.columns dentro de st.container(key="par-…") ou do cabeçalho quebram em linhas
+# quando a coluna ficaria mais estreita que o mínimo (st.columns sozinho só empilha abaixo de
+# 640 px de janela, sem contar a barra lateral).
 CSS = f"""
 <style>
+.b3-envelope {{container-type:inline-size; margin-bottom:1rem;}}
+.b3-grade {{display:grid; gap:0.75rem;}}
+{css_grade("pulso", GRADE_PULSO)}
+{css_grade("ficha", GRADE_FICHA)}
+.b3-card, .b3-metrica {{overflow-wrap:normal; word-break:normal; hyphens:manual;}}
 .b3-card {{background:{FUNDO_2}; border:1px solid {BORDA}; border-top:4px solid var(--cor);
   border-radius:8px; padding:14px 16px; min-height:150px; display:flex; flex-direction:column;
   gap:2px;}}
 .b3-card.destaque {{background:var(--fundo); border:2px solid var(--cor);}}
-.b3-rotulo {{font-size:0.9rem; font-weight:600; color:{TEXTO_2};}}
-.b3-numero {{font-size:2.2rem; font-weight:700; line-height:1.15; color:{TEXTO};}}
+.b3-rotulo {{font-size:0.9rem; font-weight:600; color:{TEXTO_2}; line-height:1.3;}}
+.b3-numero {{font-size:2.2rem; font-weight:700; line-height:1.15; color:{TEXTO};
+  white-space:nowrap; font-variant-numeric:tabular-nums;}}
 .b3-destaque {{font-size:1.15rem; font-weight:700; color:var(--cor); margin-top:4px;}}
-.b3-def {{font-size:0.8rem; color:{TEXTO_2};}}
+.b3-def {{font-size:0.8rem; color:{TEXTO_2}; line-height:1.35;}}
 .b3-barra {{display:flex; height:8px; border-radius:4px; overflow:hidden; margin-top:auto;}}
+.b3-metrica {{border:1px solid {BORDA}; border-radius:8px; padding:12px 14px;
+  display:flex; flex-direction:column; justify-content:space-between; gap:6px;}}
+.b3-metrica .b3-rotulo {{font-size:0.85rem; font-weight:400;}}
+.b3-valor {{font-size:1.5rem; font-weight:600; line-height:1.2; color:{TEXTO};
+  white-space:nowrap; font-variant-numeric:tabular-nums;}}
+.st-key-cabecalho [data-testid="stHorizontalBlock"],
+[class*="st-key-par-"] [data-testid="stHorizontalBlock"] {{flex-wrap:wrap; row-gap:1rem;}}
+.st-key-cabecalho [data-testid="stColumn"] {{min-width:min(100%, 11rem);}}
+[class*="st-key-par-"] [data-testid="stColumn"] {{min-width:min(100%, 22rem);}}
+.st-key-cabecalho h1 {{font-size:clamp(1.75rem, 1.1rem + 2.4vw, 2.75rem);}}
 </style>
 """
+
+
+def html_metrica(rotulo, valor):
+    """Mini cartão da ficha: rótulo e valor já formatado (o texto exibido não muda)."""
+    return (
+        f'<div class="b3-metrica"><div class="b3-rotulo">{rotulo}</div>'
+        f'<div class="b3-valor">{valor}</div></div>'
+    )
 
 
 def html_cartao(rotulo, valor, definicao, cor, dica=None):
@@ -695,8 +788,21 @@ def fig_valor_qualidade(ind):
         line_dash="dash",
         line_color=TEXTO_2,
         annotation_text="EV/EBIT 10x",
-        annotation_position="top",
+        # dentro da área do gráfico: acima dela, o rótulo cobria a legenda
+        annotation_position="top right",
+        annotation_yanchor="top",
         annotation_font_color=TEXTO_2,
+    )
+    # px.scatter põe o nome da coluna ("rotulo") como título da legenda; o tamanho fixo evita
+    # que o marcador da legenda herde o tamanho da bolha. Abaixo do gráfico, a legenda pode
+    # quebrar em várias linhas no celular sem cobrir o título.
+    fig.update_layout(
+        legend={
+            "title": {"text": ""},
+            "itemsizing": "constant",
+            "y": -0.16,
+            "yanchor": "top",
+        }
     )
     for x, y, texto, xa, ya in (
         (0.5, 58, "Qualidade a bom preço", "left", "top"),
@@ -766,7 +872,12 @@ def fig_ranking_tematico(df, ranking, n=15):
         unidade += " (%)"
     elif INDICADORES[ranking["barras"][0]][1] is multiplo:
         unidade += " (x)"
-    fig.update_layout(barmode="group", showlegend=len(ranking["barras"]) > 1)
+    # margem direita: o rótulo "outside" da maior barra não entra no automargin dos eixos.
+    fig.update_layout(
+        barmode="group",
+        showlegend=len(ranking["barras"]) > 1,
+        margin={"r": 56},
+    )
     fig.update_yaxes(autorange="reversed", type="category", title=None, showgrid=False)
     fig.update_xaxes(title=unidade, showgrid=True, gridcolor=BORDA)
     return _layout(fig, f"4 · {ranking['aba']} — top {n}", 120 + 30 * len(top))
@@ -821,7 +932,8 @@ def fig_radar(linha):
                 "tickfont": {"color": TEXTO},
             },
         },
-        margin={"l": 60, "r": 60, "t": 72, "b": 30},
+        # o eixo polar não tem automargin: 84 px cabem "Operacional" e "Rentabilidade"
+        margin={"l": 84, "r": 84, "t": 72, "b": 30},
     )
     return _layout(fig, "5 · Perfil nos 10 rankings", 440)
 

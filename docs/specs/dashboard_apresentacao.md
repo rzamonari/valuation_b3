@@ -1,7 +1,7 @@
 # ESPECIFICAÇÃO — PAINEL DE RECOMENDAÇÕES (DASHBOARD)
 ## Pipeline de Indicadores Fundamentalistas B3 — Camada de Apresentação
 
-**Versão:** 1.6
+**Versão:** 1.7
 **Data de referência dos números desta spec:** 2026-11-02 (conferidos nas tabelas `marts` em 2026-11-03)
 **Specs relacionadas:** `marts_sql_indicadores.md`, `marts_sql_rank.md`,
 `marts_materializacao.md` (materialização da camada Gold)
@@ -31,6 +31,12 @@
 - 1.6 (2026-11-04): expander "Por que alguns tickers do Fundamentus ficam fora dos rankings?" na
   faixa 1, abaixo dos cartões, com a tabela de `marts_painel_exclusoes_motivo` (item 3), que
   passa a ser obrigatória.
+- 1.7 (2026-11-04): layout responsivo (itens 4.3, 4.7 e 8). Os seis cartões e os dez mini
+  cartões da ficha passam a uma grade que muda o número de colunas pela largura da área de
+  conteúdo, contando a barra lateral; pares de colunas (cabeçalho, rankings temáticos, radar e
+  cotação) quebram em linhas quando ficariam estreitos; quebra de linha só entre palavras; eixos
+  com margem automática; legenda do valor × qualidade abaixo do gráfico. Nenhum número muda.
+  Motivo: em 800 px, com a barra lateral aberta, os cartões partiam palavras e números.
 
 ---
 
@@ -213,7 +219,10 @@ não distingue verde de vermelho.
 
 ### 4.3 Faixa 1 — Pulso do mercado: seis cartões
 
-Seis colunas iguais, nesta ordem. Cada cartão é um bloco HTML estilizado
+Seis cartões de mesma largura, nesta ordem, numa grade responsiva (v1.7): 6 colunas com área de
+conteúdo a partir de 54rem (1440 px com a barra lateral aberta), 3 a partir de 30rem e 2 abaixo
+disso (celular). A largura considerada é a da área de conteúdo (container query), não a da janela.
+Quebra de linha só entre palavras; o número nunca quebra. Cada cartão é um bloco HTML estilizado
 (`st.markdown(..., unsafe_allow_html=True)`), com borda superior na cor do item 4.1, número grande,
 rótulo e uma linha de definição curta:
 
@@ -293,7 +302,8 @@ mostram o mesmo número (é `DENSE_RANK`); ordenar por `rank` e depois `ticker`.
 
 - Cabeçalho: ticker, empresa, segmento, município/UF, badge da recomendação, saldo.
 - Linha de mini cartões (`marts_painel_indicadores`, `marts_retorno_total_risco`): cotação, P/L,
-  P/VP, DY, ROE, ROIC, DL/PL, CAGR 5 anos, volatilidade anualizada, máximo drawdown.
+  P/VP, DY, ROE, ROIC, DL/PL, CAGR 5 anos, volatilidade anualizada, máximo drawdown. Grade de
+  5 × 2 com área de conteúdo a partir de 40rem e 2 × 5 abaixo (v1.7), sem linha incompleta.
   Valor nulo aparece como "—", nunca como zero. Ticker sem cálculo de retorno e risco
   (`motivo_sem_calculo`) mostra o motivo numa legenda abaixo dos cartões.
 - **5 · Perfil nos 10 rankings**: gráfico polar (radar) com os 10 rankings no eixo angular e a
@@ -387,6 +397,10 @@ Paleta (constantes únicas em `painel.py`, espelhadas no `config.toml`):
   `st.plotly_chart(..., theme=None)` para o template mandar nas cores.
 - Cartões em fundo secundário com borda; o termômetro usa fundo suave da cor predominante
   (transparência) e borda inteira nessa cor.
+- Responsivo (v1.7): sem rolagem horizontal da página em 375, 800 e 1440 px. Pares de colunas
+  (cabeçalho, gráfico + tabela dos rankings temáticos, radar + cotação) quebram em linhas quando
+  uma coluna ficaria abaixo do mínimo (11rem no cabeçalho, 22rem nos demais). Eixos do plotly com
+  `automargin`, para que tickers e valores em R$ não sejam cortados.
 - Espaçamento consistente entre faixas (`st.divider` entre seções) e títulos de seção com ícone
   discreto. Nada de cores fora desta tabela e do item 4.1.
 - Página com `page_title="B3 Valuation"`, `page_icon="📊"`.

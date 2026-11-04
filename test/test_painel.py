@@ -3,6 +3,7 @@
 A leitura usa um banco DuckDB temporário: o real não é tocado.
 """
 
+import json
 import subprocess
 import sys
 from datetime import date, datetime
@@ -10,9 +11,11 @@ from decimal import Decimal
 
 import duckdb
 import pandas as pd
+import plotly.io as pio
 import pytest
 
 import painel as p
+from pipeline import fotografia
 
 
 def novo_banco(tmp_path, monkeypatch):
@@ -361,3 +364,126 @@ def test_tabela_exclusoes_ordena_pela_regra_sem_calcular():
         "quantidade",
         "quantidade_negociada",
     ]
+
+
+# --------------------------------------------------------------------------- layout responsivo
+
+
+def test_grade_do_pulso_tem_2_colunas_de_base_e_cresce_pela_largura_do_conteudo():
+    css = p.css_grade("pulso", p.GRADE_PULSO)
+    base, tres, seis = css.splitlines()
+    assert base == ".b3-grade-pulso {grid-template-columns:repeat(2, minmax(0, 1fr));}"
+    assert tres.startswith("@container (min-width: 30rem)") and "repeat(3," in tres
+    assert seis.startswith("@container (min-width: 54rem)") and "repeat(6," in seis
+
+
+def test_grade_da_ficha_nao_deixa_linha_incompleta_com_10_metricas():
+    for _, colunas in p.GRADE_FICHA:
+        assert 10 % colunas == 0
+
+
+def test_css_traz_as_duas_grades_e_proibe_quebra_no_meio_da_palavra_e_do_numero():
+    assert ".b3-grade-pulso" in p.CSS and ".b3-grade-ficha" in p.CSS
+    assert "container-type:inline-size" in p.CSS
+    assert "word-break:normal" in p.CSS and "break-all" not in p.CSS
+    for classe in (".b3-numero", ".b3-valor"):
+        regra = p.CSS.split(classe + " {")[1].split("}")[0]
+        assert "white-space:nowrap" in regra
+
+
+def test_html_grade_mantem_os_cartoes_na_ordem_e_com_o_numero_formatado():
+    cartoes = [
+        p.html_cartao("Ações analisadas", 391, "negociados", p.AZUL),
+        p.html_cartao("Compra", 1234, "saldo positivo", p.AZUL),
+    ]
+    html = p.html_grade("pulso", cartoes)
+    assert html.startswith(
+        '<div class="b3-envelope"><div class="b3-grade b3-grade-pulso">'
+    )
+    assert html.index(">391<") < html.index(">1.234<")
+    assert html.count('class="b3-card"') == 2
+
+
+def test_metrica_da_ficha_exibe_o_valor_ja_formatado_sem_alterar():
+    html = p.html_metrica("Máximo drawdown", p.pct(-54.7))
+    assert ">Máximo drawdown<" in html
+    assert '<div class="b3-valor">-54,7%</div>' in html
+    assert '<div class="b3-valor">—</div>' in p.html_metrica("DY", p.pct(None))
+
+
+def test_eixos_dos_graficos_abrem_margem_para_os_rotulos():
+    layout = pio.templates[p.TEMPLATE].layout
+    assert layout.xaxis.automargin is True
+    assert layout.yaxis.automargin is True
+
+
+# --------------------------------------------------------------------------- leitura preguiçosa
+
+
+def nova_fotografia(tmp_path, monkeypatch):
+    """Fotografia mínima (Parquet + manifesto) com os marts de novo_banco; sem banco local."""
+    banco = novo_banco(tmp_path, monkeypatch)
+    pasta = tmp_path / "fotografia"
+    pasta.mkdir()
+    tabelas = {}
+    con = duckdb.connect(str(banco), read_only=True)
+    for nome in p.MARTS_OBRIGATORIOS:
+        arquivo = pasta / f"{nome}.parquet"
+        con.execute(f"COPY marts.\"{nome}\" TO '{arquivo.as_posix()}' (FORMAT parquet)")
+        tabelas[nome] = {"arquivo": arquivo.name, "sha256": fotografia._sha256(arquivo)}
+    con.close()
+    manifesto = {
+        "formato": fotografia.FORMATO,
+        "data_referencia": "2026-11-02",
+        "hash": fotografia._hash_total(tabelas),
+        "tabelas": tabelas,
+    }
+    (pasta / fotografia.MANIFESTO).write_text(json.dumps(manifesto), encoding="utf-8")
+    monkeypatch.setattr(p, "ARQUIVO_DB", tmp_path / "sem_banco.duckdb")
+    monkeypatch.setattr(p, "PASTA_FOTOGRAFIA", pasta)
+    return pasta
+
+
+def test_cotacao_fica_fora_da_carga_da_pagina():
+    assert p.MART_COTACAO not in p.MARTS_CARREGAR
+    assert p.MART_COTACAO in p.MARTS_OBRIGATORIOS
+
+
+def test_carga_da_pagina_nao_abre_o_parquet_da_cotacao(tmp_path, monkeypatch):
+    pasta = nova_fotografia(tmp_path, monkeypatch)
+    assert p.tabelas_faltando() == []
+    # cotação ilegível: a carga da página segue, só a ficha (ler_cotacao) falha
+    (pasta / "marts_cotacao.parquet").write_bytes(b"isto nao e parquet")
+    d = p.ler(p.MARTS_CARREGAR)
+    assert d["marts_card_02_acoes_compra"]["quantidade"].tolist() == [95]
+    with pytest.raises(p.FotografiaInvalida, match="marts_cotacao.parquet ilegível"):
+        p.ler_cotacao("AAAA3")
+
+
+def test_ler_cotacao_na_fotografia_traz_so_o_ticker_pedido(tmp_path, monkeypatch):
+    nova_fotografia(tmp_path, monkeypatch)
+    cot = p.ler_cotacao("AAAA3")
+    assert sorted(cot["fechamento_ajustado"].tolist()) == [1.0, 2.0]
+    assert p.ler_cotacao("ZZZZ3").empty
+
+
+def test_hashes_da_fotografia_so_sao_recalculados_quando_um_arquivo_muda(
+    tmp_path, monkeypatch
+):
+    pasta = nova_fotografia(tmp_path, monkeypatch)
+    lidos = []
+    sha256 = fotografia._sha256
+    monkeypatch.setattr(
+        fotografia, "_sha256", lambda a: lidos.append(a.name) or sha256(a)
+    )
+
+    assert p.tabelas_faltando() == []
+    assert "marts_cotacao.parquet" in lidos
+    lidos.clear()
+    assert p.tabelas_faltando() == []  # nova interação, arquivos intactos
+    assert lidos == []
+
+    with open(pasta / "marts_cotacao.parquet", "ab") as arquivo:
+        arquivo.write(b"\0")
+    with pytest.raises(p.FotografiaInvalida, match="hash divergente"):
+        p.tabelas_faltando()

@@ -208,18 +208,30 @@ def verificar(pasta: Path = PASTA_FOTOGRAFIA) -> dict:
     return manifesto
 
 
-def conectar(pasta: Path = PASTA_FOTOGRAFIA) -> duckdb.DuckDBPyConnection:
-    """Banco em memória com views marts."<mart>" sobre os Parquet. Quem chama fecha."""
+def conectar(
+    pasta: Path = PASTA_FOTOGRAFIA, nomes: list[str] | None = None
+) -> duckdb.DuckDBPyConnection:
+    """Banco em memória com views marts."<mart>" sobre os Parquet. Quem chama fecha.
+
+    nomes restringe as views aos marts que serão lidos (None = todos do manifesto): criar a
+    view abre o Parquet, e a carga da página não precisa abrir o da cotação.
+    """
     pasta = Path(pasta).resolve()
     manifesto = ler_manifesto(pasta)
+    tabelas = {
+        n: t for n, t in manifesto["tabelas"].items() if nomes is None or n in nomes
+    }
     con = duckdb.connect()
     try:
         con.execute("CREATE SCHEMA marts")
-        for nome, t in manifesto["tabelas"].items():
-            con.execute(
-                f"CREATE VIEW marts.{_ident(nome)} AS SELECT * FROM "
-                f"read_parquet({_literal((pasta / t['arquivo']).as_posix())})"
-            )
+        for nome, t in tabelas.items():
+            try:
+                con.execute(
+                    f"CREATE VIEW marts.{_ident(nome)} AS SELECT * FROM "
+                    f"read_parquet({_literal((pasta / t['arquivo']).as_posix())})"
+                )
+            except duckdb.Error as exc:
+                raise ErroFotografia(f"{t['arquivo']} ilegível: {exc}") from exc
     except BaseException:
         con.close()
         raise

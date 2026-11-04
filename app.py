@@ -58,7 +58,8 @@ def limpar_filtros():
 # --------------------------------------------------------------------------------------------
 # Cabeçalho
 # --------------------------------------------------------------------------------------------
-esq, dir_ = st.columns([4, 1], vertical_alignment="center")
+with st.container(key="cabecalho"):
+    esq, dir_ = st.columns([4, 1], vertical_alignment="center")
 esq.title("📈 B3 Valuation · Visões de Investimentos")
 linha_data = esq.empty()
 if dir_.button("🔄 Recarregar dados", width="stretch"):
@@ -168,8 +169,7 @@ cartoes = [
     ),
     p.html_termometro(d["marts_card_05_termometro_mercado"], compra, manter, venda),
 ]
-for coluna, html in zip(st.columns(6), cartoes, strict=False):
-    coluna.markdown(html, unsafe_allow_html=True)
+st.markdown(p.html_grade("pulso", cartoes), unsafe_allow_html=True)
 
 with st.expander("Por que alguns tickers do Fundamentus ficam fora dos rankings?"):
     st.caption(
@@ -255,7 +255,8 @@ for aba, ranking in zip(
     with aba:
         st.caption(ranking["frase"])
         df_rank = d[ranking["mart"]]
-        c1, c2 = st.columns([3, 2])
+        with st.container(key=f"par-{ranking['chave']}"):
+            c1, c2 = st.columns([3, 2])
         with c1:
             grafico(p.fig_ranking_tematico(df_rank, ranking))
         with c2:
@@ -310,15 +311,15 @@ mini = [
     ("Volatilidade anualizada", p.pct(risco.get("volatilidade_anualizada"))),
     ("Máximo drawdown", p.pct(risco.get("max_drawdown"))),
 ]
-for inicio in (0, 5):
-    for coluna, (rotulo, valor) in zip(
-        st.columns(5), mini[inicio : inicio + 5], strict=False
-    ):
-        coluna.metric(rotulo, valor, border=True)
+st.markdown(
+    p.html_grade("ficha", [p.html_metrica(r, v) for r, v in mini]),
+    unsafe_allow_html=True,
+)
 if isinstance(risco.get("motivo_sem_calculo"), str):
     st.caption(f"Retorno e risco sem cálculo: {risco['motivo_sem_calculo']}.")
 
-c1, c2 = st.columns([2, 3])
+with st.container(key="par-ficha"):
+    c1, c2 = st.columns([2, 3])
 with c1:
     grafico(p.fig_radar(linha))
 with c2:
