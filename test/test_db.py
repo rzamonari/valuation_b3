@@ -85,3 +85,25 @@ def test_gravar_aceita_nome_de_coluna_com_aspas_e_espacos(tmp_path, monkeypatch)
     colunas = [c[0] for c in con.execute("DESCRIBE raw.fundamentus").fetchall()]
     con.close()
     assert colunas == ['Div. "Yield"', "Patrim. Líq"]
+
+
+def test_caminho_banco_sem_variavel_usa_o_arquivo_padrao_na_raiz(monkeypatch):
+    monkeypatch.delenv(db.VARIAVEL_DB, raising=False)
+    assert db.caminho_banco() == db._RAIZ / "fundamentalistas.duckdb"
+
+
+def test_caminho_banco_vazio_e_tratado_como_ausente(monkeypatch):
+    monkeypatch.setenv(db.VARIAVEL_DB, "  ")
+    assert db.caminho_banco() == db._RAIZ / "fundamentalistas.duckdb"
+
+
+def test_caminho_banco_relativo_e_resolvido_a_partir_da_raiz(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)  # o diretório corrente não influencia
+    monkeypatch.setenv(db.VARIAVEL_DB, "dados/outro.duckdb")
+    assert db.caminho_banco() == db._RAIZ / "dados" / "outro.duckdb"
+
+
+def test_caminho_banco_absoluto_e_usado_como_veio(monkeypatch, tmp_path):
+    arquivo = tmp_path / "homologacao.duckdb"
+    monkeypatch.setenv(db.VARIAVEL_DB, str(arquivo))
+    assert db.caminho_banco() == arquivo

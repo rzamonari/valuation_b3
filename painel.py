@@ -57,7 +57,6 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
 
 import math
 from datetime import date, datetime
-from pathlib import Path
 
 import duckdb
 import pandas as pd
@@ -66,8 +65,11 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.subplots import make_subplots
 
-RAIZ = Path(__file__).resolve().parent
-ARQUIVO_DB = RAIZ / "fundamentalistas.duckdb"
+from pipeline import db
+
+ARQUIVO_DB = (
+    db.caminho_banco()
+)  # o mesmo banco do pipeline (VALUATIONB3_DB ou o padrão)
 SCHEMA_MARTS = "marts"
 
 MARTS_CARDS = [

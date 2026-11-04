@@ -1,6 +1,9 @@
 """Ingestão da camada Raw (Bronze): B3, Fundamentus, Minha Receita e yfinance.
 
 Execução: uv run python -m pipeline.ingestao
+
+Progresso e relatório saem por logging em stdout; retries, falhas por item e erros fatais,
+em stderr (ver pipeline/log.py).
 """
 
 import base64
@@ -19,7 +22,7 @@ import yfinance as yf
 from lxml import html
 from yfinance.exceptions import YFException, YFRateLimitError
 
-from pipeline import db
+from pipeline import db, log
 
 SCHEMA = "raw"
 
@@ -39,6 +42,8 @@ WORKERS_YFINANCE = 4
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 _local = threading.local()
+# Nome fixo: executado com -m, __name__ seria "__main__", fora do logger "pipeline".
+_log = logging.getLogger("pipeline.ingestao")
 
 
 class FalhaExtracao(Exception):
@@ -78,7 +83,7 @@ def _com_retry(operacao, descricao):
             if tentativa == TENTATIVAS:
                 raise
             espera = BACKOFF_BASE**tentativa
-            print(
+            _log.warning(
                 f"  [retry {tentativa}/{TENTATIVAS - 1}] {descricao}: {exc} — aguardando {espera}s"
             )
             time.sleep(espera)
@@ -124,18 +129,18 @@ def _em_paralelo(funcao, itens, workers, rotulo):
         for i, (item, resultado, erro) in enumerate(pool.map(executar, itens), start=1):
             if erro is not None:
                 falhas.append(item)
-                print(f"  [falha] {rotulo} {item}: {erro}")
+                _log.warning(f"  [falha] {rotulo} {item}: {erro}")
             else:
                 resultados.append((item, resultado))
             if i % 250 == 0 or i == total:
-                print(f"  {rotulo}: {i}/{total} processados ({len(falhas)} falhas)")
+                _log.info(f"  {rotulo}: {i}/{total} processados ({len(falhas)} falhas)")
     return resultados, falhas
 
 
 # --------------------------------------------------------------------------- validação prévia
 
 
-def validar_fontes():
+def validar_fontes() -> None:
     """Confirma que a página oficial da B3 responde e que o app de listados (iframe dela) está no ar.
 
     O conteúdo da página oficial não é exigido: o CDN da B3 devolve com frequência HTTP 200
@@ -156,7 +161,7 @@ def validar_fontes():
 # --------------------------------------------------------------------------- fontes
 
 
-def extrair_b3():
+def extrair_b3() -> pd.DataFrame:
     timestamp = _agora_utc()
     registros, pagina, total_paginas = [], 1, 1
     while pagina <= total_paginas:
@@ -179,13 +184,13 @@ def extrair_b3():
     return df
 
 
-def identificar_cnpjs(df_b3):
+def identificar_cnpjs(df_b3: pd.DataFrame) -> list[str]:
     # Valores exatamente como vieram da B3 (M6); a repetição de consultas idênticas é evitada.
     # Vazio não identifica CNPJ: consultá-lo retornaria a página inicial da Minha Receita.
     return list(dict.fromkeys(c for c in df_b3["cnpj"] if c))
 
 
-def identificar_tickers(df_b3):
+def identificar_tickers(df_b3: pd.DataFrame) -> list[str]:
     """Tickers negociáveis via GetDetail (otherCodes) de cada codeCVM; os detalhes não são persistidos."""
     codigos_cvm = list(dict.fromkeys(c for c in df_b3["codeCVM"] if c is not None))
 
@@ -204,7 +209,7 @@ def identificar_tickers(df_b3):
     return list(dict.fromkeys(tickers))
 
 
-def extrair_fundamentus():
+def extrair_fundamentus() -> pd.DataFrame:
     timestamp = _agora_utc()
     resposta = _com_retry(lambda: _get(URL_FUNDAMENTUS), "Fundamentus")
     tabelas = html.fromstring(resposta.text).xpath("//table")
@@ -231,7 +236,7 @@ def _url_minhareceita(cnpj):
     return f"{URL_MINHARECEITA}{consulta}"
 
 
-def extrair_minhareceita(cnpjs):
+def extrair_minhareceita(cnpjs: list[str]) -> pd.DataFrame:
     timestamp = _agora_utc()
 
     def consultar(cnpj):
@@ -253,7 +258,7 @@ def extrair_minhareceita(cnpjs):
 
     rejeitados = [cnpj for cnpj, (_, payload) in resultados if payload is None]
     if rejeitados:
-        print(
+        _log.warning(
             f"  {len(rejeitados)} CNPJs rejeitados pela API (HTTP 400/404): {rejeitados}"
         )
     registros = [
@@ -271,7 +276,7 @@ def extrair_minhareceita(cnpjs):
     return pd.DataFrame(registros, dtype=object)
 
 
-def extrair_yfinance(tickers):
+def extrair_yfinance(tickers: list[str]) -> pd.DataFrame:
     timestamp = _agora_utc()
 
     def historico(ticker):
@@ -317,21 +322,21 @@ def extrair_yfinance(tickers):
 
 
 def _extrair_tudo():
-    print("Validando fontes...")
+    _log.info("Validando fontes...")
     validar_fontes()
-    print("Extraindo B3...")
+    _log.info("Extraindo B3...")
     df_b3 = extrair_b3()
-    print(f"  {len(df_b3)} registros")
-    print("Extraindo Fundamentus...")
+    _log.info(f"  {len(df_b3)} registros")
+    _log.info("Extraindo Fundamentus...")
     df_fundamentus = extrair_fundamentus()
-    print(f"  {len(df_fundamentus)} registros")
-    print("Identificando CNPJs e tickers da B3...")
+    _log.info(f"  {len(df_fundamentus)} registros")
+    _log.info("Identificando CNPJs e tickers da B3...")
     cnpjs = identificar_cnpjs(df_b3)
     tickers = identificar_tickers(df_b3)
-    print(f"  {len(cnpjs)} CNPJs, {len(tickers)} tickers")
-    print("Consultando Minha Receita...")
+    _log.info(f"  {len(cnpjs)} CNPJs, {len(tickers)} tickers")
+    _log.info("Consultando Minha Receita...")
     df_minhareceita = extrair_minhareceita(cnpjs)
-    print("Consultando yfinance...")
+    _log.info("Consultando yfinance...")
     df_yfinance = extrair_yfinance(tickers)
     return {
         "b3_empresas": df_b3,
@@ -348,16 +353,15 @@ def _imprimir_relatorio(contagens):
     largura = 33
     total = sum(contagens.values())
     numeros = max(len(fmt(total)), 15)
-    print()
+    _log.info("")
     for tabela, n in contagens.items():
-        print(f"{f'{SCHEMA}.{tabela}':<{largura}}{fmt(n):>{numeros}}")
-    print("-" * (largura + numeros))
-    print(f"{'TOTAL':<{largura}}{fmt(total):>{numeros}}")
+        _log.info(f"{f'{SCHEMA}.{tabela}':<{largura}}{fmt(n):>{numeros}}")
+    _log.info("-" * (largura + numeros))
+    _log.info(f"{'TOTAL':<{largura}}{fmt(total):>{numeros}}")
 
 
-def main():
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+def main() -> None:
+    log.configurar()
     logging.getLogger("yfinance").setLevel(logging.CRITICAL)
     warnings.filterwarnings(
         "ignore", module=r"yfinance\."
@@ -369,8 +373,8 @@ def main():
     try:
         tabelas = _extrair_tudo()
     except Exception as exc:  # noqa: BLE001 — qualquer falha de fonte aborta (E2)
-        print(f"\nERRO DE EXTRAÇÃO — {exc}", file=sys.stderr)
-        print("Nenhuma tabela foi gravada.", file=sys.stderr)
+        _log.error(f"\nERRO DE EXTRAÇÃO — {exc}")
+        _log.error("Nenhuma tabela foi gravada.")
         sys.exit(1)
 
     con = db.conectar()
@@ -384,10 +388,8 @@ def main():
             con.commit()
         except Exception as exc:  # noqa: BLE001 — qualquer falha de gravação faz rollback (E3)
             con.rollback()
-            print(f"\nERRO DE PERSISTÊNCIA — {exc}", file=sys.stderr)
-            print(
-                "Rollback executado: nenhuma das tabelas foi alterada.", file=sys.stderr
-            )
+            _log.error(f"\nERRO DE PERSISTÊNCIA — {exc}")
+            _log.error("Rollback executado: nenhuma das tabelas foi alterada.")
             sys.exit(1)
         _imprimir_relatorio(contagens)
     finally:

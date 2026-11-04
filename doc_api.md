@@ -18,7 +18,8 @@ pipeline de indicadores fundamentalistas de ações da B3 em arquitetura Medalli
 | Gold | `marts` | `sql/marts/*.sql` + `pipeline/materializacao.py` | Indicadores, rankings e agregados do painel |
 | Apresentação | — | `painel.py` + `app.py` | Leitura somente leitura dos marts e visualização |
 
-Banco único: `fundamentalistas.duckdb`, na raiz do projeto.
+Banco único: `fundamentalistas.duckdb`, na raiz do projeto (sobrescrevível pela variável de
+ambiente `VALUATIONB3_DB`; ver seção 3).
 
 ### Fontes externas
 
@@ -44,7 +45,8 @@ uv run python -m pipeline.materializacao   # 3. Gold    (marts)
 
 uv run streamlit run app.py                # painel web
 uv run python ui.py                        # DuckDB UI em http://localhost:4213
-uv run pytest --cov                        # testes (cobertura mínima 60%)
+uv run pytest                              # testes, sempre com cobertura (mínimo 60%)
+uv run mkdocs serve                        # documentação em http://127.0.0.1:8000
 ```
 
 A ordem das etapas importa: cada uma lê apenas a camada anterior.
@@ -58,6 +60,12 @@ A ordem das etapas importa: cada uma lê apenas a camada anterior.
 Todos os comandos do pipeline terminam com código `0` em sucesso e `1` em falha. Em falha, a
 gravação é desfeita por `ROLLBACK` e nenhuma tabela da camada de destino muda.
 
+### Saída e logging
+
+As etapas registram por `logging` no logger `pipeline` (configurado por
+`pipeline.log.configurar()`): progresso e relatório em **stdout**; retries, falhas por item,
+avisos e erros em **stderr**. Logs de bibliotecas (ex.: `yfinance`) não são exibidos.
+
 ---
 
 ## 3. `pipeline.db` — infraestrutura
@@ -65,11 +73,21 @@ gravação é desfeita por `ROLLBACK` e nenhuma tabela da camada de destino muda
 | Símbolo | Assinatura | Descrição |
 |---|---|---|
 | `PASTA_RAW` | `Path` | Pasta `raw/` na raiz do projeto |
-| `conectar` | `conectar() -> duckdb.DuckDBPyConnection` | Abre (criando se preciso) `fundamentalistas.duckdb` em modo leitura/escrita. Quem chama fecha. |
-| `criar_schema` | `criar_schema(con, nome)` | `CREATE SCHEMA IF NOT EXISTS` |
+| `VARIAVEL_DB` | `str` | Nome da variável de ambiente do banco: `VALUATIONB3_DB` |
+| `caminho_banco` | `caminho_banco() -> Path` | `VALUATIONB3_DB`, se definida e não vazia; senão `fundamentalistas.duckdb` na raiz |
+| `conectar` | `conectar() -> duckdb.DuckDBPyConnection` | Abre (criando se preciso) o banco em modo leitura/escrita. Quem chama fecha. |
+| `criar_schema` | `criar_schema(con, nome) -> None` | `CREATE SCHEMA IF NOT EXISTS` |
 | `gravar` | `gravar(con, df, schema, tabela) -> int` | Recria `schema.tabela` a partir de um DataFrame, com todas as colunas `VARCHAR`; devolve o `COUNT(*)`. Não controla transação. |
 
 Os caminhos são resolvidos a partir do arquivo do módulo, independentemente do diretório atual.
+Um `VALUATIONB3_DB` relativo também é resolvido a partir da raiz do projeto. O caminho é lido na
+importação; o pipeline e o painel (`painel.ARQUIVO_DB`) usam o mesmo valor. O `.mcp.json`
+continua apontando para `fundamentalistas.duckdb`.
+
+```powershell
+$env:VALUATIONB3_DB = "D:\dados\homologacao.duckdb"   # PowerShell
+uv run python -m pipeline.transformacao
+```
 
 ---
 
@@ -356,8 +374,9 @@ uv run ruff format . --check   # formatação
 
 | Arquivo | Cobre |
 |---|---|
-| `test/test_db.py` | Conexão, schema e gravação |
+| `test/test_db.py` | Conexão, caminho do banco (`VALUATIONB3_DB`), schema e gravação |
 | `test/test_ingestao.py` | Retry, extração de cada fonte e atomicidade da ingestão (sem rede) |
+| `test/test_log.py` | Destino das mensagens por nível (stdout/stderr) e reconfiguração |
 | `test/test_transformacao.py` | Conversões, chaves, deduplicação e publicação da Silver |
 | `test/test_sql_marts.py` | Execução e resultados das consultas `.sql` |
 | `test/test_marts.py` | Inventário, validação e atomicidade da materialização |
