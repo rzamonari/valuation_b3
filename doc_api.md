@@ -1,0 +1,385 @@
+# Referência da API — B3 Valuation (`valuationb3`)
+
+Pipeline de indicadores fundamentalistas de ações da B3 em arquitetura Medallion
+(Bronze → Silver → Gold) sobre DuckDB, com painel somente leitura em Streamlit.
+
+> Os sinais Compra/Manter/Venda são relativos e mecânicos, derivados de 10 rankings sobre uma
+> fotografia de dados. **Não constituem recomendação de investimento.**
+
+Números de linhas citados abaixo vêm do banco `fundamentalistas.duckdb` com data de referência
+**02/11/2026**; mudam a cada ingestão.
+
+---
+
+## 1. Visão geral
+
+| Camada | Schema | Módulo | Comando | Regra principal |
+|---|---|---|---|---|
+| Bronze | `raw` | [pipeline/ingestao.py](pipeline/ingestao.py) | `uv run python -m pipeline.ingestao` | Dado como veio, tudo `VARCHAR` |
+| Silver | `refined` | [pipeline/transformacao.py](pipeline/transformacao.py) | `uv run python -m pipeline.transformacao` | Tipagem estrita, deduplicação, chaves; sem cálculo |
+| Gold | `marts` | [sql/marts/](sql/marts/) + [pipeline/materializacao.py](pipeline/materializacao.py) | `uv run python -m pipeline.materializacao` | Um `SELECT` puro por mart |
+| Apresentação | — | [painel.py](painel.py) + [app.py](app.py) | `uv run streamlit run app.py` | Só lê, filtra, ordena e formata |
+
+Utilitários: [ui.py](ui.py) abre o banco na DuckDB UI (`http://localhost:4213`);
+[.mcp.json](.mcp.json) expõe o banco a um servidor MCP de leitura (`mcp-server-motherduck`).
+
+### Garantias transversais
+
+- **Atomicidade:** cada etapa publica tudo numa única transação; falha → `ROLLBACK`, versão anterior preservada.
+- **Idempotência:** `CREATE OR REPLACE` / `IF NOT EXISTS`; reexecutar produz o mesmo estado.
+- **Isolamento:** cada etapa lê só a camada anterior e grava só no seu schema.
+- **Nulos preservados:** nunca viram zero; divisão por zero resulta em `NULL`.
+- **Código de saída:** `0` em sucesso, `1` em falha (mensagem em `stderr`, sem traceback).
+- **Banco único:** `fundamentalistas.duckdb` na raiz, caminho derivado de `Path(__file__)` (independe do cwd).
+
+---
+
+## 2. Instalação e execução
+
+Requisitos: Python ≥ 3.13 e [uv](https://docs.astral.sh/uv/).
+
+```powershell
+uv sync
+uv run python -m pipeline.ingestao        # 1. Bronze  (raw)
+uv run python -m pipeline.transformacao   # 2. Silver  (refined)
+uv run python -m pipeline.materializacao  # 3. Gold    (marts)
+uv run streamlit run app.py               # painel
+```
+
+Feche a DuckDB UI (`ui.py`) antes das etapas 1 a 3: o DuckDB aceita um único processo gravando.
+O painel pode ficar aberto (abre e fecha conexão `read_only` a cada leitura); depois de
+materializar, clique em **Recarregar dados**.
+
+Dependências (`pyproject.toml`): `duckdb`, `pandas`, `plotly`, `pyarrow`, `streamlit`, `yfinance`.
+Grupo `dev`: `pytest`, `pytest-cov`, `ruff`.
+
+> `pipeline/ingestao.py` também importa `requests` e `lxml`, que hoje chegam como dependências
+> transitivas e não estão declaradas no `pyproject.toml` (pendência P1 do [plan.md](plan.md)).
+
+---
+
+## 3. `pipeline.db` — infraestrutura
+
+| Símbolo | Descrição |
+|---|---|
+| `PASTA_RAW` | `<raiz>/raw` |
+| `conectar()` | Abre (criando se preciso) `fundamentalistas.duckdb`. Quem chama fecha. |
+| `criar_schema(con, nome)` | `CREATE SCHEMA IF NOT EXISTS`. |
+| `gravar(con, df, schema, tabela)` | Recria `schema.tabela` a partir do DataFrame com **todas as colunas `VARCHAR`** e devolve o `COUNT(*)`. Não abre nem confirma transação. |
+| `_ident(nome)` | Cita identificador SQL com aspas duplas (escapando `"`). |
+
+---
+
+## 4. `pipeline.ingestao` — Bronze (`raw`)
+
+### Fontes
+
+| Tabela | Fonte | Como |
+|---|---|---|
+| `raw.b3_empresas` | API de empresas listadas da B3 (`listedCompaniesProxy/CompanyCall/GetInitialCompanies`) | Paginação de 120; parâmetros em JSON codificado em Base64 na URL |
+| `raw.fundamentus_acoes` | `https://www.fundamentus.com.br/resultado.php` | Primeira `<table>` do HTML (via `lxml`) |
+| `raw.minhareceita_empresas` | `https://minhareceita.org/<cnpj>` | Um GET por CNPJ da B3; payload JSON guardado inteiro em `payload_json` |
+| `raw.yfinance_cotacoes` | Yahoo Finance (`yfinance`), símbolo `<ticker>.SA` | `history(period="max", interval="1d", auto_adjust=False)` |
+
+Toda tabela recebe `_timestamp_ingestao` (UTC, ISO-8601) e `_source_origin` (URL ou símbolo consultado).
+
+### Funções públicas
+
+| Função | Retorno | Observação |
+|---|---|---|
+| `validar_fontes()` | — | Confere a página oficial da B3 e o app de listados (`<app-root>`); falha → `FalhaExtracao` |
+| `extrair_b3()` | `DataFrame` | Todas as páginas; vazio → `FalhaExtracao` |
+| `identificar_cnpjs(df_b3)` | `list[str]` | CNPJs distintos e não vazios, exatamente como vieram |
+| `identificar_tickers(df_b3)` | `list[str]` | `GetDetail` por `codeCVM`, coletando `otherCodes[].code` (detalhes não são persistidos) |
+| `extrair_fundamentus()` | `DataFrame` | Tabela sem linhas/colunas → `FalhaExtracao` |
+| `extrair_minhareceita(cnpjs)` | `DataFrame` | CNPJ completado com zeros **só na URL**; HTTP 400/404 = CNPJ rejeitado (ignorado e listado); outra falha → `FalhaExtracao` |
+| `extrair_yfinance(tickers)` | `DataFrame` | Falha por ticker é registrada e ignorada; nenhum histórico → `FalhaExtracao` |
+| `main()` | — | Extrai tudo, depois grava as 4 tabelas numa transação e imprime o relatório |
+
+### Resiliência
+
+| Constante | Valor | Uso |
+|---|---|---|
+| `TENTATIVAS` | 3 | Execuções por operação |
+| `BACKOFF_BASE` | 2 | Espera exponencial: 2 s, 4 s |
+| `TIMEOUT` | 30 | Segundos por requisição |
+| `WORKERS_HTTP` | 8 | Paralelismo B3 detalhe / Minha Receita |
+| `WORKERS_YFINANCE` | 4 | Paralelismo yfinance (rate limit) |
+
+- HTTP 429 e 5xx são repetidos; outros 4xx viram `_ErroDefinitivo` (sem retry).
+- `FalhaExtracao`: qualquer fonte inteira falhou → **nenhuma tabela é gravada**, saída 1.
+- Falha de gravação → `ROLLBACK`, nenhuma tabela `raw.*` alterada, saída 1.
+
+---
+
+## 5. `pipeline.transformacao` — Silver (`refined`)
+
+Lê só `raw`, grava só `refined`. A docstring do módulo contém a especificação técnica completa.
+
+### Tabelas produzidas (7)
+
+| Tabela | Origem | Chave lógica | Linhas |
+|---|---|---|---|
+| `refined.b3_empresas` | `raw.b3_empresas` | `codigo_cvm` | 3.548 |
+| `refined.fundamentus_acoes` | `raw.fundamentus_acoes` | `ticker` | 995 |
+| `refined.yfinance_cotacoes` | `raw.yfinance_cotacoes` | `(ticker, data)` | 1.920.774 |
+| `refined.minhareceita_empresas` | escalares de `payload_json` | `cnpj` | 3.220 |
+| `refined.minhareceita_qsa` | array `qsa` | `(cnpj, sequencia_socio)` | 14.704 |
+| `refined.minhareceita_regime_tributario` | array `regime_tributario` | `(cnpj, sequencia_regime)` | 24.903 |
+| `refined.minhareceita_cnaes_secundarios` | array `cnaes_secundarios` | `(cnpj, codigo_cnae)` | 17.929 |
+
+Os nomes das colunas são padronizados em `snake_case` português (ex.: `P/L` → `preco_lucro`,
+`Adj Close` → `fechamento_ajustado`, `codeCVM` → `codigo_cvm`). O mapeamento completo está em
+`TABELAS_SQL`, `ESCALARES_EMPRESA` e `ARRAYS_EMPRESA`.
+
+### Conversões estritas (`Conversao`)
+
+| Conversão | Formato aceito | Destino |
+|---|---|---|
+| `TEXTO` | qualquer | `VARCHAR` |
+| `DATA_BR` | `DD/MM/YYYY` | `DATE` |
+| `NUMERO_BR` | `-1.234,56` ou `12,3%`; `-` = ausente | `DECIMAL(p,s)` calculado sobre os dados (sem dividir `%` por 100) |
+| `TIMESTAMP_TZ` | `YYYY-MM-DD HH:MM:SS[.f]±HH:MM` | `TIMESTAMPTZ` |
+| `DOUBLE` | decimal/científico | `DOUBLE` |
+| `BIGINT` | inteiro | `BIGINT` |
+| `CNPJ` | até 14 dígitos | `VARCHAR` com zeros à esquerda; `''` permanece `''` |
+
+Valor que não casa com o formato **interrompe** a transformação (nada de conversão tolerante).
+
+### Regras
+
+- Toda coluna Bronze precisa estar mapeada e vice-versa (nenhuma descartada em silêncio).
+- Duplicatas **integralmente idênticas** são removidas; chave nula ou duplicada com conteúdo diferente → erro.
+- JSON da Minha Receita é validado contra o contrato (propriedades e tipos esperados).
+- Percentuais do Fundamentus ficam na escala 0–100.
+
+### API
+
+| Símbolo | Descrição |
+|---|---|
+| `ErroTransformacao(etapa, motivo, *, origem, destino, coluna, exemplo)` | Erro com contexto formatado; nenhuma tabela Silver é publicada |
+| `verificar_bronze(con)` | Exige as 4 tabelas `raw.*`; orienta rodar a ingestão |
+| `preparar_tabela_sql(con, tabela)` | Converte, deduplica e valida uma `TabelaSql` em tabela temporária → `Preparada` |
+| `preparar_minhareceita(con)` | Decodifica o JSON em tabela principal + 3 arrays → `list[Preparada]` |
+| `publicar(con, preparadas)` | Substitui todas as `refined.*` numa transação |
+| `executar(con)` | Orquestra tudo e devolve o relatório (origem, duplicatas, gravados, nulos por coluna) |
+| `main()` | Ponto de entrada CLI |
+
+---
+
+## 6. Camada Gold (`marts`)
+
+Cada `sql/marts/<nome>.sql` é um `SELECT` puro (fonte da verdade) e vira a tabela
+`marts.<nome>`. Os marts leem apenas `refined`. Documentação detalhada:
+[sql/marts/README.md](sql/marts/README.md) (indicadores) e
+[sql/marts/RANKINGS.md](sql/marts/RANKINGS.md) (rankings e recomendação).
+
+### 6.1 Indicadores (fonte: `refined.fundamentus_acoes`, 995 linhas, chave `ticker`)
+
+| Mart | Colunas | Natureza |
+|---|---|---|
+| `marts_roic` | `roic` (%) | Pronto |
+| `marts_roe` | `roe` (%) | Pronto |
+| `marts_ev_ebit` | `enterprise_value_ebit` (x) | Pronto |
+| `marts_alavancagem` | `divida_liquida_patrimonio` (x) | Pronto |
+| `marts_preco_lucro` | `preco_lucro`, `earnings_yield = 100 / P/L` | Derivado |
+| `marts_margens` | `margem_ebit`, `margem_liquida`, `margem_bruta` (%) | Pronto |
+| `marts_crescimento_receita_5_anos` | `crescimento_receita_5_anos` (%) | Pronto |
+| `marts_dividend_yield_payout` | `dividend_yield`, `payout = DY × P/L` | Derivado |
+| `marts_p_vp` | `preco_valor_patrimonial`, `roe`, `p_vp_por_roe` | Derivado |
+
+### 6.2 Retorno e risco (fonte: `refined.yfinance_cotacoes`)
+
+| Mart | Chave | Linhas | Conteúdo |
+|---|---|---|---|
+| `marts_retorno_total_risco` | `ticker` | 609 | `cagr`, `volatilidade_anualizada`, `max_drawdown` + rastreabilidade (`data_inicial`, `data_final`, `anos`, `qtd_precos_validos`, `qtd_retornos`, `preco_inicial`, `preco_final`) |
+| `marts_cotacao` | `(ticker, data)` | 1.920.774 | Histórico OHLC, `fechamento_ajustado`, `volume`, `dividendos`, `desdobramentos`, `ganhos_capital` |
+
+Metodologia: janela de 5 anos até a última cotação; preço válido = `fechamento_ajustado > 0`;
+`cagr = ((final/inicial)^(1/anos) − 1) × 100` com `anos = dias / 365,25`;
+`volatilidade = stddev_samp(ln(Pt/Pt−1)) × √252 × 100`; `max_drawdown = min(Pt / max(P0..Pt) − 1) × 100`.
+
+### 6.3 Rankings temáticos (`marts_01` … `marts_10`, chave `ticker`)
+
+Consulta-base comum:
+
+```sql
+FROM refined.fundamentus_acoes a
+INNER JOIN refined.b3_empresas b ON b.empresa_emissora = SUBSTRING(a.ticker, 1, 4)
+LEFT JOIN refined.minhareceita_empresas c ON c.cnpj = b.cnpj
+```
+
+Classificação por `DENSE_RANK` (empates recebem o mesmo rank).
+
+| Mart | Tema | Elegibilidade | Ordem | Linhas |
+|---|---|---|---|---|
+| `marts_01_rank_valor` | Valor (Magic Formula simplificada) | ROIC > 0, EV/EBIT > 0 | soma de rank ROIC ↓ + rank EV/EBIT ↑ | 387 |
+| `marts_02_rank_proventos` | Proventos | DY > 0, P/L > 0, payout ≥ 0 | DY ↓, payout ↑ | 256 |
+| `marts_03_rank_eficiencia` | Eficiência | margem EBIT > 0, margem líquida > 0 | margem EBIT ↓, margem líquida ↓ | 335 |
+| `marts_04_rank_retorno` | Retorno | ROE > 0, DL/PL não nula e ≤ 1,5 | ROE ↓, DL/PL ↑ | 367 |
+| `marts_05_rank_pechincha` | Pechincha | P/L > 0, EV/EBIT > 0 | soma de rank P/L ↑ + rank EV/EBIT ↑ | 336 |
+| `marts_06_rank_patrimonio` | Patrimônio | P/VP > 0, ROE > 0 | P/VP ÷ ROE ↑ | 384 |
+| `marts_07_rank_crescimento` | Crescimento | cresc. 5a não nulo, ROIC > 10 | cresc. receita ↓ | 222 |
+| `marts_08_rank_operacional` | Operacional | margem EBIT > 0 | margem EBIT ↓ | 394 |
+| `marts_09_rank_seguro` | Seguro | DL/PL não nula e ≤ 1,5, ROIC > 0, ROE > 0 | DL/PL ↑, ROIC ↓, ROE ↓ | 277 |
+| `marts_10_rank_rentabilidade` | Rentabilidade | P/L > 0 | earnings yield ↓ | 397 |
+
+Proventos não tem teto de payout: 56 dos 256 elegíveis têm payout estimado acima de 100%.
+
+### 6.4 Recomendação consolidada — `marts_50_rank_recomendacoes`
+
+1. Cada um dos 10 rankings é reproduzido dentro da consulta.
+2. Faixa por ranking (aritmética inteira, terços):
+
+   | Faixa | Regra | Pontos |
+   |---|---|---|
+   | Superior | `(rank − 1) × 3 < max_rank − 1` (ou `max_rank = 1`) | +1 |
+   | Intermediário | demais elegíveis | 0 |
+   | Inferior | `(rank − 1) × 3 > 2 × (max_rank − 1)` | −1 |
+   | Não elegível | reprovado na elegibilidade | −1 |
+
+3. `saldo = qtd_superior − qtd_inferior − qtd_nao_elegivel` (−10 a +10):
+   `> 0` → **Compra**, `= 0` → **Manter**, `< 0` → **Venda**.
+4. Só tickers com `liquidez_2_meses > 0`; `posicao` = `DENSE_RANK` por `saldo` ↓ e `qtd_superior` ↓.
+
+Colunas: `posicao`, `recomendacao`, `ticker`, `empresa`, `razao_social`, `segmento`, `atividade`,
+`mercado`, `municipio`, `uf`, `natureza_juridica`, `data_inicio_atividade`, `situacao`, `cotacao`,
+`liquidez_2_meses`, `saldo`, `qtd_superior`, `qtd_intermediario`, `qtd_inferior`,
+`qtd_nao_elegivel` e `faixa_<tema>` para os 10 temas (auditoria).
+
+Fotografia atual: 391 tickers — 95 Compra, 20 Manter, 276 Venda.
+
+### 6.5 Marts do painel
+
+| Mart | Grão | Colunas |
+|---|---|---|
+| `marts_card_01_acoes_analisadas` | 1 linha | `quantidade` (tickers com liquidez > 0) |
+| `marts_card_02_acoes_compra` | 1 linha | `quantidade` |
+| `marts_card_03_acoes_manter` | 1 linha | `quantidade` |
+| `marts_card_04_acoes_venda` | 1 linha | `quantidade` |
+| `marts_card_02_acoes_semindicacao` | 1 linha | `quantidade` (liquidez nula ou ≤ 0, sobre todo o Fundamentus) |
+| `marts_card_05_termometro_mercado` | 1 linha | `recomendacao` predominante (empate → Manter), `quantidade`, `total`, `percentual` |
+| `marts_painel_data_referencia` | 1 linha | `data_referencia` (`MAX(_timestamp_ingestao)` em `America/Sao_Paulo`) |
+| `marts_painel_indicadores` | `ticker` | recomendação + indicadores do Fundamentus, `payout`, `earnings_yield` |
+
+Os cards e marts do painel contêm **cópia literal** da consulta de `marts_50`: qualquer mudança
+nos rankings ou na regra precisa ser replicada neles.
+
+### 6.6 Tratamento de dados
+
+- Valores do Fundamentus sem arredondamento nem troca de escala; negativos e nulos preservados.
+- Divisões protegidas (`CASE WHEN … = 0 THEN NULL` / `NULLIF`).
+- Zeros do Fundamentus podem significar ausência na origem; os critérios `> 0` dos rankings os excluem.
+- 454 tickers do Fundamentus não têm emissora na B3 e ficam fora dos rankings (`INNER JOIN`).
+- `segmento` é o segmento de **listagem** da B3, não setor econômico.
+
+---
+
+## 7. `pipeline.materializacao` — publicação da Gold
+
+| Símbolo | Descrição |
+|---|---|
+| `Mart(nome, chave, natureza)` | Declaração de um mart; `chave=()` = resultado de linha única |
+| `MARTS` | Registro dos 30 marts com a chave do comentário `Grão:` de cada `.sql` |
+| `ErroMaterializacao(etapa, motivo, *, arquivo, destino, exemplo)` | Erro com contexto; nenhuma tabela Gold muda |
+| `inventariar(pasta, marts)` | Exige correspondência 1:1 entre `.sql` e `MARTS` |
+| `preparar(con, mart, pasta)` | Executa o `.sql` uma vez para tabela temporária; valida colunas/tipos contra `DESCRIBE` e a chave (sem nulos/duplicatas; linha única = exatamente 1) |
+| `publicar(con, preparadas)` | `CREATE OR REPLACE TABLE marts.<nome>` de todos numa transação; antes do `COMMIT` confere contagem, colunas, tipos, chave e `EXCEPT ALL` nos dois sentidos |
+| `executar(con, pasta, marts)` | Orquestra e devolve relatório (tabelas + órfãs) |
+
+Naturezas: **fotografia por ticker**, **agregado de linha única** e **série histórica**
+(`marts_cotacao`); todas com **substituição integral**. Tabelas em `marts` sem `.sql`
+correspondente são reportadas como órfãs, nunca apagadas.
+
+---
+
+## 8. `painel` — leitura, formatação e gráficos
+
+Módulo sem dependência de Streamlit (testável e reaproveitável).
+
+### Leitura
+
+| Símbolo | Descrição |
+|---|---|
+| `MARTS_CARREGAR` | Cards, marts do painel, 10 rankings, `marts_50` e `marts_retorno_total_risco` |
+| `MARTS_OBRIGATORIOS` | `MARTS_CARREGAR` + `marts_cotacao` |
+| `tabelas_faltando()` | Lista `marts.<nome>` obrigatórias ausentes (ou o arquivo do banco) |
+| `ler(nomes)` | `SELECT * FROM marts."<nome>"` para cada nome → `{nome: DataFrame}` |
+| `ler_cotacao(ticker)` | `marts_cotacao` filtrada com `WHERE ticker = ?` (parâmetro vinculado) |
+| `filtrar(df, recomendacoes, segmentos, liquidez_minima)` | Recorte por recomendação, segmento e liquidez mínima |
+| `BancoBloqueado` | Arquivo em uso por outro processo (UI, ingestão, materialização) |
+| `ErroMart(tabela, mensagem)` | Falha ao ler uma tabela |
+
+Cada leitura abre e fecha uma conexão `read_only`. Não há cálculo no painel: **número novo exige
+mart novo**.
+
+### Formatação (padrão brasileiro, independente do locale)
+
+| Função | Exemplo | Nulo |
+|---|---|---|
+| `numero(v, casas=0)` | `1.234` | `—` |
+| `reais(v, casas=2)` | `R$ 1.234,56` | `—` |
+| `reais_compacto(v)` | `R$ 1,2 mi` / `R$ 3,4 bi` / `R$ 12 mil` | `—` |
+| `pct(v, casas=1)` | `12,3%` (não multiplica por 100) | `—` |
+| `multiplo(v, casas=1)` | `8,5x` | `—` |
+| `data_br(v)` | `02/11/2026` | `—` |
+
+### Gráficos e tabelas (Plotly, template `b3` em modo escuro)
+
+`tabela_consolidado`, `fig_valor_qualidade` (linhas de referência ROIC 15% e EV/EBIT 10x),
+`fig_ranking_tematico`, `tabela_ranking_tematico`, `fig_radar` (faixa nos 10 rankings),
+`fig_cotacao` (fechamento ajustado + volume + 💰 proventos; preços ≤ 0 ficam fora),
+`html_cartao`, `html_termometro`.
+
+Constantes visuais: `REC` (ícone + rótulo + cor por recomendação, para acessibilidade),
+`FAIXAS`, `INDICADORES`, `RANKINGS`, `LIQUIDEZ_MINIMA` (Todas, R$ 100 mil, R$ 1 mi, R$ 10 mi).
+
+---
+
+## 9. `app.py` — painel Streamlit
+
+Cinco seções:
+
+1. **Pulso do mercado** — seis cartões (analisadas, Compra, Manter, Venda, sem indicação, termômetro).
+2. **Ranking de oportunidades** — tabela consolidada com saldo e faixas por tema.
+3. **Valor × qualidade** — dispersão EV/EBIT × ROIC, tamanho = liquidez.
+4. **Rankings temáticos** — uma aba por tema (top 15 em gráfico e tabela).
+5. **Ficha da ação** — indicadores, CAGR/volatilidade/drawdown, radar e cotação histórica.
+
+Filtros na barra lateral (recomendação, segmento, liquidez mínima) recortam só as seções 2, 3 e a
+lista da ficha; cartões e rankings temáticos valem para o mercado inteiro. Dados em
+`st.cache_data`, com botão **Recarregar dados**. Tabela faltando, banco bloqueado ou erro de
+leitura mostram mensagem clara e param a página. Tema escuro em
+[.streamlit/config.toml](.streamlit/config.toml).
+
+---
+
+## 10. Testes
+
+```powershell
+uv run pytest            # testpaths = test, pythonpath = .
+uv run pytest --cov      # fail_under = 60 (omit: test/*, app.py, ui.py, .venv/*)
+```
+
+| Arquivo | Testes | Cobre |
+|---|---|---|
+| [test/test_db.py](test/test_db.py) | 5 | conexão, schema, `gravar` |
+| [test/test_transformacao.py](test/test_transformacao.py) | 27 | conversões, deduplicação, chaves, JSON, publicação |
+| [test/test_sql_marts.py](test/test_sql_marts.py) | 9 | SQLs dos marts com dados fictícios |
+| [test/test_marts.py](test/test_marts.py) | 18 | inventário, preparação, publicação e rollback da materialização |
+| [test/test_painel.py](test/test_painel.py) | 25 | leitura, filtros, formatação e gráficos |
+
+A ingestão ainda não tem testes (Etapa B do [plan.md](plan.md)).
+
+---
+
+## 11. Limitações conhecidas
+
+- Fora do escopo: Dívida Líquida/EBITDA, Sharpe, valor justo por Gordon e comparação setorial.
+- Rank Valor é uma versão simplificada da Magic Formula; payout é estimado (`DY × P/L`).
+- Classes da mesma emissora (ON/PN) compartilham fundamentos e aparecem empatadas.
+- 8 tickers têm `fechamento_ajustado < 0` em parte do histórico (tratado como inválido).
+- `marts_retorno_total_risco` pode variar no último bit da volatilidade entre execuções
+  (`stddev_samp` paralelo); por isso a materialização compara com a temporária, não com uma reexecução.
+
+Pendências e roadmap: [plan.md](plan.md).
