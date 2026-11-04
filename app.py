@@ -170,6 +170,25 @@ cartoes = [
 for coluna, html in zip(st.columns(6), cartoes, strict=False):
     coluna.markdown(html, unsafe_allow_html=True)
 
+with st.expander("Por que alguns tickers do Fundamentus ficam fora dos rankings?"):
+    st.caption(
+        "Entram nos rankings só os tickers cuja emissora (4 primeiras letras) está no "
+        "cadastro de empresas ativas da B3. Os demais, por motivo:"
+    )
+    st.dataframe(
+        p.tabela_exclusoes(d[p.MART_EXCLUSOES]),
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "motivo": st.column_config.TextColumn("Motivo"),
+            "descricao": st.column_config.TextColumn("Descrição"),
+            "quantidade": st.column_config.NumberColumn("Tickers"),
+            "quantidade_negociada": st.column_config.NumberColumn(
+                "Negociados em 2 meses"
+            ),
+        },
+    )
+
 # --------------------------------------------------------------------------------------------
 # Faixa 2 — Ranking de oportunidades
 # --------------------------------------------------------------------------------------------
