@@ -36,7 +36,14 @@ resumo AS (
 SELECT
     CASE
         WHEN s.qtd_no_maximo > 1 THEN 'Manter'
-        ELSE (SELECT c.recomendacao FROM contagem c WHERE c.quantidade = s.maximo)
+        -- LIMIT 1: o DuckDB avalia a subconsulta mesmo no empate (quando o CASE devolve
+        -- 'Manter'), e subconsulta escalar com mais de uma linha é erro.
+        ELSE (
+            SELECT c.recomendacao FROM contagem c
+            WHERE c.quantidade = s.maximo
+            ORDER BY c.recomendacao
+            LIMIT 1
+        )
     END                                         AS recomendacao,
     s.maximo                                    AS quantidade,
     s.total                                     AS total,

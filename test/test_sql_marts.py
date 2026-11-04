@@ -389,6 +389,20 @@ def test_termometro_usa_as_contagens_de_marts_50(tmp_path):
     assert termometro["quantidade"] == max(contagem.values())
 
 
+def test_termometro_empate_no_maximo_e_manter(tmp_path):
+    # Uma Compra e uma Venda: empate no máximo -> Manter (P1). A subconsulta do ELSE devolve
+    # as duas recomendações empatadas e não pode derrubar a consulta.
+    acoes = [{"ticker": "BOAS3", **COMPLETA}, {"ticker": "RUIM3", **NENHUMA}]
+    con = novo_banco(tmp_path, acoes, emissoras_de(acoes))
+    [termometro] = executar_mart(con, "marts_card_05_termometro_mercado")
+    assert termometro == {
+        "recomendacao": "Manter",
+        "quantidade": 1,
+        "total": 2,
+        "percentual": 50.0,
+    }
+
+
 def test_painel_indicadores_repete_a_recomendacao_de_marts_50(tmp_path):
     acoes = acoes_com_as_tres_recomendacoes()
     con = novo_banco(tmp_path, acoes, emissoras_de(acoes))
