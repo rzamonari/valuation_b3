@@ -183,6 +183,8 @@ SPEC
 
 CRITÉRIOS DE ACEITE
 - uv run pytest --cov termina sem falha, com TOTAL de 60% ou mais.
+  Revisão (04/11/2026): meta elevada para 85% (fail_under = 85), com a cobertura já em 92%;
+  o mesmo comando roda no GitHub Actions (.github/workflows/ci.yml).
 - Com fundamentalistas.duckdb renomeado, o resultado é o mesmo.
 - Rodar duas vezes seguidas dá o mesmo resultado: mesmos testes aprovados e mesma tabela de
   coverage. Só o tempo de execução pode mudar.

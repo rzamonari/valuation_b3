@@ -384,7 +384,7 @@ leitura mostram mensagem clara e param a página. Tema escuro em
 ## 10. Testes
 
 ```powershell
-uv run pytest   # testpaths = test, pythonpath = .; addopts = --cov, fail_under = 60
+uv run pytest   # testpaths = test, pythonpath = .; addopts = --cov, fail_under = 85
 ```
 
 Cobertura medida sem `test/*`, `app.py`, `ui.py` e `.venv/*`. `test/conftest.py` remove

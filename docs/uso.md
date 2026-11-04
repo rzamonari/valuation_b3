@@ -59,7 +59,7 @@ assistentes de IA.
 ```powershell
 uv run ruff check .            # lint
 uv run ruff format . --check   # formatação
-uv run pytest                  # testes, sempre com cobertura (mínimo 60%)
+uv run pytest                  # testes, sempre com cobertura (mínimo 85%)
 uv run mkdocs serve            # esta documentação em http://127.0.0.1:8000
 uv run mkdocs build --strict   # falha com link quebrado ou página fora da navegação
 ```

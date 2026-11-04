@@ -32,7 +32,7 @@ source = ["."]
 omit = ["test/*", "app.py", "ui.py", ".venv/*"]
 
 [tool.coverage.report]
-fail_under = 60
+fail_under = 85
 show_missing = true
 
 [tool.ruff]
@@ -47,7 +47,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 max-line-length = 100
 
 [tool.taskipy.tasks]
-test = { cmd = "pytest", help = "testes com cobertura (fail_under 60)" }
+test = { cmd = "pytest", help = "testes com cobertura (fail_under 85)" }
 lint = { cmd = "ruff check . && ruff format . --check", help = "lint e verificação de formatação" }
 format = { cmd = "ruff check . --fix && ruff format .", help = "corrige lint (inclui imports) e formata" }
 docs = { cmd = "mkdocs serve", help = "documentação em http://127.0.0.1:8000" }

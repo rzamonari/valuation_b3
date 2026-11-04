@@ -1,6 +1,6 @@
 ---
 name: python-engenharia-dados
-description: Regras e boas práticas de desenvolvimento Python do projeto b3_valuation (pacote valuationb3) — estrutura do pacote pipeline/, uv, Ruff, pytest com cobertura mínima de 60%, MkDocs Material e engenharia de dados sobre DuckDB (Bronze/Silver/Gold). Use ao criar, alterar, revisar ou testar código Python, SQL de marts, dependências ou documentação deste repositório.
+description: Regras e boas práticas de desenvolvimento Python do projeto b3_valuation (pacote valuationb3) — estrutura do pacote pipeline/, uv, Ruff, pytest com cobertura mínima de 85%, MkDocs Material e engenharia de dados sobre DuckDB (Bronze/Silver/Gold). Use ao criar, alterar, revisar ou testar código Python, SQL de marts, dependências ou documentação deste repositório.
 ---
 
 # Python para Engenharia de Dados — b3_valuation
@@ -152,11 +152,11 @@ max-line-length = 100   # E501 em prosa/SQL; o formatter mantém o código em 88
 ## 4. Testes — pytest e cobertura
 
 Estado ✅: `pytest`, `pytest-cov`; `testpaths = ["test"]`, `pythonpath = ["."]`,
-`addopts = "--cov"`; `[tool.coverage.report] fail_under = 60`, `show_missing = true`.
+`addopts = "--cov"`; `[tool.coverage.report] fail_under = 85`, `show_missing = true`.
 Todo `uv run pytest` aplica o limite. `htmlcov/` está no `.gitignore`.
 
 ```powershell
-uv run pytest                                  # todos os testes + cobertura (fail_under 60)
+uv run pytest                                  # todos os testes + cobertura (fail_under 85)
 uv run pytest test/test_db.py -k gravar --no-cov   # recorte rápido, sem cobertura
 uv run pytest --cov-report=html                # relatório em htmlcov/index.html
 ```
@@ -293,6 +293,6 @@ docs/
 
 - [ ] Mudança na camada correta; sem lógica de cálculo fora da Gold.
 - [ ] Testes de sucesso, erro e bordas; sem rede e sem banco real.
-- [ ] `uv run pytest` ≥ 60% sem mexer em `fail_under`/`omit`.
+- [ ] `uv run pytest` ≥ 85% sem mexer em `fail_under`/`omit`.
 - [ ] `pyproject.toml` + `uv.lock` juntos quando houver dependência nova.
 - [ ] `doc_api.md`, docstrings e `sql/marts/README.md` atualizados se a interface mudou.

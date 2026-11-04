@@ -293,7 +293,7 @@ uv run mkdocs build --strict
 
 - [ ] Mudança na camada correta (seção 2); sem cálculo fora da Gold.
 - [ ] Testes de sucesso, erro e bordas (nulos, duplicatas, tabela vazia, divisão por zero, zeros do Fundamentus); sem rede e sem banco real.
-- [ ] Cobertura ≥ 60% sem mexer em `fail_under`/`omit`.
+- [ ] Cobertura ≥ 85% sem mexer em `fail_under`/`omit`.
 - [ ] `pyproject.toml` + `uv.lock` no mesmo commit quando houver dependência nova; nunca `pip install`.
 - [ ] `doc_api.md`, docstrings e `sql/marts/README.md`/`RANKINGS.md` atualizados se a interface mudou.
 - [ ] Comandos executados e resultado real (incluindo % de cobertura) relatados no PR.
