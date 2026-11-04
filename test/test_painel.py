@@ -15,7 +15,7 @@ import plotly.io as pio
 import pytest
 
 import painel as p
-from pipeline import fotografia
+from pipeline import execucao, fotografia
 
 
 def novo_banco(tmp_path, monkeypatch):
@@ -487,3 +487,140 @@ def test_hashes_da_fotografia_so_sao_recalculados_quando_um_arquivo_muda(
         arquivo.write(b"\0")
     with pytest.raises(p.FotografiaInvalida, match="hash divergente"):
         p.tabelas_faltando()
+
+
+# --------------------------------------------------------------------------- saúde do pipeline
+
+
+def banco_com_saude(tmp_path, monkeypatch):
+    """Banco do painel com meta.execucoes e o mart de saúde publicados pelo registro real."""
+    arquivo = novo_banco(tmp_path, monkeypatch)
+    con = duckdb.connect(str(arquivo))
+    try:
+        for etapa, inicio, status, tabelas, avisos, erro in [
+            (
+                "ingestao",
+                datetime(2026, 11, 2, 9),
+                "sucesso",
+                {"raw.a": 1500},
+                [],
+                None,
+            ),
+            (
+                "materializacao",
+                datetime(2026, 11, 1, 9),
+                "sucesso",
+                {"marts.x": 2},
+                [],
+                None,
+            ),
+            ("materializacao", datetime(2026, 11, 2, 10), "falha", {}, [], "quebrou"),
+            ("qualidade", datetime(2026, 11, 2, 11), "sucesso", {}, ["roe: 2"], None),
+        ]:
+            registro = execucao.Execucao(etapa, inicio_utc=inicio)
+            registro.tabelas = tabelas
+            registro.concluir(status, avisos, erro)
+            registro.fim_utc, registro.duracao_s = inicio, 185.0
+            execucao.gravar(con, registro)
+    finally:
+        con.close()
+    return arquivo
+
+
+def test_saude_ausente_nao_impede_o_painel(tmp_path, monkeypatch):
+    novo_banco(tmp_path, monkeypatch)
+    assert p.ler_saude() is None
+    assert p.tabelas_faltando() == []
+    assert p.MART_SAUDE not in p.MARTS_OBRIGATORIOS
+
+
+def test_tabela_saude_mostra_a_ultima_execucao_formatada(tmp_path, monkeypatch):
+    banco_com_saude(tmp_path, monkeypatch)
+    vista = p.tabela_saude(p.ler_saude())
+    assert vista["etapa"].tolist() == [
+        "1 · Ingestão",
+        "2 · Transformação",
+        "3 · Materialização",
+        "4 · Qualidade",
+    ]
+    assert vista["status"].tolist() == [
+        "✅ Sucesso",
+        p.SEM_REGISTRO,
+        "❌ Falha",
+        "✅ Sucesso",
+    ]
+    ingestao = vista.iloc[0]
+    assert (ingestao["inicio"], ingestao["duracao"], ingestao["camada"]) == (
+        "02/11/2026 09:00 UTC",
+        "3 min 05 s",
+        "Bronze (raw)",
+    )
+    assert (ingestao["tabelas"], ingestao["linhas"]) == ("1", "1.500")
+    assert vista.iloc[1]["inicio"] == p.TRACO
+    assert vista.iloc[2]["ultimo_sucesso"] == "01/11/2026 09:00 UTC"
+    assert vista.iloc[3]["camada"] == p.TRACO
+
+
+def test_falhas_e_avisos_da_saude(tmp_path, monkeypatch):
+    banco_com_saude(tmp_path, monkeypatch)
+    saude = p.ler_saude()
+    assert p.falhas_saude(saude) == [
+        (
+            "3 · Materialização",
+            "02/11/2026 10:00 UTC",
+            "01/11/2026 09:00 UTC",
+            "quebrou",
+        )
+    ]
+    assert p.avisos_saude(saude) == [("4 · Qualidade", ["roe: 2"])]
+    assert p.tabela_linhas_por_tabela(saude).to_dict("records") == [
+        {"etapa": "1 · Ingestão", "tabela": "raw.a", "linhas": "1.500"}
+    ]
+
+
+def test_grafico_de_duracao_tem_uma_barra_por_etapa_com_registro(tmp_path, monkeypatch):
+    banco_com_saude(tmp_path, monkeypatch)
+    [barra] = p.fig_duracao_etapas(p.ler_saude()).data
+    assert list(barra.y) == ["4 · Qualidade", "3 · Materialização", "1 · Ingestão"]
+    assert list(barra.marker.color) == [
+        p.STATUS_EXECUCAO["sucesso"]["cor"],
+        p.STATUS_EXECUCAO["falha"]["cor"],
+        p.STATUS_EXECUCAO["sucesso"]["cor"],
+    ]
+
+
+def test_metricas_da_saude_no_banco_local(tmp_path, monkeypatch):
+    banco_com_saude(tmp_path, monkeypatch)
+    idade = p.idade_dados(pd.Timestamp("2026-10-30"), date(2026, 11, 2))
+    assert p.execucao_fotografia() is None
+    assert p.metricas_saude(p.ler_saude(), idade, None) == [
+        ("Idade dos dados (3 corridos)", "1 dia útil"),
+        ("Última ingestão", "02/11/2026"),
+        ("Avisos da qualidade", "1"),
+        ("Fotografia gerada em", "banco local"),
+    ]
+
+
+def test_metricas_sem_mart_de_saude(tmp_path, monkeypatch):
+    novo_banco(tmp_path, monkeypatch)
+    idade = p.idade_dados(date(2026, 10, 26), date(2026, 11, 2))
+    assert p.metricas_saude(None, idade, {"fim_utc": "2026-11-02T12:00:00"}) == [
+        ("Idade dos dados (7 corridos)", "5 dias úteis"),
+        ("Última ingestão", p.TRACO),
+        ("Avisos da qualidade", p.TRACO),
+        ("Fotografia gerada em", "02/11/2026"),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("segundos", "texto"),
+    [(8.44, "8,4 s"), (185, "3 min 05 s"), (3720, "1 h 02 min"), (None, p.TRACO)],
+)
+def test_duracao_formata_segundos_minutos_e_horas(segundos, texto):
+    assert p.duracao(segundos) == texto
+
+
+def test_data_hora_aceita_texto_do_manifesto_e_timestamp():
+    assert p.data_hora("2026-11-02T09:05:00") == "02/11/2026 09:05 UTC"
+    assert p.data_hora(pd.Timestamp("2026-11-02 09:05")) == "02/11/2026 09:05 UTC"
+    assert p.data_hora(pd.NaT) == p.TRACO

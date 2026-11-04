@@ -42,7 +42,7 @@ import sys
 
 import duckdb
 
-from pipeline import db
+from pipeline import db, execucao
 from pipeline.db import _ident
 from pipeline.log import configurar as configurar_logging
 from pipeline.transformacao import b3, fundamentus, yfinance
@@ -240,17 +240,19 @@ def main() -> None:
     sys.stderr.reconfigure(encoding="utf-8")
     configurar_logging()
 
-    try:
-        con = db.conectar()
-    except duckdb.Error as exc:
-        log.error(f"\nERRO DE TRANSFORMAÇÃO\n  Etapa:   conexão\n  Motivo:  {exc}")
-        sys.exit(1)
-    try:
-        relatorio = executar(con)
-    except ErroTransformacao as exc:
-        log.error(f"\nERRO DE TRANSFORMAÇÃO\n{exc}")
-        log.error("Nenhuma tabela Silver foi alterada.")
-        sys.exit(1)
-    finally:
-        con.close()
-    _imprimir_relatorio(relatorio)
+    with execucao.registrada("transformacao") as registro:
+        try:
+            con = db.conectar()
+        except duckdb.Error as exc:
+            log.error(f"\nERRO DE TRANSFORMAÇÃO\n  Etapa:   conexão\n  Motivo:  {exc}")
+            sys.exit(1)
+        try:
+            relatorio = executar(con)
+        except ErroTransformacao as exc:
+            log.error(f"\nERRO DE TRANSFORMAÇÃO\n{exc}")
+            log.error("Nenhuma tabela Silver foi alterada.")
+            sys.exit(1)
+        finally:
+            con.close()
+        registro.tabelas = {r["tabela"]: r["gravados"] for r in relatorio}
+        _imprimir_relatorio(relatorio)

@@ -11,7 +11,7 @@ import pytest
 from test_qualidade import novo_banco
 
 import painel as p
-from pipeline import db, qualidade
+from pipeline import db, execucao, qualidade
 from pipeline import fotografia as f
 from pipeline import materializacao as m
 
@@ -290,3 +290,79 @@ def test_fotografia_sem_manifesto_na_leitura_vira_erro_do_painel(
     (pasta / f.MANIFESTO).unlink()
     with pytest.raises(p.FotografiaInvalida, match="manifesto"):
         p.ler(p.MARTS_CARDS)
+
+
+# --------------------------------------------------------------------------- registro de execução
+
+
+def test_manifesto_traz_a_execucao_de_cada_etapa_e_por_ultimo_a_da_fotografia(
+    con, tmp_path
+):
+    anterior = execucao.Execucao("materializacao")
+    anterior.tabelas = {"marts.marts_roic": 2}
+    anterior.concluir(execucao.SUCESSO, [])
+    execucao.gravar(con, anterior)
+    manifesto = f.exportar(con, tmp_path / "fotografia")
+    etapas = [e["etapa"] for e in manifesto["execucoes"]]
+    assert etapas == ["materializacao", "fotografia"]
+    propria = manifesto["execucoes"][-1]
+    assert propria["status"] == "sucesso"
+    assert propria["linhas_por_tabela"]["fotografia/marts_cotacao.parquet"] == 2
+    assert propria["avisos"] == qualidade.avisos(qualidade.executar(con))
+
+
+def test_saude_do_pipeline_fica_fora_do_hash_dos_dados(con, foto, tmp_path):
+    _, primeiro = foto
+    registro = execucao.Execucao("qualidade")
+    registro.concluir(execucao.SUCESSO, ["aviso novo"])
+    execucao.gravar(con, registro)  # republica marts_painel_saude_pipeline
+    segundo = f.exportar(con, tmp_path / "outra")
+    saude = execucao.MART_SAUDE
+    assert segundo["tabelas"][saude]["sha256"] != primeiro["tabelas"][saude]["sha256"]
+    assert segundo["hash"] == primeiro["hash"]
+    assert f.verificar(tmp_path / "outra")["hash"] == segundo["hash"]
+
+
+def test_main_registra_a_fotografia_no_banco(banco, tmp_path, monkeypatch):
+    monkeypatch.setenv(db.VARIAVEL_DB, str(banco))
+    monkeypatch.setattr(f, "PASTA_FOTOGRAFIA", tmp_path / "fotografia")
+    assert _main(monkeypatch, []) == 0
+    manifesto = f.ler_manifesto(tmp_path / "fotografia")
+    conexao = duckdb.connect(str(banco), read_only=True)
+    try:
+        [(inicio, status)] = conexao.execute(
+            "SELECT inicio_utc, status FROM meta.execucoes WHERE etapa = 'fotografia'"
+        ).fetchall()
+    finally:
+        conexao.close()
+    assert status == "sucesso"
+    assert manifesto["execucoes"][-1]["inicio_utc"] == inicio.isoformat(
+        timespec="seconds"
+    )
+
+
+def test_painel_le_a_saude_e_a_execucao_da_fotografia(con, tmp_path, monkeypatch):
+    registro = execucao.Execucao("ingestao")
+    registro.tabelas = {"raw.b3_empresas": 2}
+    registro.concluir(execucao.SUCESSO, [])
+    execucao.gravar(con, registro)
+    pasta = tmp_path / "fotografia"
+    f.exportar(con, pasta)
+    monkeypatch.setattr(p, "ARQUIVO_DB", tmp_path / "sem_banco.duckdb")
+    monkeypatch.setattr(p, "PASTA_FOTOGRAFIA", pasta)
+    saude = p.ler_saude()
+    assert saude.sort_values("ordem")["status"].tolist()[0] == "sucesso"
+    assert p.execucao_fotografia()["etapa"] == "fotografia"
+
+
+def test_fotografia_sem_o_mart_de_saude_abre_o_painel_sem_a_aba(foto, monkeypatch):
+    pasta, manifesto = foto
+    del manifesto["tabelas"][execucao.MART_SAUDE]
+    del manifesto["execucoes"]
+    (pasta / f"{execucao.MART_SAUDE}.parquet").unlink()
+    (pasta / f.MANIFESTO).write_text(json.dumps(manifesto), encoding="utf-8")
+    monkeypatch.setattr(p, "ARQUIVO_DB", pasta / "sem_banco.duckdb")
+    monkeypatch.setattr(p, "PASTA_FOTOGRAFIA", pasta)
+    assert p.tabelas_faltando() == []  # o hash dos dados não depende do mart de saúde
+    assert p.ler_saude() is None
+    assert p.execucao_fotografia() is None

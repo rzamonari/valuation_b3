@@ -24,6 +24,13 @@ Execução:
    (ticker, data, fechamento_ajustado, dividendos, volume), registradas em "colunas" no manifesto.
    Motivo: é quase todo o volume da fotografia (26 MB → 10 MB), e cada fotografia nova fica
    no histórico do git. O banco local continua com a série completa.
+7. Registro de execução (pipeline.execucao): "execucoes" no manifesto traz a execução mais
+   recente de cada etapa em meta.execucoes e, por último, a da própria fotografia (início, fim,
+   duração, arquivos e registros, avisos da qualidade). A linha da fotografia é concluída antes
+   de o manifesto ser escrito; a mesma execução vai depois para meta.execucoes.
+8. FORA_DO_HASH: marts operacionais (marts_painel_saude_pipeline) têm arquivo e SHA-256 no
+   manifesto, conferidos por verificar(), mas ficam fora do hash total. Motivo: o hash identifica
+   os dados; os horários das execuções mudam a cada ciclo mesmo com os dados iguais.
 """
 
 import argparse
@@ -37,7 +44,7 @@ from pathlib import Path
 
 import duckdb
 
-from pipeline import db, qualidade
+from pipeline import db, execucao, qualidade
 from pipeline.db import _ident
 from pipeline.log import configurar as configurar_logging
 from pipeline.materializacao import MARTS, Mart
@@ -52,6 +59,7 @@ MART_DATA_REFERENCIA = "marts_painel_data_referencia"
 COLUNAS = {
     "marts_cotacao": ("ticker", "data", "fechamento_ajustado", "dividendos", "volume")
 }
+FORA_DO_HASH = {execucao.MART_SAUDE}  # decisão 8
 
 
 class ErroFotografia(Exception):
@@ -70,7 +78,11 @@ def _sha256(arquivo: Path) -> str:
 
 
 def _hash_total(tabelas: dict) -> str:
-    linhas = "".join(f"{nome} {t['sha256']}\n" for nome, t in sorted(tabelas.items()))
+    linhas = "".join(
+        f"{nome} {t['sha256']}\n"
+        for nome, t in sorted(tabelas.items())
+        if nome not in FORA_DO_HASH
+    )
     return hashlib.sha256(linhas.encode("utf-8")).hexdigest()
 
 
@@ -111,8 +123,13 @@ def exportar(
     con: duckdb.DuckDBPyConnection,
     pasta: Path = PASTA_FOTOGRAFIA,
     marts: list[Mart] = MARTS,
+    registro: execucao.Execucao | None = None,
 ) -> dict:
-    """Grava a fotografia de marts.* em pasta e devolve o manifesto."""
+    """Grava a fotografia de marts.* em pasta e devolve o manifesto.
+
+    registro: execução da etapa, concluída aqui para entrar no manifesto (decisão 7).
+    """
+    registro = registro or execucao.Execucao("fotografia")
     resultados = qualidade.exigir(con)
     pasta = Path(pasta)
     temporaria = pasta.with_name(f".{pasta.name}.nova")
@@ -141,6 +158,12 @@ def exportar(
                 "bytes": arquivo.stat().st_size,
                 "sha256": _sha256(arquivo),
             }
+        registro.tabelas = {
+            f"{pasta.name}/{t['arquivo']}": t["registros"] for t in tabelas.values()
+        }
+        registro.avisos = qualidade.avisos(resultados)
+        registro.concluir(execucao.SUCESSO, [])
+        anteriores = [e for e in execucao.ultimas(con) if e["etapa"] != registro.etapa]
         [(data_referencia,)] = con.execute(
             f"SELECT data_referencia FROM marts.{_ident(MART_DATA_REFERENCIA)}"
         ).fetchall()
@@ -155,6 +178,7 @@ def exportar(
                 "avisos": sum(r.status == "AVISO" for r in resultados),
             },
             "tabelas": tabelas,
+            "execucoes": anteriores + [registro.como_dict()],
         }
         (temporaria / MANIFESTO).write_text(
             json.dumps(manifesto, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -265,24 +289,26 @@ def main(argv: list[str] | None = None) -> None:
         )
         return
 
-    try:
-        con = duckdb.connect(str(db.caminho_banco()), read_only=True)
-    except duckdb.Error as exc:
-        log.error(f"\nERRO DE FOTOGRAFIA\n  Etapa:   conexão\n  Motivo:  {exc}")
-        sys.exit(1)
-    try:
-        manifesto = exportar(con, PASTA_FOTOGRAFIA)
-    except qualidade.ErroQualidade as exc:
-        qualidade.imprimir_relatorio(exc.resultados)
-        log.error(f"\nERRO DE FOTOGRAFIA\n  Qualidade reprovada: {exc}")
-        log.error("Nenhum arquivo da fotografia foi alterado.")
-        sys.exit(1)
-    except (duckdb.Error, ErroFotografia) as exc:
-        log.error(f"\nERRO DE FOTOGRAFIA\n  Etapa:   exportação\n  Motivo:  {exc}")
-        log.error("Nenhum arquivo da fotografia foi alterado.")
-        sys.exit(1)
-    finally:
-        con.close()
+    with execucao.registrada("fotografia") as registro:
+        try:
+            con = duckdb.connect(str(db.caminho_banco()), read_only=True)
+        except duckdb.Error as exc:
+            log.error(f"\nERRO DE FOTOGRAFIA\n  Etapa:   conexão\n  Motivo:  {exc}")
+            sys.exit(1)
+        try:
+            manifesto = exportar(con, PASTA_FOTOGRAFIA, registro=registro)
+        except qualidade.ErroQualidade as exc:
+            qualidade.imprimir_relatorio(exc.resultados)
+            log.error(f"\nERRO DE FOTOGRAFIA\n  Qualidade reprovada: {exc}")
+            log.error("Nenhum arquivo da fotografia foi alterado.")
+            sys.exit(1)
+        except (duckdb.Error, ErroFotografia) as exc:
+            log.error(f"\nERRO DE FOTOGRAFIA\n  Etapa:   exportação\n  Motivo:  {exc}")
+            log.error("Nenhum arquivo da fotografia foi alterado.")
+            sys.exit(1)
+        finally:
+            con.close()
+
     total = sum(t["bytes"] for t in manifesto["tabelas"].values())
     log.info(
         f"Fotografia gerada em {PASTA_FOTOGRAFIA.name}/: data de referência "
