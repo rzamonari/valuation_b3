@@ -51,3 +51,5 @@ test = { cmd = "pytest", help = "testes com cobertura (fail_under 85)" }
 lint = { cmd = "ruff check . && ruff format . --check", help = "lint e verificação de formatação" }
 format = { cmd = "ruff check . --fix && ruff format .", help = "corrige lint (inclui imports) e formata" }
 docs = { cmd = "mkdocs serve", help = "documentação em http://127.0.0.1:8000" }
+qualidade = { cmd = "python -m pipeline.qualidade", help = "reconciliação raw -> refined -> marts e regras de domínio" }
+fotografia = { cmd = "python -m pipeline.fotografia", help = "exporta a fotografia versionada da Gold (exige qualidade sem erros)" }

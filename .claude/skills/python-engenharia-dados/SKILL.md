@@ -28,8 +28,14 @@ b3_valuation/
 │   ├── ingestao.py         Bronze  → schema raw      (python -m pipeline.ingestao)
 │   ├── transformacao/      Silver  → schema refined  (subpacote: comum, b3, fundamentus,
 │   │                       yfinance, minhareceita; orquestração no __init__)
-│   └── materializacao.py   Gold    → schema marts    (executa sql/marts/*.sql)
+│   ├── materializacao.py   Gold    → schema marts    (executa sql/marts/*.sql; dependências
+│   │                       marts.<nome> resolvidas em ordem topológica)
+│   ├── qualidade.py        reconciliação raw → refined → marts e regras de domínio (só lê)
+│   └── fotografia.py       marts.* → fotografia/*.parquet + manifesto.json (data, SHA-256)
 ├── sql/marts/*.sql         ✅ um SELECT puro por mart (fonte da verdade da Gold)
+├── fotografia/             ✅ fotografia versionada da Gold (lida pelo painel sem banco local)
+├── requirements.txt        ✅ exportado do uv.lock para o Streamlit Cloud (não editar à mão)
+├── .github/workflows/      ✅ CI: ruff check, ruff format --check, pytest (Ubuntu e Windows)
 ├── painel.py               ✅ lógica do painel (leitura, filtros, formatação)
 ├── app.py                  ✅ interface Streamlit (apenas layout/interação)
 ├── ui.py                   ✅ abre a DuckDB UI
@@ -45,7 +51,8 @@ b3_valuation/
 | Acesso a dados | `pipeline/db.py` | Conexão, schema, gravação genérica. Sem regra de negócio |
 | Ingestão (Bronze) | `pipeline/ingestao.py` | Dado como veio, tudo `VARCHAR`, com `_timestamp_ingestao` e `_source_origin` |
 | Transformação (Silver) | `pipeline/transformacao/` | Tipagem, deduplicação, chaves. **Sem cálculo financeiro, sem preencher ausentes** |
-| Regras de negócio (Gold) | `sql/marts/*.sql` + `MARTS` em `materializacao.py` | Indicador novo = mart novo |
+| Regras de negócio (Gold) | `sql/marts/*.sql` + `MARTS` em `materializacao.py` | Indicador novo = mart novo; regra de outro mart é lida (`marts.<nome>`), nunca copiada |
+| Qualidade | `pipeline/qualidade.py` | Regra nova = `Verificacao` (SELECT das violações); ERRO só para o que a fonte nunca viola |
 | Orquestração/CLI | `main()` + `if __name__ == "__main__"` de cada módulo | Código de saída `0` sucesso, `1` falha |
 | Apresentação | `painel.py` (lógica) e `app.py` (Streamlit) | Só lê, filtra, ordena e formata. **Número novo exige mart novo** |
 

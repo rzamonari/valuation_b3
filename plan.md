@@ -162,7 +162,7 @@ Cada etapa é um PR dedicado, com testes verdes antes e depois. Refatoração e 
 nunca se misturam com mudança de comportamento. Ordem sugerida: A → B → C → D → E; F só após
 decisão; G conforme demanda.
 
-**Estado em 04/11/2026:** A–E ✅ entregues (branch `evolucao/pendencias-e-roadmap`);
+**Estado em 04/11/2026:** A–E e H ✅ entregues (branch `evolucao/pendencias-e-roadmap`);
 F 📋 aguarda decisão; G 📋 backlog.
 
 ### Etapa A — Qualidade de código (Ruff) ✅
@@ -251,6 +251,28 @@ Diverge do padrão `pipeline/` adotado na skill; **decidir antes de executar**. 
 
 **Pronto quando:** pipeline completo, painel e `uv run pytest` funcionam com os novos caminhos.
 
+### Etapa H — Publicação e confiabilidade ✅
+
+> Entregue em 04/11/2026, um commit por item.
+
+1. `marts_50` lê os rankings `marts_01` … `marts_10`, e cards e `marts_painel_indicadores` leem
+   `marts_50`; a materialização resolve as dependências `marts.<nome>` em ordem topológica.
+   As 30 tabelas `marts.*` ficaram iguais sobre o banco real (`EXCEPT ALL` nos dois sentidos).
+2. CI no GitHub Actions (`ruff check`, `ruff format --check`, `pytest` em Ubuntu e Windows) e
+   `fail_under` de 60 para 85.
+3. `pipeline/qualidade.py`: 71 verificações (reconciliação raw → refined → marts e regras de
+   domínio, como `cotacao > 0` e percentuais em faixas plausíveis); erro = código 1.
+4. `pipeline/fotografia.py`: `fotografia/` versionada (Parquet + manifesto com data de
+   referência e SHA-256), gerada só com qualidade aprovada; o painel a lê quando não há banco
+   local (Streamlit Community Cloud).
+5. `README.md` na raiz com objetivo, diagrama, execução, capturas do painel e resultados.
+
+Correções encontradas no caminho: o termômetro falhava em empate no máximo (subconsulta escalar
+com duas linhas) e `total` era `HUGEINT`, sem equivalente em Parquet.
+
+**Pendente fora do repositório:** criar o app no Streamlit Community Cloud (conta do usuário),
+depois do merge na `main`.
+
 ### Etapa G — Novos indicadores (backlog de produto) 📋
 
 Candidatos: Dívida Líquida/EBITDA, Sharpe, valor justo por Gordon, comparação setorial (exige
@@ -274,6 +296,8 @@ uv sync
 uv run python -m pipeline.ingestao        # 1. Bronze  (raw)
 uv run python -m pipeline.transformacao   # 2. Silver  (refined)
 uv run python -m pipeline.materializacao  # 3. Gold    (marts)
+uv run python -m pipeline.qualidade       # 4. Qualidade (só leitura; erro = código 1)
+uv run python -m pipeline.fotografia      # 5. Fotografia versionada (commit de fotografia/)
 uv run streamlit run app.py               # painel
 ```
 
@@ -290,6 +314,9 @@ uv run ruff format . --check
 uv run pytest                  # cobertura obrigatória (addopts = --cov)
 uv run mkdocs build --strict
 ```
+
+O CI (`.github/workflows/ci.yml`) repete as três primeiras e confere `requirements.txt` e a
+fotografia versionada.
 
 - [ ] Mudança na camada correta (seção 2); sem cálculo fora da Gold.
 - [ ] Testes de sucesso, erro e bordas (nulos, duplicatas, tabela vazia, divisão por zero, zeros do Fundamentus); sem rede e sem banco real.
