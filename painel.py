@@ -14,6 +14,12 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
    - ler_cotacao(ticker): marts.marts_cotacao com WHERE ticker = ? (parâmetro vinculado).
      Motivo: a tabela tem ~1,9 milhão de linhas; filtrar no banco evita carregar tudo em memória.
    - tabelas_faltando() lista as tabelas obrigatórias ausentes (catálogo duckdb_tables()).
+   - FONTE: banco local (ARQUIVO_DB) ou fotografia versionada (fotografia/, gerada por
+     pipeline.fotografia). VALUATIONB3_FONTE = "banco" ou "fotografia" fixa a fonte; sem a
+     variável, usa o banco se o arquivo existir e, senão, a fotografia (caso do Streamlit
+     Cloud, onde o banco não é versionado). Na fotografia, tabelas_faltando() confere os
+     hashes do manifesto antes de qualquer leitura (FotografiaInvalida se divergir) e a
+     leitura usa views marts."<nome>" sobre os Parquet: as consultas são as mesmas.
    - Tabela não garante ordem: quem exibe ordena no pandas (posicao/rank, ticker; data).
 
 2. NENHUM CÁLCULO
@@ -24,8 +30,8 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
      Motivo: número novo na tela exige um .sql novo em sql/marts/, declarado em
      pipeline/materializacao.py e materializado em marts.
 
-3. MARTS DO PAINEL (marts.marts_card_05_* e marts.marts_painel_*), todos com a regra de
-   recomendação de marts_50 copiada literalmente. Termômetro: empate -> Manter (P1).
+3. MARTS DO PAINEL (marts.marts_card_* e marts.marts_painel_*): leem a recomendação de
+   marts.marts_50_rank_recomendacoes, sem repetir a regra. Termômetro: empate -> Manter (P1).
 
 4. LAYOUT (app.py) e LINGUAGEM VISUAL
    - Cinco faixas: pulso do mercado, ranking de oportunidades, valor × qualidade, rankings
@@ -56,6 +62,7 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
 """
 
 import math
+import os
 from datetime import date, datetime
 
 import duckdb
@@ -65,10 +72,14 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.subplots import make_subplots
 
-from pipeline import db
+from pipeline import db, fotografia
 
 # Mesmo arquivo do pipeline (fundamentalistas.duckdb ou VALUATIONB3_DB), lido na importação.
 ARQUIVO_DB = db.caminho_banco()
+PASTA_FOTOGRAFIA = fotografia.PASTA_FOTOGRAFIA
+VARIAVEL_FONTE = "VALUATIONB3_FONTE"
+BANCO = "banco"
+FOTOGRAFIA = "fotografia"
 SCHEMA_MARTS = "marts"
 
 MARTS_CARDS = [
@@ -113,12 +124,20 @@ MSG_MATERIALIZAR = (
     "Gere a camada Gold com `uv run python -m pipeline.materializacao` e clique em "
     "Recarregar dados."
 )
+MSG_FOTOGRAFIA = (
+    "Gere a fotografia com `uv run python -m pipeline.fotografia` e versione a pasta "
+    "`fotografia/`."
+)
 
 
 # --------------------------------------------------------------------------------------------
 # 1. Leitura
 # --------------------------------------------------------------------------------------------
 class BancoBloqueado(Exception):
+    pass
+
+
+class FotografiaInvalida(Exception):
     pass
 
 
@@ -137,8 +156,43 @@ def _rotulo(nome):
     return f"{SCHEMA_MARTS}.{nome}"
 
 
+def fonte():
+    """De onde o painel lê: BANCO ou FOTOGRAFIA (ver regra 1, FONTE)."""
+    escolhida = os.environ.get(VARIAVEL_FONTE, "").strip().lower()
+    if escolhida in (BANCO, FOTOGRAFIA):
+        return escolhida
+    if escolhida:
+        raise ValueError(
+            f"{VARIAVEL_FONTE}={escolhida!r} inválida: use {BANCO!r} ou {FOTOGRAFIA!r}"
+        )
+    if ARQUIVO_DB.exists() or not (PASTA_FOTOGRAFIA / fotografia.MANIFESTO).exists():
+        return BANCO
+    return FOTOGRAFIA
+
+
+def origem():
+    """Rótulo da fonte para o cabeçalho do app (sem ler as tabelas)."""
+    if fonte() == BANCO:
+        return f"banco local `{ARQUIVO_DB.name}`"
+    manifesto = fotografia.ler_manifesto(PASTA_FOTOGRAFIA)
+    return (
+        f"fotografia versionada de {data_br(date.fromisoformat(manifesto['data_referencia']))}"
+        f" · hash `{manifesto['hash'][:12]}`"
+    )
+
+
+def mensagem_faltando():
+    return MSG_FOTOGRAFIA if fonte() == FOTOGRAFIA else MSG_MATERIALIZAR
+
+
 def tabelas_faltando():
     """Banco ou tabelas marts obrigatórias que não existem (rótulos marts.<nome>)."""
+    if fonte() == FOTOGRAFIA:
+        try:
+            manifesto = fotografia.verificar(PASTA_FOTOGRAFIA)
+        except fotografia.ErroFotografia as erro:
+            raise FotografiaInvalida(str(erro)) from erro
+        return [_rotulo(n) for n in MARTS_OBRIGATORIOS if n not in manifesto["tabelas"]]
     if not ARQUIVO_DB.exists():
         return [ARQUIVO_DB.name]
     con = _conectar()
@@ -156,6 +210,11 @@ def tabelas_faltando():
 
 
 def _conectar():
+    if fonte() == FOTOGRAFIA:
+        try:
+            return fotografia.conectar(PASTA_FOTOGRAFIA)
+        except fotografia.ErroFotografia as erro:
+            raise FotografiaInvalida(str(erro)) from erro
     try:
         return duckdb.connect(str(ARQUIVO_DB), read_only=True)
     except duckdb.IOException as erro:

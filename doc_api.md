@@ -18,6 +18,8 @@ Números de linhas citados abaixo vêm do banco `fundamentalistas.duckdb` com da
 | Bronze | `raw` | [pipeline/ingestao.py](pipeline/ingestao.py) | `uv run python -m pipeline.ingestao` | Dado como veio, tudo `VARCHAR` |
 | Silver | `refined` | [pipeline/transformacao/](pipeline/transformacao/__init__.py) | `uv run python -m pipeline.transformacao` | Tipagem estrita, deduplicação, chaves; sem cálculo |
 | Gold | `marts` | [sql/marts/](sql/marts/) + [pipeline/materializacao.py](pipeline/materializacao.py) | `uv run python -m pipeline.materializacao` | Um `SELECT` puro por mart |
+| Qualidade | — | [pipeline/qualidade.py](pipeline/qualidade.py) | `uv run python -m pipeline.qualidade` | Reconciliação raw → refined → marts e regras de domínio (só leitura) |
+| Fotografia | — | [pipeline/fotografia.py](pipeline/fotografia.py) | `uv run python -m pipeline.fotografia` | `marts.*` em Parquet + manifesto com data de referência e hash |
 | Apresentação | — | [painel.py](painel.py) + [app.py](app.py) | `uv run streamlit run app.py` | Só lê, filtra, ordena e formata |
 
 Utilitários: [ui.py](ui.py) abre o banco na DuckDB UI (`http://localhost:4213`);
@@ -44,6 +46,8 @@ uv sync
 uv run python -m pipeline.ingestao        # 1. Bronze  (raw)
 uv run python -m pipeline.transformacao   # 2. Silver  (refined)
 uv run python -m pipeline.materializacao  # 3. Gold    (marts)
+uv run python -m pipeline.qualidade       # 4. Qualidade (reconciliação e regras de domínio)
+uv run python -m pipeline.fotografia      # 5. Fotografia versionada (fotografia/)
 uv run streamlit run app.py               # painel
 ```
 
@@ -285,8 +289,12 @@ Fotografia atual: 391 tickers — 95 Compra, 20 Manter, 276 Venda.
 | `marts_painel_data_referencia` | 1 linha | `data_referencia` (`MAX(_timestamp_ingestao)` em `America/Sao_Paulo`) |
 | `marts_painel_indicadores` | `ticker` | recomendação + indicadores do Fundamentus, `payout`, `earnings_yield` |
 
-Os cards e marts do painel contêm **cópia literal** da consulta de `marts_50`: qualquer mudança
-nos rankings ou na regra precisa ser replicada neles.
+Dependências entre marts: `marts_50` lê `marts.marts_01` … `marts_10` (ticker e rank), e os cards
+01–05 e `marts_painel_indicadores` leem `marts.marts_50_rank_recomendacoes`. A elegibilidade e o
+`DENSE_RANK` de cada tema vivem só no arquivo do ranking, e a regra de recomendação só no
+`marts_50`. A materialização extrai as referências `marts.<nome>` do `.sql`, prepara os marts em
+ordem topológica e troca cada referência pela temporária da mesma execução (`dependencias`,
+`ordenar`).
 
 ### 6.6 Tratamento de dados
 
@@ -306,7 +314,9 @@ nos rankings ou na regra precisa ser replicada neles.
 | `MARTS` | Registro dos 30 marts com a chave do comentário `Grão:` de cada `.sql` |
 | `ErroMaterializacao(etapa, motivo, *, arquivo, destino, exemplo)` | Erro com contexto; nenhuma tabela Gold muda |
 | `inventariar(pasta, marts)` | Exige correspondência 1:1 entre `.sql` e `MARTS` |
-| `preparar(con, mart, pasta)` | Executa o `.sql` uma vez para tabela temporária; valida colunas/tipos contra `DESCRIBE` e a chave (sem nulos/duplicatas; linha única = exatamente 1) |
+| `dependencias(sql)` | Marts lidos pela consulta (`marts.<nome>` fora de comentários) |
+| `ordenar(marts, pasta)` | Ordem topológica pelas dependências (empate alfabético); dependência não declarada ou ciclo interrompem |
+| `preparar(con, mart, pasta, temporarias)` | Executa o `.sql` uma vez para tabela temporária; valida colunas/tipos contra `DESCRIBE` e a chave (sem nulos/duplicatas; linha única = exatamente 1) |
 | `publicar(con, preparadas)` | `CREATE OR REPLACE TABLE marts.<nome>` de todos numa transação; antes do `COMMIT` confere contagem, colunas, tipos, chave e `EXCEPT ALL` nos dois sentidos |
 | `executar(con, pasta, marts)` | Orquestra e devolve relatório (tabelas + órfãs) |
 
@@ -316,7 +326,53 @@ correspondente são reportadas como órfãs, nunca apagadas.
 
 ---
 
-## 8. `painel` — leitura, formatação e gráficos
+## 8. `pipeline.qualidade` — reconciliação e regras de domínio
+
+Só lê o banco (`read_only`). Cada verificação é um `SELECT` das linhas que violam a regra
+(zero linhas = ok); as primeiras viram exemplo no relatório. Código de saída `1` se alguma
+verificação de **erro** falhar.
+
+| Símbolo | Descrição |
+|---|---|
+| `Verificacao(nome, camada, severidade, sql)` | Regra declarada; `severidade` = `ERRO` ou `AVISO` |
+| `Resultado` | `violacoes`, `exemplos`, `falha` (consulta não executou) e `status` (`OK`, `AVISO`, `ERRO`) |
+| `verificacoes()` | Catálogo completo (71 verificações) |
+| `executar(con, catalogo=None)` / `erros(resultados)` | Executa e filtra os erros |
+| `exigir(con)` | Executa e levanta `ErroQualidade` se houver erro (portão da fotografia) |
+
+| Camada | O que confere | Severidade |
+|---|---|---|
+| raw → refined | chaves distintas da Bronze = registros da Silver; mesma `_timestamp_ingestao` (4 fontes) | erro |
+| refined → marts | marts do Fundamentus com os mesmos tickers; `marts_cotacao` com as mesmas chaves; rankings dentro do universo; `marts_50` = universo negociado; painel e cards = `marts_50` | erro |
+| domínio refined | DY ≥ 0, liquidez ≥ 0, crescimento ≥ −100%, fechamento > 0, volume/dividendos/desdobramentos ≥ 0 | erro |
+| domínio refined | cotação > 0 (zero = ausência), percentuais em faixas plausíveis (`FAIXAS_PLAUSIVEIS`), máxima ≥ mínima, fechamento ajustado > 0 | aviso |
+| domínio marts | `marts_50`: cotação > 0, saldo em [−10, 10], faixas somam 10, recomendação coerente com o saldo, faixas válidas; rank ≥ 1; termômetro em [0, 100]; data de referência informada | erro |
+
+As faixas plausíveis são aviso porque o Fundamentus publica extremos reais (ROE acima de
+1.000.000%, margem líquida de 144.637%) e a Silver preserva o dado como veio. Nulo não viola
+regra de domínio. Na base de 02/11/2026: 61 ok, 10 avisos, 0 erros.
+
+---
+
+## 9. `pipeline.fotografia` — fotografia versionada da Gold
+
+| Símbolo | Descrição |
+|---|---|
+| `exportar(con, pasta)` | Exige qualidade sem erros; grava cada mart de `MARTS` em `<mart>.parquet` (zstd, ordenado pela chave) e `manifesto.json`; troca a pasta por renomeação (falha preserva a anterior) |
+| `verificar(pasta)` | Confere arquivos e SHA-256 contra o manifesto; `ErroFotografia` se divergir |
+| `conectar(pasta)` | DuckDB em memória com views `marts."<mart>"` sobre os Parquet |
+| `ler_manifesto(pasta)` | Lê e valida o formato do manifesto |
+
+Manifesto: `data_referencia`, `gerada_em`, versão do `duckdb`, resumo da qualidade e, por tabela,
+`arquivo`, `registros`, `bytes` e `sha256`. `hash` = SHA-256 das linhas `"<mart> <sha256>"` em
+ordem alfabética: identifica a fotografia inteira e só muda quando os dados mudam (a escrita é
+determinística para a mesma versão do DuckDB). Tipos sem equivalente em Parquet (ex.: `HUGEINT`)
+interrompem a exportação. `uv run python -m pipeline.fotografia --verificar` confere a fotografia
+versionada (também no CI).
+
+---
+
+## 10. `painel` — leitura, formatação e gráficos
 
 Módulo sem dependência de Streamlit (testável e reaproveitável).
 
@@ -359,7 +415,7 @@ Constantes visuais: `REC` (ícone + rótulo + cor por recomendação, para acess
 
 ---
 
-## 9. `app.py` — painel Streamlit
+## 11. `app.py` — painel Streamlit
 
 Cinco seções:
 
@@ -377,29 +433,32 @@ leitura mostram mensagem clara e param a página. Tema escuro em
 
 ---
 
-## 10. Testes
+## 12. Testes
 
 ```powershell
-uv run pytest   # testpaths = test, pythonpath = .; addopts = --cov, fail_under = 60
+uv run pytest   # testpaths = test, pythonpath = .; addopts = --cov, fail_under = 85
 ```
 
 Cobertura medida sem `test/*`, `app.py`, `ui.py` e `.venv/*`. `test/conftest.py` remove
-`VALUATIONB3_DB` do ambiente de cada teste: nenhum teste toca o banco real nem a rede.
+`VALUATIONB3_DB` e `VALUATIONB3_FONTE` do ambiente de cada teste e aponta a fotografia do painel
+para uma pasta vazia: nenhum teste toca o banco real, a fotografia versionada nem a rede.
 
 | Arquivo | Testes | Cobre |
 |---|---|---|
 | [test/test_db.py](test/test_db.py) | 10 | conexão, `caminho_banco` (`VALUATIONB3_DB`), schema, `gravar` |
 | [test/test_ingestao.py](test/test_ingestao.py) | 38 | retry/backoff, 4xx definitivo, cada fonte, `FalhaExtracao`, rollback da gravação |
-| [test/test_transformacao.py](test/test_transformacao.py) | 49 | conversões, deduplicação, chaves, JSON, publicação |
-| [test/test_sql_marts.py](test/test_sql_marts.py) | 12 | SQLs dos marts com dados fictícios; cards × `marts_50` |
-| [test/test_marts.py](test/test_marts.py) | 18 | inventário, preparação, publicação e rollback da materialização |
+| [test/test_transformacao.py](test/test_transformacao.py) | 50 | conversões, deduplicação, chaves, JSON, publicação |
+| [test/test_sql_marts.py](test/test_sql_marts.py) | 14 | SQLs dos marts com dados fictícios; `marts_50` sobre os rankings; cards × `marts_50`; empate do termômetro |
+| [test/test_marts.py](test/test_marts.py) | 24 | inventário, dependências entre marts, preparação, publicação e rollback |
+| [test/test_qualidade.py](test/test_qualidade.py) | 16 | pipeline de ponta a ponta + cada tipo de violação; código de saída |
+| [test/test_fotografia.py](test/test_fotografia.py) | 22 | exportação, determinismo do hash, portão de qualidade, adulteração, painel sobre a fotografia |
 | [test/test_painel.py](test/test_painel.py) | 25 | leitura, filtros, formatação e gráficos |
 | [test/test_log.py](test/test_log.py) | 4 | destino das mensagens (`stdout`/`stderr`) e configuração idempotente |
 | [test/test_docs_hooks.py](test/test_docs_hooks.py) | 6 | hook do MkDocs: inclusão de documentos e reescrita de links |
 
 ---
 
-## 11. Limitações conhecidas
+## 13. Limitações conhecidas
 
 - Fora do escopo: Dívida Líquida/EBITDA, Sharpe, valor justo por Gordon e comparação setorial.
 - Rank Valor é uma versão simplificada da Magic Formula; payout é estimado (`DY × P/L`).

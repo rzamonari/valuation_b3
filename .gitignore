@@ -56,6 +56,10 @@ data/
 dados/
 raw/
 tmp/
+# Exceção: a fotografia da Gold é versionada (pipeline.fotografia; painel no Streamlit Cloud).
+!fotografia/
+!fotografia/*.parquet
+.fotografia.*/
 
 # --- Logs --------------------------------------------------------------------
 *.log

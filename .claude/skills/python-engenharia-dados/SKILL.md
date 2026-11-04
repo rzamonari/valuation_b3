@@ -1,6 +1,6 @@
 ---
 name: python-engenharia-dados
-description: Regras e boas práticas de desenvolvimento Python do projeto b3_valuation (pacote valuationb3) — estrutura do pacote pipeline/, uv, Ruff, pytest com cobertura mínima de 60%, MkDocs Material e engenharia de dados sobre DuckDB (Bronze/Silver/Gold). Use ao criar, alterar, revisar ou testar código Python, SQL de marts, dependências ou documentação deste repositório.
+description: Regras e boas práticas de desenvolvimento Python do projeto b3_valuation (pacote valuationb3) — estrutura do pacote pipeline/, uv, Ruff, pytest com cobertura mínima de 85%, MkDocs Material e engenharia de dados sobre DuckDB (Bronze/Silver/Gold). Use ao criar, alterar, revisar ou testar código Python, SQL de marts, dependências ou documentação deste repositório.
 ---
 
 # Python para Engenharia de Dados — b3_valuation
@@ -28,8 +28,14 @@ b3_valuation/
 │   ├── ingestao.py         Bronze  → schema raw      (python -m pipeline.ingestao)
 │   ├── transformacao/      Silver  → schema refined  (subpacote: comum, b3, fundamentus,
 │   │                       yfinance, minhareceita; orquestração no __init__)
-│   └── materializacao.py   Gold    → schema marts    (executa sql/marts/*.sql)
+│   ├── materializacao.py   Gold    → schema marts    (executa sql/marts/*.sql; dependências
+│   │                       marts.<nome> resolvidas em ordem topológica)
+│   ├── qualidade.py        reconciliação raw → refined → marts e regras de domínio (só lê)
+│   └── fotografia.py       marts.* → fotografia/*.parquet + manifesto.json (data, SHA-256)
 ├── sql/marts/*.sql         ✅ um SELECT puro por mart (fonte da verdade da Gold)
+├── fotografia/             ✅ fotografia versionada da Gold (lida pelo painel sem banco local)
+├── requirements.txt        ✅ exportado do uv.lock para o Streamlit Cloud (não editar à mão)
+├── .github/workflows/      ✅ CI: ruff check, ruff format --check, pytest (Ubuntu e Windows)
 ├── painel.py               ✅ lógica do painel (leitura, filtros, formatação)
 ├── app.py                  ✅ interface Streamlit (apenas layout/interação)
 ├── ui.py                   ✅ abre a DuckDB UI
@@ -45,7 +51,8 @@ b3_valuation/
 | Acesso a dados | `pipeline/db.py` | Conexão, schema, gravação genérica. Sem regra de negócio |
 | Ingestão (Bronze) | `pipeline/ingestao.py` | Dado como veio, tudo `VARCHAR`, com `_timestamp_ingestao` e `_source_origin` |
 | Transformação (Silver) | `pipeline/transformacao/` | Tipagem, deduplicação, chaves. **Sem cálculo financeiro, sem preencher ausentes** |
-| Regras de negócio (Gold) | `sql/marts/*.sql` + `MARTS` em `materializacao.py` | Indicador novo = mart novo |
+| Regras de negócio (Gold) | `sql/marts/*.sql` + `MARTS` em `materializacao.py` | Indicador novo = mart novo; regra de outro mart é lida (`marts.<nome>`), nunca copiada |
+| Qualidade | `pipeline/qualidade.py` | Regra nova = `Verificacao` (SELECT das violações); ERRO só para o que a fonte nunca viola |
 | Orquestração/CLI | `main()` + `if __name__ == "__main__"` de cada módulo | Código de saída `0` sucesso, `1` falha |
 | Apresentação | `painel.py` (lógica) e `app.py` (Streamlit) | Só lê, filtra, ordena e formata. **Número novo exige mart novo** |
 
@@ -152,11 +159,11 @@ max-line-length = 100   # E501 em prosa/SQL; o formatter mantém o código em 88
 ## 4. Testes — pytest e cobertura
 
 Estado ✅: `pytest`, `pytest-cov`; `testpaths = ["test"]`, `pythonpath = ["."]`,
-`addopts = "--cov"`; `[tool.coverage.report] fail_under = 60`, `show_missing = true`.
+`addopts = "--cov"`; `[tool.coverage.report] fail_under = 85`, `show_missing = true`.
 Todo `uv run pytest` aplica o limite. `htmlcov/` está no `.gitignore`.
 
 ```powershell
-uv run pytest                                  # todos os testes + cobertura (fail_under 60)
+uv run pytest                                  # todos os testes + cobertura (fail_under 85)
 uv run pytest test/test_db.py -k gravar --no-cov   # recorte rápido, sem cobertura
 uv run pytest --cov-report=html                # relatório em htmlcov/index.html
 ```
@@ -293,6 +300,6 @@ docs/
 
 - [ ] Mudança na camada correta; sem lógica de cálculo fora da Gold.
 - [ ] Testes de sucesso, erro e bordas; sem rede e sem banco real.
-- [ ] `uv run pytest` ≥ 60% sem mexer em `fail_under`/`omit`.
+- [ ] `uv run pytest` ≥ 85% sem mexer em `fail_under`/`omit`.
 - [ ] `pyproject.toml` + `uv.lock` juntos quando houver dependência nova.
 - [ ] `doc_api.md`, docstrings e `sql/marts/README.md` atualizados se a interface mudou.

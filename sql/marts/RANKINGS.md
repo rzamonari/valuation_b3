@@ -98,8 +98,9 @@ Observações de dados:
 
 Consolida os 10 rankings em `Compra`, `Manter` ou `Venda` por ticker (spec §7).
 
-1. **Ranks**: cada ranking é reproduzido dentro da consulta, com a mesma elegibilidade e o mesmo
-   `DENSE_RANK` do arquivo individual, sobre a consulta-base completa.
+1. **Ranks**: lidos de `marts.marts_01_rank_valor` … `marts.marts_10_rank_rentabilidade` (ticker
+   e rank). A elegibilidade e o `DENSE_RANK` vivem só no arquivo de cada ranking; a consulta-base
+   continua fornecendo o universo de tickers e os atributos de cadastro.
 2. **Faixa por ranking**, pela posição relativa do rank (aritmética inteira; empates ficam na
    mesma faixa):
 

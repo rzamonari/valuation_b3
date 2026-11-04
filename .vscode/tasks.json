@@ -23,12 +23,27 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "Pipeline: 4. Qualidade",
+			"type": "shell",
+			"command": "uv run python -m pipeline.qualidade",
+			"group": "test",
+			"problemMatcher": []
+		},
+		{
+			"label": "Pipeline: 5. Fotografia",
+			"type": "shell",
+			"command": "uv run python -m pipeline.fotografia",
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
 			"label": "Pipeline: completo",
 			"dependsOrder": "sequence",
 			"dependsOn": [
 				"Pipeline: 1. Ingestão (raw)",
 				"Pipeline: 2. Transformação (refined)",
-				"Pipeline: 3. Materialização (marts)"
+				"Pipeline: 3. Materialização (marts)",
+				"Pipeline: 4. Qualidade"
 			],
 			"problemMatcher": []
 		},

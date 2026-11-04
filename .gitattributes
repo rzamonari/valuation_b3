@@ -1,0 +1,2 @@
+# A fotografia é conferida por SHA-256: nenhuma conversão de fim de linha nos binários.
+fotografia/*.parquet binary

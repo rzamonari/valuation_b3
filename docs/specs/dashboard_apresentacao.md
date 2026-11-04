@@ -162,10 +162,9 @@ correspondentes. Mantidos aqui como definição:
 
 Regras:
 
-- Todos partem da mesma consulta-base e da mesma regra de recomendação de
-  `marts_50_rank_recomendacoes.sql` (universo: ações analisadas, `liquidez_2_meses > 0`). O mart de
-  recomendações já repete os rankings internamente; seguir o mesmo padrão e documentar no
-  cabeçalho que qualquer mudança na regra deve ser replicada.
+- Todos partem da mesma regra de recomendação de `marts_50_rank_recomendacoes.sql` (universo:
+  ações analisadas, `liquidez_2_meses > 0`). Revisão de 04/11/2026: em vez de copiar a consulta,
+  leem `marts.marts_50_rank_recomendacoes` (dependência resolvida pela materialização).
 - Valores do Fundamentus preservados, na escala original (percentuais 0–100).
 - Termômetro: empate na quantidade máxima → `Manter` (P1, respondida).
 

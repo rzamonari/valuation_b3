@@ -109,6 +109,85 @@ def test_mart_declarado_sem_arquivo_interrompe(tmp_path):
         m.executar(con, pasta, MARTS)
 
 
+# --------------------------------------------------------------------------- dependências
+
+# "marts_a_positivos" (nome alfabeticamente anterior) lê marts_roic: a ordem topológica
+# precisa vencer a alfabética.
+DEPENDENTE = m.Mart("marts_a_positivos", ("ticker",), m.FOTOGRAFIA)
+
+
+def pasta_com_dependente(tmp_path, texto):
+    pasta = nova_pasta(tmp_path)
+    (pasta / f"{DEPENDENTE.nome}.sql").write_text(texto, encoding="utf-8")
+    return pasta
+
+
+def test_dependencias_ignoram_comentarios_e_aceitam_aspas():
+    sql = (
+        "-- lê marts.marts_comentado só no comentário\n"
+        'SELECT * FROM marts.marts_roic JOIN MARTS."marts_card" USING (x)'
+    )
+    assert m.dependencias(sql) == {"marts_roic", "marts_card"}
+    assert m.dependencias("SELECT * FROM refined.fundamentus_acoes") == set()
+
+
+def test_real_marts_50_le_os_dez_rankings():
+    sql = (m.PASTA_MARTS / "marts_50_rank_recomendacoes.sql").read_text(
+        encoding="utf-8-sig"
+    )
+    rankings = {f.stem for f in m.PASTA_MARTS.glob("marts_[01]?_rank_*.sql")}
+    assert len(rankings) == 10
+    assert m.dependencias(sql) == rankings
+    ordem = [mart.nome for mart in m.ordenar(m.MARTS)]
+    assert all(
+        ordem.index(r) < ordem.index("marts_50_rank_recomendacoes") for r in rankings
+    )
+
+
+def test_dependente_le_a_versao_preparada_na_mesma_execucao(tmp_path):
+    con = novo_banco(tmp_path)
+    pasta = pasta_com_dependente(
+        tmp_path, "SELECT ticker FROM marts.marts_roic WHERE roic > 0"
+    )
+    marts = [*MARTS, DEPENDENTE]
+    m.executar(con, pasta, marts)
+    assert consultar(con, "SELECT * FROM marts.marts_a_positivos") == [("AAAA3",)]
+    # nova execução: o dependente enxerga o marts_roic recém-preparado, não o publicado antes
+    con.execute("UPDATE refined.fundamentus_acoes SET roic = 1 WHERE ticker = 'CCCC3'")
+    m.executar(con, pasta, marts)
+    assert consultar(con, "SELECT * FROM marts.marts_a_positivos ORDER BY 1") == [
+        ("AAAA3",),
+        ("CCCC3",),
+    ]
+
+
+def test_dependencia_nao_declarada_interrompe(tmp_path):
+    con = novo_banco(tmp_path)
+    pasta = pasta_com_dependente(tmp_path, "SELECT ticker FROM marts.marts_inexistente")
+    with pytest.raises(m.ErroMaterializacao, match="não declarado") as erro:
+        m.executar(con, pasta, [*MARTS, DEPENDENTE])
+    assert "marts.marts_inexistente" in erro.value.exemplo
+    assert tabelas_gold(con) == []
+
+
+def test_dependencia_circular_interrompe(tmp_path):
+    con = novo_banco(tmp_path)
+    pasta = pasta_com_dependente(tmp_path, "SELECT ticker FROM marts.marts_roic")
+    (pasta / "marts_roic.sql").write_text(
+        "SELECT ticker, 1 AS roic FROM marts.marts_a_positivos", encoding="utf-8"
+    )
+    with pytest.raises(m.ErroMaterializacao, match="circular"):
+        m.executar(con, pasta, [*MARTS, DEPENDENTE])
+    assert tabelas_gold(con) == []
+
+
+def test_preparar_sem_a_dependencia_pronta_interrompe(tmp_path):
+    con = novo_banco(tmp_path)
+    pasta = pasta_com_dependente(tmp_path, "SELECT ticker FROM marts.marts_roic")
+    with pytest.raises(m.ErroMaterializacao, match="ainda não preparada"):
+        m.preparar(con, DEPENDENTE, pasta)
+
+
 # --------------------------------------------------------------------------- materialização
 
 

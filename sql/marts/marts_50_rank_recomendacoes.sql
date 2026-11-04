@@ -2,12 +2,14 @@
 -- Objetivo: consolidar os 10 rankings fundamentalistas (01 a 10) em uma única recomendação por
 -- ticker, para o investidor iniciante, ordenada da melhor (Compra) para a pior (Venda).
 --
--- Fontes Silver (consulta-base):
---   refined.fundamentus_acoes a  INNER JOIN refined.b3_empresas b  LEFT JOIN refined.minhareceita_empresas c
+-- Fontes:
+--   Silver (universo e atributos): refined.fundamentus_acoes a  INNER JOIN refined.b3_empresas b
+--                                  LEFT JOIN refined.minhareceita_empresas c  (consulta-base)
+--   Gold (rankings): ticker e rank dos dez marts_NN_rank_*. A elegibilidade e o DENSE_RANK de cada
+--                    tema vivem só no arquivo do ranking; a materialização prepara os dez antes
+--                    deste (dependência marts.<nome>, ver pipeline/materializacao.py).
 --
--- 1. Rankings: cada CTE rank_XX reproduz exatamente a elegibilidade e o DENSE_RANK do arquivo
---    marts_XX_rank_*.sql correspondente, sobre a consulta-base completa. Qualquer alteração em um
---    ranking individual deve ser replicada aqui.
+-- 1. Rankings: ticker ausente do mart do ranking = não elegível naquele tema.
 --
 -- 2. Faixa por ranking (posição relativa do rank, aritmética inteira, empates na mesma faixa):
 --      Superior      (+1): (rank - 1) * 3 <  max_rank - 1, ou max_rank = 1  (terço melhor)
@@ -40,111 +42,24 @@ WITH base AS (
         c.data_inicio_atividade,
         b.situacao,
         a.cotacao,
-        a.liquidez_2_meses,
-        a.roic,
-        a.roe,
-        a.enterprise_value_ebit,
-        a.preco_lucro,
-        a.dividend_yield,
-        a.dividend_yield * a.preco_lucro              AS payout,
-        a.margem_ebit,
-        a.margem_liquida,
-        a.divida_liquida_patrimonio,
-        a.preco_valor_patrimonial,
-        a.preco_valor_patrimonial / NULLIF(a.roe, 0) AS p_vp_por_roe,
-        a.crescimento_receita_5_anos,
-        100.0 / NULLIF(a.preco_lucro, 0)             AS earnings_yield
+        a.liquidez_2_meses
     FROM refined.fundamentus_acoes a
     INNER JOIN refined.b3_empresas b
         ON b.empresa_emissora = SUBSTRING(a.ticker, 1, 4)
     LEFT JOIN refined.minhareceita_empresas c
         ON c.cnpj = b.cnpj
 ),
-rank_01 AS (  -- Valor: soma de rank ROIC ↓ e rank EV/EBIT ↑
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY soma_ranks ASC) AS rank
-    FROM (
-        SELECT
-            ticker,
-            DENSE_RANK() OVER (ORDER BY roic DESC)
-                + DENSE_RANK() OVER (ORDER BY enterprise_value_ebit ASC) AS soma_ranks
-        FROM base
-        WHERE roic > 0
-          AND enterprise_value_ebit > 0
-    )
-),
-rank_02 AS (  -- Proventos: DY ↓, payout ↑
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY dividend_yield DESC, payout ASC) AS rank
-    FROM base
-    WHERE dividend_yield > 0
-      AND preco_lucro > 0
-      AND payout >= 0
-),
-rank_03 AS (  -- Eficiência: margem EBIT ↓, margem líquida ↓
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY margem_ebit DESC, margem_liquida DESC) AS rank
-    FROM base
-    WHERE margem_ebit > 0
-      AND margem_liquida > 0
-),
-rank_04 AS (  -- Retorno: ROE ↓, DL/PL ↑
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY roe DESC, divida_liquida_patrimonio ASC) AS rank
-    FROM base
-    WHERE roe > 0
-      AND divida_liquida_patrimonio IS NOT NULL
-      AND divida_liquida_patrimonio <= 1.5
-),
-rank_05 AS (  -- Pechincha: soma de rank P/L ↑ e rank EV/EBIT ↑
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY soma_ranks ASC) AS rank
-    FROM (
-        SELECT
-            ticker,
-            DENSE_RANK() OVER (ORDER BY preco_lucro ASC)
-                + DENSE_RANK() OVER (ORDER BY enterprise_value_ebit ASC) AS soma_ranks
-        FROM base
-        WHERE preco_lucro > 0
-          AND enterprise_value_ebit > 0
-    )
-),
-rank_06 AS (  -- Patrimônio: P/VP ÷ ROE ↑
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY p_vp_por_roe ASC) AS rank
-    FROM base
-    WHERE preco_valor_patrimonial > 0
-      AND roe > 0
-),
-rank_07 AS (  -- Crescimento: crescimento da receita 5 anos ↓, com ROIC > 10
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY crescimento_receita_5_anos DESC) AS rank
-    FROM base
-    WHERE crescimento_receita_5_anos IS NOT NULL
-      AND roic > 10
-),
-rank_08 AS (  -- Operacional: margem EBIT ↓
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY margem_ebit DESC) AS rank
-    FROM base
-    WHERE margem_ebit > 0
-),
-rank_09 AS (  -- Seguro: DL/PL ↑, ROIC ↓, ROE ↓
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY divida_liquida_patrimonio ASC, roic DESC, roe DESC) AS rank
-    FROM base
-    WHERE divida_liquida_patrimonio IS NOT NULL
-      AND divida_liquida_patrimonio <= 1.5
-      AND roic > 0
-      AND roe > 0
-),
-rank_10 AS (  -- Rentabilidade: earnings yield ↓
-    SELECT ticker, DENSE_RANK() OVER (ORDER BY earnings_yield DESC) AS rank
-    FROM base
-    WHERE preco_lucro > 0
-),
 ranks AS (
-    SELECT 'valor'         AS ranking, ticker, rank FROM rank_01
-    UNION ALL SELECT 'proventos',      ticker, rank FROM rank_02
-    UNION ALL SELECT 'eficiencia',     ticker, rank FROM rank_03
-    UNION ALL SELECT 'retorno',        ticker, rank FROM rank_04
-    UNION ALL SELECT 'pechincha',      ticker, rank FROM rank_05
-    UNION ALL SELECT 'patrimonio',     ticker, rank FROM rank_06
-    UNION ALL SELECT 'crescimento',    ticker, rank FROM rank_07
-    UNION ALL SELECT 'operacional',    ticker, rank FROM rank_08
-    UNION ALL SELECT 'seguro',         ticker, rank FROM rank_09
-    UNION ALL SELECT 'rentabilidade',  ticker, rank FROM rank_10
+    SELECT 'valor'         AS ranking, ticker, rank FROM marts.marts_01_rank_valor
+    UNION ALL SELECT 'proventos',      ticker, rank FROM marts.marts_02_rank_proventos
+    UNION ALL SELECT 'eficiencia',     ticker, rank FROM marts.marts_03_rank_eficiencia
+    UNION ALL SELECT 'retorno',        ticker, rank FROM marts.marts_04_rank_retorno
+    UNION ALL SELECT 'pechincha',      ticker, rank FROM marts.marts_05_rank_pechincha
+    UNION ALL SELECT 'patrimonio',     ticker, rank FROM marts.marts_06_rank_patrimonio
+    UNION ALL SELECT 'crescimento',    ticker, rank FROM marts.marts_07_rank_crescimento
+    UNION ALL SELECT 'operacional',    ticker, rank FROM marts.marts_08_rank_operacional
+    UNION ALL SELECT 'seguro',         ticker, rank FROM marts.marts_09_rank_seguro
+    UNION ALL SELECT 'rentabilidade',  ticker, rank FROM marts.marts_10_rank_rentabilidade
 ),
 faixas_elegiveis AS (
     SELECT

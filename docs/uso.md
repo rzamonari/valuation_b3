@@ -19,6 +19,8 @@ As etapas rodam em ordem: cada uma lê apenas a camada anterior.
 uv run python -m pipeline.ingestao        # 1. Bronze  (raw)
 uv run python -m pipeline.transformacao   # 2. Silver  (refined)
 uv run python -m pipeline.materializacao  # 3. Gold    (marts)
+uv run python -m pipeline.qualidade       # 4. Qualidade (só leitura)
+uv run python -m pipeline.fotografia      # 5. Fotografia versionada (fotografia/)
 uv run streamlit run app.py               # painel
 ```
 
@@ -43,7 +45,39 @@ Progresso e relatórios saem em `stdout`; avisos e erros, em `stderr`.
     `read_only`. Depois de materializar, clique em **Recarregar dados**.
 
 No VS Code, as mesmas etapas estão em **Terminal → Executar Tarefa** (`.vscode/tasks.json`),
-inclusive **Pipeline: completo**, que roda as três em sequência.
+inclusive **Pipeline: completo**, que roda materialização e qualidade em sequência.
+
+## Qualidade e fotografia
+
+`pipeline.qualidade` reconcilia raw → refined → marts e aplica regras de domínio; termina com
+código `1` se alguma verificação de erro falhar (avisos só aparecem no relatório).
+
+`pipeline.fotografia` exige a qualidade sem erros e grava `marts.*` em `fotografia/` (um Parquet
+por mart + `manifesto.json` com data de referência, contagens e SHA-256). A pasta é versionada no
+git; para publicar dados novos, gere a fotografia e faça commit dela.
+
+```powershell
+uv run python -m pipeline.fotografia --verificar   # confere os hashes da fotografia versionada
+```
+
+## Painel sobre a fotografia (Streamlit Cloud)
+
+O painel lê o banco local se `fundamentalistas.duckdb` existir; senão, lê a fotografia versionada.
+`VALUATIONB3_FONTE=fotografia` (ou `banco`) fixa a fonte. O cabeçalho do painel mostra qual fonte
+está em uso e, na fotografia, a data de referência e o início do hash.
+
+```powershell
+$env:VALUATIONB3_FONTE = "fotografia"; uv run streamlit run app.py
+```
+
+Publicação no [Streamlit Community Cloud](https://share.streamlit.io): **Create app** → repositório
+`rzamonari/valuation_b3`, branch `main`, arquivo principal `app.py`, Python 3.13 em
+**Advanced settings**. As dependências vêm de `requirements.txt`, exportado do `uv.lock`
+(o CI falha se os dois divergirem):
+
+```powershell
+uv export --no-dev --no-hashes --no-emit-project --locked -o requirements.txt
+```
 
 ## Ferramentas auxiliares
 
@@ -59,10 +93,15 @@ assistentes de IA.
 ```powershell
 uv run ruff check .            # lint
 uv run ruff format . --check   # formatação
-uv run pytest                  # testes, sempre com cobertura (mínimo 60%)
+uv run pytest                  # testes, sempre com cobertura (mínimo 85%)
+uv run python -m pipeline.fotografia --verificar   # integridade da fotografia
 uv run mkdocs serve            # esta documentação em http://127.0.0.1:8000
 uv run mkdocs build --strict   # falha com link quebrado ou página fora da navegação
 ```
+
+O GitHub Actions (`.github/workflows/ci.yml`) roda `ruff check`, `ruff format --check`, a
+conferência de `requirements.txt` e da fotografia e o `pytest` (Ubuntu e Windows) a cada push na
+`main` e em todo pull request.
 
 Os testes nunca tocam o banco real nem a rede: usam DuckDB em pasta temporária e substituem as
 chamadas HTTP e o yfinance por respostas mínimas.

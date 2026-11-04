@@ -1,0 +1,193 @@
+{
+  "formato": 1,
+  "data_referencia": "2026-11-02",
+  "gerada_em": "2026-11-04T14:16:06+00:00",
+  "duckdb": "2.0.0",
+  "hash": "8cb85eb7125b9b4bf262b3769a5d7bd385e76e81ca954d149ccd611286be9137",
+  "qualidade": {
+    "verificacoes": 71,
+    "avisos": 10
+  },
+  "tabelas": {
+    "marts_01_rank_valor": {
+      "arquivo": "marts_01_rank_valor.parquet",
+      "registros": 387,
+      "bytes": 20874,
+      "sha256": "8957ba842497d7ef8fdf7b926590c97cd60750f54e67ff7c40b715b56d10fcc6"
+    },
+    "marts_02_rank_proventos": {
+      "arquivo": "marts_02_rank_proventos.parquet",
+      "registros": 256,
+      "bytes": 15946,
+      "sha256": "60874a5f874daf2e63f75955653d41ae8311680b32f2ed0f5d4604883a5bd45d"
+    },
+    "marts_03_rank_eficiencia": {
+      "arquivo": "marts_03_rank_eficiencia.parquet",
+      "registros": 335,
+      "bytes": 16762,
+      "sha256": "1d43378843cb721716ec4944c70684feba939659f60c4aae1fb4674cfa473267"
+    },
+    "marts_04_rank_retorno": {
+      "arquivo": "marts_04_rank_retorno.parquet",
+      "registros": 367,
+      "bytes": 17686,
+      "sha256": "a833864d714404300bb30d280ac0bfade729137065a04bb736cb0329a6fd4a10"
+    },
+    "marts_05_rank_pechincha": {
+      "arquivo": "marts_05_rank_pechincha.parquet",
+      "registros": 336,
+      "bytes": 19441,
+      "sha256": "dc48b21d0e743889cff81d5af1d51c2a4c1ef667d82fa76376d525f4239b76af"
+    },
+    "marts_06_rank_patrimonio": {
+      "arquivo": "marts_06_rank_patrimonio.parquet",
+      "registros": 384,
+      "bytes": 21319,
+      "sha256": "baa56bf2fe5a2f1e57f59136b2509a4a8e75196ca8ed9a9a17edd0bd6a1af4b9"
+    },
+    "marts_07_rank_crescimento": {
+      "arquivo": "marts_07_rank_crescimento.parquet",
+      "registros": 222,
+      "bytes": 12597,
+      "sha256": "cd54fe166a9fd315ec957da35ea08d12718dd33af075ce2754363e27497a5cc3"
+    },
+    "marts_08_rank_operacional": {
+      "arquivo": "marts_08_rank_operacional.parquet",
+      "registros": 394,
+      "bytes": 17853,
+      "sha256": "85bc07f462cb70e8c2b78e5d3feddcd7548738988cb4ad77b7a0ae921c5de738"
+    },
+    "marts_09_rank_seguro": {
+      "arquivo": "marts_09_rank_seguro.parquet",
+      "registros": 277,
+      "bytes": 15503,
+      "sha256": "e62e58efbba498aa1ee05b578192986fbb2b2e9fd846e357a26a3d29925ec1eb"
+    },
+    "marts_10_rank_rentabilidade": {
+      "arquivo": "marts_10_rank_rentabilidade.parquet",
+      "registros": 397,
+      "bytes": 20957,
+      "sha256": "d7bb15bf448984a03c26f5dda1027e1c589b7565664e12473731818e74b7c01f"
+    },
+    "marts_50_rank_recomendacoes": {
+      "arquivo": "marts_50_rank_recomendacoes.parquet",
+      "registros": 391,
+      "bytes": 28047,
+      "sha256": "6e570b8d37e86105ada1ec932393ef46f0a490b504bfa03e2d48f2c88ce4472a"
+    },
+    "marts_alavancagem": {
+      "arquivo": "marts_alavancagem.parquet",
+      "registros": 995,
+      "bytes": 4727,
+      "sha256": "7980fb64f5d5f037e98b37a40f2f769690f0ca741d0356805ded3214ff6e19b3"
+    },
+    "marts_card_01_acoes_analisadas": {
+      "arquivo": "marts_card_01_acoes_analisadas.parquet",
+      "registros": 1,
+      "bytes": 240,
+      "sha256": "18297a217c8d64ca896ffbe29b4f7d2f39ee53bd46a2e5f71ccd651aaf4bfbba"
+    },
+    "marts_card_02_acoes_compra": {
+      "arquivo": "marts_card_02_acoes_compra.parquet",
+      "registros": 1,
+      "bytes": 240,
+      "sha256": "c343c0fcbf383cb0ce5583c6e207b8976ebd9aada1edb2ab2e06308e2c1aa534"
+    },
+    "marts_card_02_acoes_semindicacao": {
+      "arquivo": "marts_card_02_acoes_semindicacao.parquet",
+      "registros": 1,
+      "bytes": 240,
+      "sha256": "02bce348b6977be209332c852cb3b3b5ad69c5a246253f7fb6adee2ef5c22d36"
+    },
+    "marts_card_03_acoes_manter": {
+      "arquivo": "marts_card_03_acoes_manter.parquet",
+      "registros": 1,
+      "bytes": 240,
+      "sha256": "0776d0f8887039680a78a268d3a09f7405076ab0111dc9a0c7c8c152d3e03184"
+    },
+    "marts_card_04_acoes_venda": {
+      "arquivo": "marts_card_04_acoes_venda.parquet",
+      "registros": 1,
+      "bytes": 240,
+      "sha256": "95e6e1645b55e1a13c01656fda05e80a5c43ecd5a85da813d02bbd1123cc83d2"
+    },
+    "marts_card_05_termometro_mercado": {
+      "arquivo": "marts_card_05_termometro_mercado.parquet",
+      "registros": 1,
+      "bytes": 659,
+      "sha256": "e94ade32d9c58bb470a1208edf448dc8e2dabfe769c11eedee0cd290beb2e5ee"
+    },
+    "marts_cotacao": {
+      "arquivo": "marts_cotacao.parquet",
+      "registros": 1920774,
+      "bytes": 26399755,
+      "sha256": "0d74df7ddd034991a83057128e1b046f9e0069faca78f1d237489fc57765821f"
+    },
+    "marts_crescimento_receita_5_anos": {
+      "arquivo": "marts_crescimento_receita_5_anos.parquet",
+      "registros": 995,
+      "bytes": 5090,
+      "sha256": "f10cd19043a8911e5243dd5c14b4859c2e1b0aa07f0a42cfff0fcae0d057ad61"
+    },
+    "marts_dividend_yield_payout": {
+      "arquivo": "marts_dividend_yield_payout.parquet",
+      "registros": 995,
+      "bytes": 5671,
+      "sha256": "d3ec521f6a2395a8bc0724eff0e91bb5fd2391d2dbcd660a12767075646c350f"
+    },
+    "marts_ev_ebit": {
+      "arquivo": "marts_ev_ebit.parquet",
+      "registros": 995,
+      "bytes": 5497,
+      "sha256": "56a9371a37836620c5ff5e3d36d979299b35593843aef4c964d74ae7f7562a86"
+    },
+    "marts_margens": {
+      "arquivo": "marts_margens.parquet",
+      "registros": 995,
+      "bytes": 8756,
+      "sha256": "696bbfeecd96dfd0a223cf7c9dbe0c3fae7e692f4ba0a6259a2d8b390c344bd6"
+    },
+    "marts_p_vp": {
+      "arquivo": "marts_p_vp.parquet",
+      "registros": 995,
+      "bytes": 13887,
+      "sha256": "8439883e805fcbf84485601bee4a12979f9b403667508fd37e087674de1c20b8"
+    },
+    "marts_painel_data_referencia": {
+      "arquivo": "marts_painel_data_referencia.parquet",
+      "registros": 1,
+      "bytes": 230,
+      "sha256": "6906a587a21e955b05ca2aa512450aef48df800d92ec2d7c239b429fbede733f"
+    },
+    "marts_painel_indicadores": {
+      "arquivo": "marts_painel_indicadores.parquet",
+      "registros": 391,
+      "bytes": 23654,
+      "sha256": "be798375123a16da4931c953d6cea978d0dacfc889889467b828ce6441441dbc"
+    },
+    "marts_preco_lucro": {
+      "arquivo": "marts_preco_lucro.parquet",
+      "registros": 995,
+      "bytes": 11189,
+      "sha256": "2a175f55baa9494a1b891152d85c8dd719713714cbd2116f4084eb281506620e"
+    },
+    "marts_retorno_total_risco": {
+      "arquivo": "marts_retorno_total_risco.parquet",
+      "registros": 609,
+      "bytes": 22007,
+      "sha256": "1dc49c37cf2c204e3ba1a25faa9a1bb4423edeb5d3efe884a8644f1bd9792f4e"
+    },
+    "marts_roe": {
+      "arquivo": "marts_roe.parquet",
+      "registros": 995,
+      "bytes": 5076,
+      "sha256": "32ede88156750b14eb4456488c2dee13b8ed58816fc7e4a293cf7f76030f786a"
+    },
+    "marts_roic": {
+      "arquivo": "marts_roic.parquet",
+      "registros": 995,
+      "bytes": 4952,
+      "sha256": "2bb725ac357e8658b7e5062764f09b6639c6ccb9bf03ac26e9686a25c6c4f7ad"
+    }
+  }
+}

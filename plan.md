@@ -42,7 +42,7 @@ indicadores e rankings fundamentalistas e exibi-los num painel somente leitura.
 |---|---|---|---|
 | Bronze | `raw` | `pipeline/ingestao.py` | Dado como veio, tudo `VARCHAR`, com `_timestamp_ingestao` e `_source_origin` |
 | Silver | `refined` | `pipeline/transformacao/` | Tipagem estrita, deduplicação, validação de chave; **sem cálculo, sem preencher ausentes** |
-| Gold | `marts` | `sql/marts/*.sql` + `pipeline/materializacao.py` | Um `SELECT` puro por mart, lendo só `refined`; o `.sql` é a fonte da verdade |
+| Gold | `marts` | `sql/marts/*.sql` + `pipeline/materializacao.py` | Um `SELECT` puro por mart, lendo `refined` e, quando agrega outro mart, `marts.<nome>`; o `.sql` é a fonte da verdade |
 | Apresentação | — | `painel.py` + `app.py` | Só lê, filtra, ordena e formata; **número novo exige mart novo** |
 
 Garantias transversais, válidas para todas as etapas:
@@ -50,6 +50,8 @@ Garantias transversais, válidas para todas as etapas:
 - **Atomicidade:** cada etapa publica numa única transação; falha → `ROLLBACK` e versão anterior preservada.
 - **Idempotência:** reexecutar produz o mesmo estado (`CREATE OR REPLACE`, `IF NOT EXISTS`).
 - **Isolamento entre camadas:** cada etapa lê apenas a camada anterior e grava só no seu schema.
+  Na Gold, um mart pode ler outro mart da mesma execução (`marts.<nome>`, resolvido em ordem
+  topológica pela materialização), nunca a versão publicada anterior.
 - **Banco único:** `fundamentalistas.duckdb` na raiz, caminho derivado de `Path(__file__)`;
   `VALUATIONB3_DB` aponta outro arquivo (ex.: homologação) para pipeline e painel.
 - **Nulos preservados:** nunca viram zero; divisão por zero resulta em `NULL`.
@@ -160,7 +162,7 @@ Cada etapa é um PR dedicado, com testes verdes antes e depois. Refatoração e 
 nunca se misturam com mudança de comportamento. Ordem sugerida: A → B → C → D → E; F só após
 decisão; G conforme demanda.
 
-**Estado em 04/11/2026:** A–E ✅ entregues (branch `evolucao/pendencias-e-roadmap`);
+**Estado em 04/11/2026:** A–E e H ✅ entregues (branch `evolucao/pendencias-e-roadmap`);
 F 📋 aguarda decisão; G 📋 backlog.
 
 ### Etapa A — Qualidade de código (Ruff) ✅
@@ -249,6 +251,28 @@ Diverge do padrão `pipeline/` adotado na skill; **decidir antes de executar**. 
 
 **Pronto quando:** pipeline completo, painel e `uv run pytest` funcionam com os novos caminhos.
 
+### Etapa H — Publicação e confiabilidade ✅
+
+> Entregue em 04/11/2026, um commit por item.
+
+1. `marts_50` lê os rankings `marts_01` … `marts_10`, e cards e `marts_painel_indicadores` leem
+   `marts_50`; a materialização resolve as dependências `marts.<nome>` em ordem topológica.
+   As 30 tabelas `marts.*` ficaram iguais sobre o banco real (`EXCEPT ALL` nos dois sentidos).
+2. CI no GitHub Actions (`ruff check`, `ruff format --check`, `pytest` em Ubuntu e Windows) e
+   `fail_under` de 60 para 85.
+3. `pipeline/qualidade.py`: 71 verificações (reconciliação raw → refined → marts e regras de
+   domínio, como `cotacao > 0` e percentuais em faixas plausíveis); erro = código 1.
+4. `pipeline/fotografia.py`: `fotografia/` versionada (Parquet + manifesto com data de
+   referência e SHA-256), gerada só com qualidade aprovada; o painel a lê quando não há banco
+   local (Streamlit Community Cloud).
+5. `README.md` na raiz com objetivo, diagrama, execução, capturas do painel e resultados.
+
+Correções encontradas no caminho: o termômetro falhava em empate no máximo (subconsulta escalar
+com duas linhas) e `total` era `HUGEINT`, sem equivalente em Parquet.
+
+**Pendente fora do repositório:** criar o app no Streamlit Community Cloud (conta do usuário),
+depois do merge na `main`.
+
 ### Etapa G — Novos indicadores (backlog de produto) 📋
 
 Candidatos: Dívida Líquida/EBITDA, Sharpe, valor justo por Gordon, comparação setorial (exige
@@ -260,7 +284,8 @@ fonte de setor econômico). Para cada um:
 4. Se exibido: `MARTS_CARREGAR` / `MARTS_OBRIGATORIOS` em `painel.py` e `doc_api.md`.
 
 Se o indicador depender de dado ausente na Silver, a mudança começa na Bronze (nova fonte) e segue
-camada a camada. Se alterar rankings ou a regra de recomendação, replicar nos cards (ver P8).
+camada a camada. Rankings e regra de recomendação têm uma única fonte (`marts_01`…`10` e
+`marts_50`); cards e painel os leem como dependência.
 
 ---
 
@@ -271,6 +296,8 @@ uv sync
 uv run python -m pipeline.ingestao        # 1. Bronze  (raw)
 uv run python -m pipeline.transformacao   # 2. Silver  (refined)
 uv run python -m pipeline.materializacao  # 3. Gold    (marts)
+uv run python -m pipeline.qualidade       # 4. Qualidade (só leitura; erro = código 1)
+uv run python -m pipeline.fotografia      # 5. Fotografia versionada (commit de fotografia/)
 uv run streamlit run app.py               # painel
 ```
 
@@ -288,9 +315,12 @@ uv run pytest                  # cobertura obrigatória (addopts = --cov)
 uv run mkdocs build --strict
 ```
 
+O CI (`.github/workflows/ci.yml`) repete as três primeiras e confere `requirements.txt` e a
+fotografia versionada.
+
 - [ ] Mudança na camada correta (seção 2); sem cálculo fora da Gold.
 - [ ] Testes de sucesso, erro e bordas (nulos, duplicatas, tabela vazia, divisão por zero, zeros do Fundamentus); sem rede e sem banco real.
-- [ ] Cobertura ≥ 60% sem mexer em `fail_under`/`omit`.
+- [ ] Cobertura ≥ 85% sem mexer em `fail_under`/`omit`.
 - [ ] `pyproject.toml` + `uv.lock` no mesmo commit quando houver dependência nova; nunca `pip install`.
 - [ ] `doc_api.md`, docstrings e `sql/marts/README.md`/`RANKINGS.md` atualizados se a interface mudou.
 - [ ] Comandos executados e resultado real (incluindo % de cobertura) relatados no PR.
@@ -303,7 +333,7 @@ uv run mkdocs build --strict
 |---|---|---|
 | Fonte muda formato ou sai do ar | Ingestão aborta | `validar_fontes`, `FalhaExtracao`, conversões estritas na Silver |
 | Rate limit do Yahoo Finance | Extração lenta ou falha | Paralelismo 4, retry com backoff |
-| Consulta de `marts_50` copiada em cards e painel | Números divergentes entre seções | Teste de consistência em `test_sql_marts.py` (P8 ✅) |
+| Regra de recomendação repetida em vários `.sql` | Números divergentes entre seções | Resolvido: `marts_50` lê os rankings e cards/painel leem `marts_50`; teste de consistência mantido (P8 ✅) |
 | Zeros do Fundamentus significando ausência | Rankings distorcidos | Preservados e excluídos pelos critérios `> 0` |
 | Payout estimado (`DY × P/L`) acima de 100% | Proventos favorece pagadora insustentável | Desempate por menor payout; documentado (56 de 256 elegíveis) |
 | `fechamento_ajustado` negativo (8 tickers) | Métricas de risco erradas | Tratado como inválido no mart e no gráfico |

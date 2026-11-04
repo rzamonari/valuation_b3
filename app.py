@@ -31,6 +31,8 @@ def carregar_cotacao(ticker):
 def parar_com_erro(erro):
     if isinstance(erro, p.BancoBloqueado):
         st.error(p.MSG_BLOQUEADO)
+    elif isinstance(erro, p.FotografiaInvalida):
+        st.error(f"Fotografia dos dados inválida:\n\n{erro}\n\n{p.MSG_FOTOGRAFIA}")
     else:
         st.error(f"Erro ao ler `{erro.tabela}`:\n\n{erro.mensagem}")
     st.stop()
@@ -66,22 +68,23 @@ st.caption(f"⚠️ {AVISO}")
 # Fora do cache: "Recarregar dados" precisa enxergar uma materialização recém-feita.
 try:
     faltando = p.tabelas_faltando()
-except p.BancoBloqueado as erro:
+except (p.BancoBloqueado, p.FotografiaInvalida) as erro:
     parar_com_erro(erro)
 if faltando:
     mensagem = "Tabelas obrigatórias não encontradas:\n"
     for tabela in faltando:
         mensagem += f"\n- `{tabela}`"
-    st.error(f"{mensagem}\n\n{p.MSG_MATERIALIZAR}")
+    st.error(f"{mensagem}\n\n{p.mensagem_faltando()}")
     st.stop()
 
 try:
     d = carregar()
-except (p.BancoBloqueado, p.ErroMart) as erro:
+except (p.BancoBloqueado, p.ErroMart, p.FotografiaInvalida) as erro:
     parar_com_erro(erro)
 
 linha_data.markdown(
     f"Dados de **{p.data_br(d['marts_painel_data_referencia'].iloc[0, 0])}**"
+    f" · fonte: {p.origem()}"
 )
 
 rec = d[p.MART_RECOMENDACOES]
@@ -299,7 +302,7 @@ with c1:
 with c2:
     try:
         cotacao = carregar_cotacao(ticker)
-    except (p.BancoBloqueado, p.ErroMart) as erro:
+    except (p.BancoBloqueado, p.ErroMart, p.FotografiaInvalida) as erro:
         parar_com_erro(erro)
     if cotacao.empty:
         st.info("Sem histórico de cotação para este ticker")
