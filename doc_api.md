@@ -136,8 +136,8 @@ exemplo), em vez de virar `NULL` sem aviso.
 ## 6. Camada Gold — `sql/marts/`
 
 Cada arquivo `.sql` é uma consulta `SELECT` pura, sem efeito colateral, e é a fonte da verdade do
-seu mart. Detalhes completos em [sql/marts/README.md](sql/marts/README.md) (indicadores) e
-[sql/marts/RANKINGS.md](sql/marts/RANKINGS.md) (rankings).
+seu mart. Detalhes completos em `sql/marts/README.md` (indicadores) e
+`sql/marts/RANKINGS.md` (rankings).
 
 ### 6.1 Indicadores
 

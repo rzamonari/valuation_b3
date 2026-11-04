@@ -1,0 +1,49 @@
+site_name: B3 Valuation
+site_description: Pipeline de indicadores fundamentalistas de ações da B3 (Bronze → Silver → Gold) sobre DuckDB, com painel em Streamlit.
+docs_dir: docs
+
+theme:
+  name: material
+  language: pt-BR
+  palette:
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Tema claro
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Tema escuro
+  features:
+    - navigation.sections
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      # doc_api.md e sql/marts/*.md continuam sendo a fonte; o site só os inclui.
+      base_path: ["."]
+      check_paths: true
+      encoding: utf-8-sig
+
+nav:
+  - Início: index.md
+  - Instalação e uso: uso.md
+  - Arquitetura: arquitetura.md
+  - Referência da API: referencia/api.md
+  - Marts:
+      - Indicadores e materialização: referencia/marts.md
+      - Rankings e recomendação: referencia/rankings.md
+  - Decisões:
+      - decisoes/index.md
+      - "Bronze — ingestão": specs/raw_ingestao.md
+      - "Silver — transformação": specs/refined_transformacao.md
+      - "Gold — agregação e materialização": specs/marts.agregacao.md
+      - "Gold — indicadores": specs/marts_sql_indicadores.md
+      - "Gold — rankings": specs/marts_sql_rank.md
+      - "Apresentação — painel": specs/dashboard_apresentacao.md
+      - "Testes": specs/testes_codigo.md

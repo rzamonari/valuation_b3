@@ -1,0 +1,1 @@
+--8<-- "sql/marts/README.md"
