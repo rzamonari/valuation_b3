@@ -286,3 +286,74 @@ def test_ticker_sem_liquidez_fica_fora_das_recomendacoes(tmp_path):
         linha["ticker"] for linha in executar_mart(con, "marts_50_rank_recomendacoes")
     ]
     assert tickers == ["BOAS3"]
+
+
+# --------------------------------------------------------------------------- cards × marts_50
+# Cards e marts_painel_indicadores trazem cópia literal da consulta de marts_50: os números
+# exibidos no painel precisam bater com a recomendação consolidada.
+
+CARDS = {
+    "marts_card_02_acoes_compra": "Compra",
+    "marts_card_03_acoes_manter": "Manter",
+    "marts_card_04_acoes_venda": "Venda",
+}
+
+
+def acoes_com_as_tres_recomendacoes():
+    return [
+        {"ticker": "BOAS3", **COMPLETA},
+        {"ticker": "OTIM3", **COMPLETA, "roic": 35, "margem_ebit": 35},
+        {
+            "ticker": "MEIO3",
+            "liquidez_2_meses": 1000,
+            "roic": 40,
+            "enterprise_value_ebit": 3,
+            "preco_lucro": 5,
+            "dividend_yield": 0,
+            "margem_ebit": 50,
+            "margem_liquida": 40,
+            "preco_valor_patrimonial": 1,
+        },
+        {"ticker": "RUIM3", **NENHUMA},
+        {"ticker": "PESS3", **NENHUMA, "roic": -9},
+        {"ticker": "PARA3", **COMPLETA, "liquidez_2_meses": 0},  # fora do universo
+    ]
+
+
+def test_cards_contam_as_recomendacoes_de_marts_50(tmp_path):
+    acoes = acoes_com_as_tres_recomendacoes()
+    con = novo_banco(tmp_path, acoes, emissoras_de(acoes))
+    recomendacoes = por_ticker(
+        executar_mart(con, "marts_50_rank_recomendacoes"), "recomendacao"
+    )
+    assert set(recomendacoes.values()) == {"Compra", "Manter", "Venda"}
+
+    analisadas = executar_mart(con, "marts_card_01_acoes_analisadas")
+    assert analisadas == [{"quantidade": len(recomendacoes)}]
+    for mart, recomendacao in CARDS.items():
+        esperado = sum(1 for r in recomendacoes.values() if r == recomendacao)
+        assert executar_mart(con, mart) == [{"quantidade": esperado}], mart
+
+
+def test_termometro_usa_as_contagens_de_marts_50(tmp_path):
+    acoes = acoes_com_as_tres_recomendacoes()
+    con = novo_banco(tmp_path, acoes, emissoras_de(acoes))
+    recomendacoes = por_ticker(
+        executar_mart(con, "marts_50_rank_recomendacoes"), "recomendacao"
+    )
+    contagem = {
+        r: sum(1 for v in recomendacoes.values() if v == r)
+        for r in ("Compra", "Manter", "Venda")
+    }
+    [termometro] = executar_mart(con, "marts_card_05_termometro_mercado")
+    assert termometro["total"] == len(recomendacoes)
+    assert termometro["quantidade"] == max(contagem.values())
+
+
+def test_painel_indicadores_repete_a_recomendacao_de_marts_50(tmp_path):
+    acoes = acoes_com_as_tres_recomendacoes()
+    con = novo_banco(tmp_path, acoes, emissoras_de(acoes))
+    marts_50 = executar_mart(con, "marts_50_rank_recomendacoes")
+    painel = executar_mart(con, "marts_painel_indicadores")
+    assert por_ticker(painel, "recomendacao") == por_ticker(marts_50, "recomendacao")
+    assert por_ticker(painel, "saldo") == por_ticker(marts_50, "saldo")
