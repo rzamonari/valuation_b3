@@ -1,6 +1,6 @@
 ﻿# Camada Gold (Marts) — Rankings Fundamentalistas
 
-Especificação de origem: `.venv/.specs/marts_agregacao_rank.md`.
+Especificação de origem: `docs/specs/marts_sql_rank.md`.
 
 Dez consultas `SELECT` independentes (DuckDB), somente leitura da Silver (`refined`). Nenhuma
 tabela, coluna ou registro de `raw`/`refined` foi alterado. As próprias consultas não criam

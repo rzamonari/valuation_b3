@@ -2,7 +2,7 @@
 
 Execução: uv run python -m pipeline.materializacao
 
-Spec: .venv/.specs/marts.agregacao.md (ajuste "Materialização dos resultados na camada Gold").
+Spec: docs/specs/marts_materializacao.md (ajuste "Materialização dos resultados na camada Gold").
 
 # DECISÕES DE IMPLEMENTAÇÃO
 

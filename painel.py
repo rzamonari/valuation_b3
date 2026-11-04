@@ -1,6 +1,6 @@
 """Painel de recomendações — leitura, formatação e gráficos (camada de apresentação).
 
-Spec: .venv/.specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o motivo de cada uma:
+Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o motivo de cada uma:
 
 1. LEITURA
    - ler(nomes) executa SELECT * FROM marts."<nome>": as tabelas físicas que
