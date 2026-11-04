@@ -1,8 +1,97 @@
-.venv/
+# =============================================================================
+# b3_valuation — .gitignore
+# Pipeline Python (uv) + DuckDB (Bronze/Silver/Gold) + Streamlit + MkDocs
+# =============================================================================
+
+# --- Python: bytecode e extensões compiladas ---------------------------------
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# --- Empacotamento / build ---------------------------------------------------
+build/
+dist/
+wheels/
+*.egg-info/
+*.egg
+.eggs/
+pip-wheel-metadata/
+MANIFEST
+
+# --- Ambientes virtuais (uv) -------------------------------------------------
+# uv.lock e .python-version SÃO versionados (reprodutibilidade).
+.venv/
+venv/
+env/
+.uv/
+
+# --- Testes, cobertura e caches de ferramentas -------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+junit*.xml
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.hypothesis/
+.tox/
+.nox/
+
+# --- Dados e bancos locais (gerados pelo pipeline, nunca versionados) --------
+# O banco é reconstruível via ingestão + materialização (VALUATIONB3_DB).
 *.duckdb
 *.duckdb.wal
+*.duckdb.tmp/
+*.db
+*.sqlite
+*.sqlite3
 *.parquet
-.coverage
-htmlcov/
+*.arrow
+*.feather
+data/
+dados/
+raw/
+tmp/
+
+# --- Logs --------------------------------------------------------------------
+*.log
+logs/
+
+# --- Documentação gerada (MkDocs: site_dir) ----------------------------------
 site/
+.cache/
+
+# --- Notebooks ---------------------------------------------------------------
+.ipynb_checkpoints/
+
+# --- Segredos e configuração local -------------------------------------------
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+*.pem
+*.key
+
+# --- Claude Code: preferências locais (skills e .mcp.json são versionados) ---
+.claude/settings.local.json
+CLAUDE.local.md
+
+# --- IDEs / editores ---------------------------------------------------------
+# .vscode/tasks.json é versionado; o resto do .vscode é pessoal.
+.vscode/*
+!.vscode/tasks.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+
+# --- Sistema operacional -----------------------------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
