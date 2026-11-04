@@ -16,7 +16,7 @@ Números de linhas citados abaixo vêm do banco `fundamentalistas.duckdb` com da
 | Camada | Schema | Módulo | Comando | Regra principal |
 |---|---|---|---|---|
 | Bronze | `raw` | [pipeline/ingestao.py](pipeline/ingestao.py) | `uv run python -m pipeline.ingestao` | Dado como veio, tudo `VARCHAR` |
-| Silver | `refined` | [pipeline/transformacao.py](pipeline/transformacao.py) | `uv run python -m pipeline.transformacao` | Tipagem estrita, deduplicação, chaves; sem cálculo |
+| Silver | `refined` | [pipeline/transformacao/](pipeline/transformacao/__init__.py) | `uv run python -m pipeline.transformacao` | Tipagem estrita, deduplicação, chaves; sem cálculo |
 | Gold | `marts` | [sql/marts/](sql/marts/) + [pipeline/materializacao.py](pipeline/materializacao.py) | `uv run python -m pipeline.materializacao` | Um `SELECT` puro por mart |
 | Apresentação | — | [painel.py](painel.py) + [app.py](app.py) | `uv run streamlit run app.py` | Só lê, filtra, ordena e formata |
 
@@ -128,7 +128,16 @@ Toda tabela recebe `_timestamp_ingestao` (UTC, ISO-8601) e `_source_origin` (URL
 
 ## 5. `pipeline.transformacao` — Silver (`refined`)
 
-Lê só `raw`, grava só `refined`. A docstring do módulo contém a especificação técnica completa.
+Lê só `raw`, grava só `refined`. Regras: [spec da Silver](docs/specs/refined_transformacao.md);
+a docstring do pacote registra as decisões de implementação.
+
+| Módulo | Conteúdo |
+|---|---|
+| `__init__` | Orquestração: `verificar_bronze`, `publicar`, relatório, `executar`, `main`; reexporta a interface pública |
+| `comum` | `ErroTransformacao`, conversões (`Conversao`), utilitários, deduplicação e chave, `preparar_tabela_sql` |
+| `b3`, `fundamentus`, `yfinance` | `TABELA`: mapeamento de colunas, conversões e chave de cada fonte |
+| `minhareceita` | Contrato JSON (`ESCALARES_EMPRESA`, `ARRAYS_EMPRESA`) e `preparar_minhareceita` |
+| `__main__` | `python -m pipeline.transformacao` |
 
 ### Tabelas produzidas (7)
 

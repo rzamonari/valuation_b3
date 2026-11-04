@@ -6,7 +6,7 @@ origem na docstring, junto das decisões de implementação.
 | Spec | Camada | Citada em |
 |---|---|---|
 | [Bronze — ingestão](specs/raw_ingestao.md) | `raw` | `pipeline/ingestao.py` |
-| [Silver — transformação](specs/refined_transformacao.md) | `refined` | `pipeline/transformacao.py` |
+| [Silver — transformação](specs/refined_transformacao.md) | `refined` | `pipeline/transformacao/` |
 | [Gold — materialização](specs/marts_materializacao.md) | `marts` | `pipeline/materializacao.py`, `sql/marts/README.md` |
 | [Gold — indicadores](specs/marts_sql_indicadores.md) | `marts` | `sql/marts/README.md` |
 | [Gold — rankings](specs/marts_sql_rank.md) | `marts` | `sql/marts/RANKINGS.md` |

@@ -25,7 +25,8 @@ b3_valuation/
 ├── pipeline/               ✅ pacote Python (módulos planos)
 │   ├── db.py               conexão e persistência genérica no DuckDB
 │   ├── ingestao.py         Bronze  → schema raw      (python -m pipeline.ingestao)
-│   ├── transformacao.py    Silver  → schema refined  (~1.800 linhas)
+│   ├── transformacao/      Silver  → schema refined  (subpacote: comum, b3, fundamentus,
+│   │                       yfinance, minhareceita; orquestração no __init__)
 │   └── materializacao.py   Gold    → schema marts    (executa sql/marts/*.sql)
 ├── sql/marts/*.sql         ✅ um SELECT puro por mart (fonte da verdade da Gold)
 ├── painel.py               ✅ lógica do painel (leitura, filtros, formatação)
@@ -41,7 +42,7 @@ b3_valuation/
 |---|---|---|
 | Acesso a dados | `pipeline/db.py` | Conexão, schema, gravação genérica. Sem regra de negócio |
 | Ingestão (Bronze) | `pipeline/ingestao.py` | Dado como veio, tudo `VARCHAR`, com `_timestamp_ingestao` e `_source_origin` |
-| Transformação (Silver) | `pipeline/transformacao.py` | Tipagem, deduplicação, chaves. **Sem cálculo financeiro, sem preencher ausentes** |
+| Transformação (Silver) | `pipeline/transformacao/` | Tipagem, deduplicação, chaves. **Sem cálculo financeiro, sem preencher ausentes** |
 | Regras de negócio (Gold) | `sql/marts/*.sql` + `MARTS` em `materializacao.py` | Indicador novo = mart novo |
 | Orquestração/CLI | `main()` + `if __name__ == "__main__"` de cada módulo | Código de saída `0` sucesso, `1` falha |
 | Apresentação | `painel.py` (lógica) e `app.py` (Streamlit) | Só lê, filtra, ordena e formata. **Número novo exige mart novo** |

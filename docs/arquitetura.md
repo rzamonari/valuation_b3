@@ -7,7 +7,7 @@ B3 · Fundamentus · Minha Receita · Yahoo Finance
         │  pipeline/ingestao.py
         ▼
 raw (Bronze)        dado como veio, tudo VARCHAR
-        │  pipeline/transformacao.py
+        │  pipeline/transformacao/
         ▼
 refined (Silver)    tipado, deduplicado, chaves validadas
         │  sql/marts/*.sql + pipeline/materializacao.py
@@ -23,7 +23,7 @@ Painel Streamlit
 | Camada | Schema | Artefato | Regra |
 |---|---|---|---|
 | Bronze | `raw` | `pipeline/ingestao.py` | Dado como veio, tudo `VARCHAR`, com `_timestamp_ingestao` e `_source_origin` |
-| Silver | `refined` | `pipeline/transformacao.py` | Tipagem estrita, deduplicação, validação de chave; **sem cálculo, sem preencher ausentes** |
+| Silver | `refined` | `pipeline/transformacao/` | Tipagem estrita, deduplicação, validação de chave; **sem cálculo, sem preencher ausentes** |
 | Gold | `marts` | `sql/marts/*.sql` + `pipeline/materializacao.py` | Um `SELECT` puro por mart; o `.sql` é a fonte da verdade |
 | Apresentação | — | `painel.py` + `app.py` | Só lê, filtra, ordena e formata; **número novo exige mart novo** |
 
