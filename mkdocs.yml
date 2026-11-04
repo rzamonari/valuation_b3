@@ -1,0 +1,62 @@
+site_name: B3 Valuation
+site_description: Pipeline de indicadores fundamentalistas de ações da B3 (valuationb3)
+docs_dir: docs
+site_dir: site
+strict: true
+
+theme:
+  name: material
+  language: pt-BR
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Modo escuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Modo claro
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+hooks:
+  - docs/hooks.py
+
+exclude_docs: |
+  hooks.py
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Início: index.md
+  - Instalação e uso: uso.md
+  - Arquitetura: arquitetura.md
+  - Referência:
+      - API: referencia/api.md
+      - Marts: referencia/marts.md
+      - Rankings: referencia/rankings.md
+  - Decisões: decisoes.md
+  - Specs:
+      - Bronze — ingestão: specs/raw_ingestao.md
+      - Silver — transformação: specs/refined_transformacao.md
+      - Gold — materialização: specs/marts_materializacao.md
+      - Gold — indicadores: specs/marts_sql_indicadores.md
+      - Gold — rankings: specs/marts_sql_rank.md
+      - Apresentação — painel: specs/dashboard_apresentacao.md
+      - Testes: specs/testes_codigo.md
