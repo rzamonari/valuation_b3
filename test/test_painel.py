@@ -340,3 +340,24 @@ def test_tabela_consolidado_ordena_por_posicao_e_traduz_faixas():
     assert vista["cotacao"].tolist() == ["R$ 25,50", "R$ 10,00"]
     assert vista["liquidez_2_meses"].tolist() == ["R$ 12,3 mi", "R$ 850 mil"]
     assert vista["faixa_valor"].tolist() == ["⚪ N/E", "🟢 Sup."]
+
+
+def test_tabela_exclusoes_ordena_pela_regra_sem_calcular():
+    exclusoes = pd.DataFrame(
+        {
+            "ordem": [2, 1],
+            "motivo": ["BDR", "Fracionário"],
+            "descricao": ["recibo", "fracionário"],
+            "quantidade": [9, 0],
+            "quantidade_negociada": [0, 0],
+        }
+    )
+    vista = p.tabela_exclusoes(exclusoes)
+    assert vista["motivo"].tolist() == ["Fracionário", "BDR"]
+    assert vista["quantidade"].tolist() == [0, 9]
+    assert list(vista.columns) == [
+        "motivo",
+        "descricao",
+        "quantidade",
+        "quantidade_negociada",
+    ]

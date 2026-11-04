@@ -1,7 +1,7 @@
 # ESPECIFICAÇÃO — PAINEL DE RECOMENDAÇÕES (DASHBOARD)
 ## Pipeline de Indicadores Fundamentalistas B3 — Camada de Apresentação
 
-**Versão:** 1.5
+**Versão:** 1.6
 **Data de referência dos números desta spec:** 2026-11-02 (conferidos nas tabelas `marts` em 2026-11-03)
 **Specs relacionadas:** `marts_sql_indicadores.md`, `marts_sql_rank.md`,
 `marts_materializacao.md` (materialização da camada Gold)
@@ -28,6 +28,9 @@
   o texto dos `.sql` de `sql/marts/`. Revisados: "O que já existe", itens 1, 2, 3 e 7, critérios
   de aceite e entrega. Novas regras: a única SQL do painel é `SELECT * FROM marts.<tabela>`;
   tabela ausente orienta a rodar a materialização; ordem de exibição sempre explícita no pandas.
+- 1.6 (2026-11-04): expander "Por que alguns tickers do Fundamentus ficam fora dos rankings?" na
+  faixa 1, abaixo dos cartões, com a tabela de `marts_painel_exclusoes_motivo` (item 3), que
+  passa a ser obrigatória.
 
 ---
 
@@ -158,11 +161,12 @@ correspondentes. Mantidos aqui como definição:
 |---|---|---|
 | `marts_card_05_termometro_mercado.sql` | `recomendacao` predominante entre as ações analisadas, `quantidade` dela, `total` analisado e `percentual` (0–100) | 1 linha |
 | `marts_painel_data_referencia.sql` | data da fotografia do Fundamentus: `MAX(_timestamp_ingestao)` de `refined.fundamentus_acoes` (única coluna de data da tabela), convertido para o fuso `America/Sao_Paulo` e truncado para `DATE`, como `data_referencia`. Motivo: a data exibida não pode depender do fuso da máquina | 1 linha |
+| `marts_painel_exclusoes_motivo.sql` | tickers do Fundamentus fora do universo dos rankings, por motivo: `ordem`, `motivo`, `descricao`, `quantidade`, `quantidade_negociada`; lê `marts.marts_exclusoes_universo` (v1.6) | 1 linha por motivo |
 | `marts_painel_indicadores.sql` | por ticker analisado: `ticker`, `empresa`, `segmento`, `uf`, `recomendacao`, `saldo`, `liquidez_2_meses`, `cotacao`, `roic`, `roe`, `enterprise_value_ebit`, `preco_lucro`, `earnings_yield`, `preco_valor_patrimonial`, `dividend_yield`, `payout`, `margem_ebit`, `margem_liquida`, `divida_liquida_patrimonio`, `crescimento_receita_5_anos` | 1 linha por ticker |
 
 Regras:
 
-- Todos partem da mesma regra de recomendação de `marts_50_rank_recomendacoes.sql` (universo:
+- Cards e indicadores partem da mesma regra de recomendação de `marts_50_rank_recomendacoes.sql` (universo:
   ações analisadas, `liquidez_2_meses > 0`). Revisão de 04/11/2026: em vez de copiar a consulta,
   leem `marts.marts_50_rank_recomendacoes` (dependência resolvida pela materialização).
 - Valores do Fundamentus preservados, na escala original (percentuais 0–100).
@@ -230,6 +234,11 @@ rótulo e uma linha de definição curta:
 Nos cartões 2 a 4, mostrar abaixo do número o percentual sobre as analisadas **somente se** vier
 de mart. Nesta versão não vem: não mostrar.
 
+Abaixo dos cartões (v1.6), `st.expander` "Por que alguns tickers do Fundamentus ficam fora dos
+rankings?", com uma legenda curta sobre a regra do universo e uma tabela de
+`marts_painel_exclusoes_motivo` na ordem de `ordem`: Motivo, Descrição, Tickers e Negociados em
+2 meses. Sem total no título nem soma no pandas: só os números do mart.
+
 ### 4.4 Faixa 2 — Ranking de oportunidades: largura inteira
 
 - **2 · Ranking consolidado** (`marts_50_rank_recomendacoes`, filtrado pelo item 6): `st.dataframe`
@@ -285,7 +294,8 @@ mostram o mesmo número (é `DENSE_RANK`); ordenar por `rank` e depois `ticker`.
 - Cabeçalho: ticker, empresa, segmento, município/UF, badge da recomendação, saldo.
 - Linha de mini cartões (`marts_painel_indicadores`, `marts_retorno_total_risco`): cotação, P/L,
   P/VP, DY, ROE, ROIC, DL/PL, CAGR 5 anos, volatilidade anualizada, máximo drawdown.
-  Valor nulo aparece como "—", nunca como zero.
+  Valor nulo aparece como "—", nunca como zero. Ticker sem cálculo de retorno e risco
+  (`motivo_sem_calculo`) mostra o motivo numa legenda abaixo dos cartões.
 - **5 · Perfil nos 10 rankings**: gráfico polar (radar) com os 10 rankings no eixo angular e a
   faixa no radial por um código ordinal fixo vindo de dicionário constante, usado apenas para
   posicionar (Não elegível 0 no centro, Inferior 1, Intermediário 2, Superior 3 na borda),

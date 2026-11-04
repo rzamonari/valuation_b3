@@ -32,6 +32,8 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
 
 3. MARTS DO PAINEL (marts.marts_card_* e marts.marts_painel_*): leem a recomendação de
    marts.marts_50_rank_recomendacoes, sem repetir a regra. Termômetro: empate -> Manter (P1).
+   Exclusões do universo por motivo: marts.marts_painel_exclusoes_motivo (contagem pronta,
+   inclusive motivos com zero); o painel só ordena e renomeia.
 
 4. LAYOUT (app.py) e LINGUAGEM VISUAL
    - Cinco faixas: pulso do mercado, ranking de oportunidades, valor × qualidade, rankings
@@ -90,9 +92,11 @@ MARTS_CARDS = [
     "marts_card_02_acoes_semindicacao",
     "marts_card_05_termometro_mercado",
 ]
+MART_EXCLUSOES = "marts_painel_exclusoes_motivo"
 MARTS_PAINEL = [
     "marts_painel_data_referencia",
     "marts_painel_indicadores",
+    MART_EXCLUSOES,
 ]
 MARTS_RANKINGS = [
     "marts_01_rank_valor",
@@ -625,6 +629,19 @@ def tabela_consolidado(rec):
     for coluna in FAIXA_COLUNAS:
         vista[coluna] = df[coluna].map(FAIXA_CELULA)
     return vista
+
+
+def tabela_exclusoes(exclusoes):
+    """DataFrame de exibição das exclusões do universo por motivo (ordem das regras)."""
+    df = exclusoes.sort_values("ordem")
+    return pd.DataFrame(
+        {
+            "motivo": df["motivo"],
+            "descricao": df["descricao"],
+            "quantidade": df["quantidade"],
+            "quantidade_negociada": df["quantidade_negociada"],
+        }
+    )
 
 
 def fig_valor_qualidade(ind):

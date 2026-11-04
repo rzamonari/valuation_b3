@@ -1,5 +1,6 @@
 -- Mart: Retorno total e risco histórico
--- Fonte Silver: refined.yfinance_cotacoes (ticker, data, fechamento_ajustado)
+-- Fonte Silver: refined.yfinance_cotacoes (ticker, data, fechamento, fechamento_ajustado,
+--               dividendos)
 --
 -- Metodologia aprovada:
 --   Janela      : 5 anos, terminando na última cotação disponível de cada ticker
@@ -7,6 +8,14 @@
 --   Preço       : fechamento_ajustado (retorno total). Preços NULL ou <= 0 são inválidos:
 --                 não geram retorno, não entram no pico do drawdown nem no CAGR.
 --                 Datas ausentes não são preenchidas; séries não se misturam entre tickers.
+--
+-- Ajuste retroativo inválido (decisão D1 da spec de indicadores, aprovada em 2026-11-04):
+--   O Yahoo ajusta o passado pelo fator (1 - provento / fechamento anterior). Quando o
+--   provento é >= fechamento anterior, o fator fica <= 0 e inverte o sinal de toda a série
+--   anterior; trechos positivos entre duas inversões também ficam errados. Se a janela tem
+--   alguma data com fechamento_ajustado <= 0 ou algum desses proventos, o ticker fica SEM
+--   CÁLCULO: cagr, volatilidade_anualizada, max_drawdown, preco_inicial e preco_final NULL e
+--   motivo_sem_calculo preenchido. Datas e contagens da janela continuam para rastreio.
 --
 -- Indicadores (todos DERIVADOS na Gold, percentual na escala 0–100):
 --   cagr                   = ((preco_final / preco_inicial) ^ (1 / anos) - 1) * 100
@@ -28,23 +37,37 @@ WITH limites AS (
     FROM refined.yfinance_cotacoes
     GROUP BY ticker
 ),
+historico AS (
+    -- fechamento anterior calculado antes do corte da janela: o provento do primeiro dia
+    -- da janela também é comparado com o pregão anterior
+    SELECT
+        ticker,
+        data,
+        fechamento_ajustado,
+        dividendos > 0
+            AND dividendos >= LAG(fechamento) OVER (PARTITION BY ticker ORDER BY data)
+            AS ajuste_invalido
+    FROM refined.yfinance_cotacoes
+),
 janela AS (
     SELECT
-        c.ticker,
-        c.data,
+        h.ticker,
+        h.data,
         CASE
-            WHEN c.fechamento_ajustado > 0 THEN c.fechamento_ajustado
-        END AS preco
-    FROM refined.yfinance_cotacoes AS c
+            WHEN h.fechamento_ajustado > 0 THEN h.fechamento_ajustado
+        END AS preco,
+        h.fechamento_ajustado <= 0 OR h.ajuste_invalido AS ajuste_invalido
+    FROM historico AS h
     JOIN limites AS l
-        ON l.ticker = c.ticker
-    WHERE c.data >= l.data_fim_janela - INTERVAL 5 YEAR
+        ON l.ticker = h.ticker
+    WHERE h.data >= l.data_fim_janela - INTERVAL 5 YEAR
 ),
 serie AS (
     SELECT
         ticker,
         data,
         preco,
+        ajuste_invalido,
         LN(preco / LAG(preco) OVER (PARTITION BY ticker ORDER BY data)) AS retorno_log,
         MAX(preco) OVER (
             PARTITION BY ticker ORDER BY data
@@ -62,7 +85,8 @@ resumo AS (
         COUNT(preco) AS qtd_precos_validos,
         COUNT(retorno_log) AS qtd_retornos,
         STDDEV_SAMP(retorno_log) AS desvio_retorno_diario,
-        MIN(preco / pico - 1) AS drawdown_minimo
+        MIN(preco / pico - 1) AS drawdown_minimo,
+        COALESCE(BOOL_OR(ajuste_invalido), FALSE) AS ajuste_invalido
     FROM serie
     GROUP BY ticker
 ),
@@ -79,12 +103,19 @@ SELECT
     anos,
     qtd_precos_validos,
     qtd_retornos,
-    preco_inicial,
-    preco_final,
+    CASE WHEN NOT ajuste_invalido THEN preco_inicial END AS preco_inicial,
+    CASE WHEN NOT ajuste_invalido THEN preco_final END AS preco_final,
     CASE
-        WHEN anos > 0 THEN (POWER(preco_final / preco_inicial, 1.0 / anos) - 1) * 100
+        WHEN NOT ajuste_invalido AND anos > 0
+            THEN (POWER(preco_final / preco_inicial, 1.0 / anos) - 1) * 100
     END AS cagr,
-    desvio_retorno_diario * SQRT(252) * 100 AS volatilidade_anualizada,
-    drawdown_minimo * 100 AS max_drawdown
+    CASE
+        WHEN NOT ajuste_invalido THEN desvio_retorno_diario * SQRT(252) * 100
+    END AS volatilidade_anualizada,
+    CASE WHEN NOT ajuste_invalido THEN drawdown_minimo * 100 END AS max_drawdown,
+    CASE
+        WHEN ajuste_invalido
+            THEN 'Ajuste retroativo inválido do Yahoo (provento >= fechamento anterior)'
+    END AS motivo_sem_calculo
 FROM calculo
 ORDER BY ticker;

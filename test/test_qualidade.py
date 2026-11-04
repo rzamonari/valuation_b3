@@ -205,6 +205,72 @@ def test_ranking_com_ticker_fora_do_universo_e_erro(con):
     assert r.exemplos == (("PARA3",),)
 
 
+UNIVERSO_E_EXCLUSOES = (
+    "marts_exclusoes_universo: universo + exclusões = tickers do Fundamentus"
+)
+
+
+def test_ticker_sem_emissora_esta_nas_exclusoes_e_fecha_a_particao(con):
+    assert con.execute(
+        "SELECT ticker, motivo FROM marts.marts_exclusoes_universo"
+    ).fetchall() == [("PARA3", "Deslistada ou cancelada")]
+    assert por_nome(q.executar(con))[UNIVERSO_E_EXCLUSOES].ok
+
+
+def test_ticker_faltando_nas_exclusoes_quebra_a_particao(con):
+    con.execute("DELETE FROM marts.marts_exclusoes_universo")
+    r = por_nome(q.executar(con))[UNIVERSO_E_EXCLUSOES]
+    assert r.status == "ERRO"
+    assert r.exemplos == (("faltando nas partes", "PARA3"),)
+
+
+def test_ticker_do_universo_nas_exclusoes_e_sobreposicao(con):
+    con.execute(
+        "INSERT INTO marts.marts_exclusoes_universo (ticker, motivo) "
+        "VALUES ('BOAS3', 'Unit')"
+    )
+    r = por_nome(q.executar(con))[UNIVERSO_E_EXCLUSOES]
+    assert r.status == "ERRO"
+    assert r.exemplos == (("sobra ou repetido nas partes", "BOAS3"),)
+
+
+def test_contagem_por_motivo_divergente_das_exclusoes_e_erro(con):
+    con.execute(
+        "UPDATE marts.marts_painel_exclusoes_motivo SET quantidade = 2 "
+        "WHERE motivo = 'Deslistada ou cancelada'"
+    )
+    r = por_nome(q.executar(con))[
+        "marts_painel_exclusoes_motivo: contagem por motivo das exclusões"
+    ]
+    assert r.status == "ERRO"
+    assert r.violacoes == 2  # (motivo, 1) só no esperado e (motivo, 2) só no obtido
+
+
+def test_motivo_fora_da_categoria_fechada_e_erro(con):
+    con.execute("UPDATE marts.marts_exclusoes_universo SET motivo = 'Outro'")
+    falhas = {r.verificacao.nome for r in q.erros(q.executar(con))}
+    assert "marts_exclusoes_universo: motivo dentro do domínio" in falhas
+
+
+def test_nao_identificado_acima_do_limite_e_aviso(con, monkeypatch):
+    monkeypatch.setattr(q, "LIMITE_NAO_IDENTIFICADO", 0)
+    con.execute("UPDATE marts.marts_exclusoes_universo SET motivo = 'Não identificado'")
+    r = por_nome(q.executar(con))[
+        "marts_exclusoes_universo: até 0 sem motivo identificado"
+    ]
+    assert r.status == "AVISO"
+    assert r.exemplos == ((1, 0),)
+
+
+def test_nao_identificado_dentro_do_limite_passa(con):
+    con.execute("UPDATE marts.marts_exclusoes_universo SET motivo = 'Não identificado'")
+    r = por_nome(q.executar(con))[
+        f"marts_exclusoes_universo: até {q.LIMITE_NAO_IDENTIFICADO} sem motivo "
+        "identificado"
+    ]
+    assert r.ok
+
+
 # --------------------------------------------------------------------------- domínio
 
 
@@ -228,6 +294,46 @@ def test_percentual_fora_da_faixa_plausivel_e_aviso_sem_bloquear(con):
     assert r.status == "AVISO"
     assert [e[0] for e in r.exemplos] == ["RUIM3"]
     assert q.erros(resultados) == []
+
+
+RISCO_COM_PRECO_NAO_POSITIVO = (
+    "marts_retorno_total_risco: nenhum indicador calculado com fechamento ajustado ≤ 0 "
+    "na janela"
+)
+
+
+def test_ajustado_negativo_e_aviso_na_silver_e_erro_se_o_mart_calcula(con):
+    con.execute(
+        "UPDATE refined.yfinance_cotacoes SET fechamento_ajustado = -1 "
+        "WHERE data = (SELECT MIN(data) FROM refined.yfinance_cotacoes)"
+    )
+    resultados = por_nome(q.executar(con))
+    assert resultados["YFinance: fechamento ajustado > 0"].status == "AVISO"
+    r = resultados[RISCO_COM_PRECO_NAO_POSITIVO]
+    assert r.status == "ERRO"
+    assert r.exemplos == (("BOAS3", 1),)
+
+
+def test_ajustado_negativo_com_ticker_sem_calculo_nao_e_erro(con):
+    con.execute(
+        "UPDATE refined.yfinance_cotacoes SET fechamento_ajustado = -1 "
+        "WHERE data = (SELECT MIN(data) FROM refined.yfinance_cotacoes)"
+    )
+    m.executar(con)
+    assert por_nome(q.executar(con))[RISCO_COM_PRECO_NAO_POSITIVO].ok
+    linha = con.execute(
+        "SELECT cagr, motivo_sem_calculo FROM marts.marts_retorno_total_risco"
+    ).fetchone()
+    assert linha[0] is None and linha[1] is not None
+
+
+def test_ticker_sem_calculo_com_indicador_e_erro(con):
+    con.execute(
+        "UPDATE marts.marts_retorno_total_risco SET motivo_sem_calculo = 'x' "
+        "WHERE cagr IS NOT NULL"
+    )
+    falhas = {r.verificacao.nome for r in q.erros(q.executar(con))}
+    assert "marts_retorno_total_risco: ticker sem cálculo não tem indicador" in falhas
 
 
 def test_nulo_nao_viola_regra_de_dominio(con):

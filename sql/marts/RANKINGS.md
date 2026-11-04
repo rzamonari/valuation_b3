@@ -42,7 +42,9 @@ LEFT JOIN refined.minhareceita_empresas c
 Os placeholders de `b.cnpj` não existem em `c` e não aparecem nos tickers que cruzam. A
 consulta-base retorna 541 linhas = 541 tickers (sem multiplicação); todos têm dados de Minha
 Receita. 454 tickers do Fundamentus não têm emissora correspondente na B3 e ficam fora pelo
-`INNER JOIN` (apenas 6 deles com `liquidez_2_meses > 0`).
+`INNER JOIN` (apenas 6 deles com `liquidez_2_meses > 0`). O motivo de cada um está em
+`marts_exclusoes_universo` e a contagem por motivo em `marts_painel_exclusoes_motivo` (ver
+`README.md` §13).
 
 ## 2. Rankings
 
