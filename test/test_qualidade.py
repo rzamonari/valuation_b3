@@ -205,6 +205,72 @@ def test_ranking_com_ticker_fora_do_universo_e_erro(con):
     assert r.exemplos == (("PARA3",),)
 
 
+UNIVERSO_E_EXCLUSOES = (
+    "marts_exclusoes_universo: universo + exclusões = tickers do Fundamentus"
+)
+
+
+def test_ticker_sem_emissora_esta_nas_exclusoes_e_fecha_a_particao(con):
+    assert con.execute(
+        "SELECT ticker, motivo FROM marts.marts_exclusoes_universo"
+    ).fetchall() == [("PARA3", "Deslistada ou cancelada")]
+    assert por_nome(q.executar(con))[UNIVERSO_E_EXCLUSOES].ok
+
+
+def test_ticker_faltando_nas_exclusoes_quebra_a_particao(con):
+    con.execute("DELETE FROM marts.marts_exclusoes_universo")
+    r = por_nome(q.executar(con))[UNIVERSO_E_EXCLUSOES]
+    assert r.status == "ERRO"
+    assert r.exemplos == (("faltando nas partes", "PARA3"),)
+
+
+def test_ticker_do_universo_nas_exclusoes_e_sobreposicao(con):
+    con.execute(
+        "INSERT INTO marts.marts_exclusoes_universo (ticker, motivo) "
+        "VALUES ('BOAS3', 'Unit')"
+    )
+    r = por_nome(q.executar(con))[UNIVERSO_E_EXCLUSOES]
+    assert r.status == "ERRO"
+    assert r.exemplos == (("sobra ou repetido nas partes", "BOAS3"),)
+
+
+def test_contagem_por_motivo_divergente_das_exclusoes_e_erro(con):
+    con.execute(
+        "UPDATE marts.marts_painel_exclusoes_motivo SET quantidade = 2 "
+        "WHERE motivo = 'Deslistada ou cancelada'"
+    )
+    r = por_nome(q.executar(con))[
+        "marts_painel_exclusoes_motivo: contagem por motivo das exclusões"
+    ]
+    assert r.status == "ERRO"
+    assert r.violacoes == 2  # (motivo, 1) só no esperado e (motivo, 2) só no obtido
+
+
+def test_motivo_fora_da_categoria_fechada_e_erro(con):
+    con.execute("UPDATE marts.marts_exclusoes_universo SET motivo = 'Outro'")
+    falhas = {r.verificacao.nome for r in q.erros(q.executar(con))}
+    assert "marts_exclusoes_universo: motivo dentro do domínio" in falhas
+
+
+def test_nao_identificado_acima_do_limite_e_aviso(con, monkeypatch):
+    monkeypatch.setattr(q, "LIMITE_NAO_IDENTIFICADO", 0)
+    con.execute("UPDATE marts.marts_exclusoes_universo SET motivo = 'Não identificado'")
+    r = por_nome(q.executar(con))[
+        "marts_exclusoes_universo: até 0 sem motivo identificado"
+    ]
+    assert r.status == "AVISO"
+    assert r.exemplos == ((1, 0),)
+
+
+def test_nao_identificado_dentro_do_limite_passa(con):
+    con.execute("UPDATE marts.marts_exclusoes_universo SET motivo = 'Não identificado'")
+    r = por_nome(q.executar(con))[
+        f"marts_exclusoes_universo: até {q.LIMITE_NAO_IDENTIFICADO} sem motivo "
+        "identificado"
+    ]
+    assert r.ok
+
+
 # --------------------------------------------------------------------------- domínio
 
 

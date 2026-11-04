@@ -15,7 +15,10 @@ Execução: uv run python -m pipeline.qualidade   (depois da materialização; s
    - refined → marts: marts por ticker do Fundamentus com o mesmo conjunto de tickers;
      marts_cotacao com as mesmas chaves (ticker, data) da Silver; rankings dentro do universo
      da consulta-base (Fundamentus ⨝ B3 pela emissora); marts_50 = universo negociado
-     (liquidez_2_meses > 0); painel e cards coerentes com marts_50.
+     (liquidez_2_meses > 0); painel e cards coerentes com marts_50; universo + exclusões
+     (marts_exclusoes_universo) = todos os tickers do Fundamentus, sem sobreposição (EXCEPT
+     ALL: ticker repetido entre as partes também viola); contagem por motivo do painel
+     coerente com as exclusões.
 3. Regras de domínio:
    - ERRO: o que a fonte nunca deveria violar e hoje não viola (cotação das ações analisadas
      > 0, DY ≥ 0, fechamento > 0, saldo entre −10 e +10...). Falha = código de saída 1 e a
@@ -23,6 +26,9 @@ Execução: uv run python -m pipeline.qualidade   (depois da materialização; s
    - AVISO: faixas plausíveis de percentuais (FAIXAS_PLAUSIVEIS). O Fundamentus publica
      valores extremos reais (ex.: ROE acima de 1.000.000%, margem líquida de 144.637%), e a
      Silver preserva o dado como veio; o aviso dá visibilidade sem bloquear o pipeline.
+     Também AVISO: mais de LIMITE_NAO_IDENTIFICADO exclusões com motivo "Não identificado"
+     (negociadas, mas sem emissora no cadastro da B3): o normal é a exclusão ter causa
+     conhecida; o aumento pede revisar a classificação ou o cadastro da B3.
    NULL não viola regra de domínio: NOT (NULL) não seleciona a linha (nulos preservados).
 4. Tabela ausente ou consulta inválida é ERRO, qualquer que seja a severidade declarada.
 """
@@ -80,6 +86,18 @@ RANKINGS = (
     "marts_10_rank_rentabilidade",
 )
 RECOMENDACOES = "marts.marts_50_rank_recomendacoes"
+EXCLUSOES = "marts.marts_exclusoes_universo"
+EXCLUSOES_MOTIVO = "marts.marts_painel_exclusoes_motivo"
+MOTIVOS_EXCLUSAO = (
+    "Fracionário",
+    "BDR",
+    "Unit",
+    "Não identificado",
+    "Deslistada ou cancelada",
+    "Outro código",
+)
+NAO_IDENTIFICADO = "Não identificado"
+LIMITE_NAO_IDENTIFICADO = 10  # exclusões sem causa conhecida (6 em 2026-11-02)
 CARDS = {
     "marts_card_02_acoes_compra": "Compra",
     "marts_card_03_acoes_manter": "Manter",
@@ -170,6 +188,19 @@ def _mesmo_conjunto(nome, camada, esperado, obtido):
         ERRO,
         f"SELECT 'só no esperado' AS lado, * FROM (({esperado}) EXCEPT ({obtido})) "
         f"UNION ALL SELECT 'só no obtido', * FROM (({obtido}) EXCEPT ({esperado}))",
+    )
+
+
+def _particao(nome, camada, partes, todo):
+    """As partes, somadas com repetição, formam exatamente o todo (sem sobra nem sobreposição)."""
+    soma = " UNION ALL ".join(f"({parte})" for parte in partes)
+    return Verificacao(
+        nome,
+        camada,
+        ERRO,
+        f"SELECT 'sobra ou repetido nas partes' AS lado, * FROM (({soma}) EXCEPT ALL "
+        f"({todo})) UNION ALL SELECT 'faltando nas partes', * FROM (({todo}) EXCEPT ALL "
+        f"({soma}))",
     )
 
 
@@ -286,6 +317,18 @@ def _refined_marts():
             "WHERE liquidez_2_meses IS NULL OR liquidez_2_meses <= 0",
             "SELECT quantidade FROM marts.marts_card_02_acoes_semindicacao",
         ),
+        _particao(
+            "marts_exclusoes_universo: universo + exclusões = tickers do Fundamentus",
+            REFINED_MARTS,
+            [UNIVERSO, f"SELECT ticker FROM {EXCLUSOES}"],
+            fundamentus,
+        ),
+        _mesmo_conjunto(
+            "marts_painel_exclusoes_motivo: contagem por motivo das exclusões",
+            REFINED_MARTS,
+            f"SELECT motivo, COUNT(*) FROM {EXCLUSOES} GROUP BY motivo",
+            f"SELECT motivo, quantidade FROM {EXCLUSOES_MOTIVO} WHERE quantidade > 0",
+        ),
     ]
     verificacoes += [
         _comparar(
@@ -386,6 +429,7 @@ def _dominio_refined():
 
 def _dominio_marts():
     faixas = ", ".join(f"'{f}'" for f in FAIXAS)
+    motivos = ", ".join(f"'{m}'" for m in MOTIVOS_EXCLUSAO)
     regras = [
         _regra(
             "marts_50: cotação > 0",
@@ -435,6 +479,23 @@ def _dominio_marts():
             "marts.marts_card_05_termometro_mercado",
             "percentual BETWEEN 0 AND 100",
             ["recomendacao", "percentual"],
+        ),
+        _regra(
+            "marts_exclusoes_universo: motivo dentro do domínio",
+            DOMINIO_MARTS,
+            ERRO,
+            EXCLUSOES,
+            f"motivo IN ({motivos})",
+            ["ticker", "motivo"],
+        ),
+        Verificacao(
+            f"marts_exclusoes_universo: até {LIMITE_NAO_IDENTIFICADO} sem motivo "
+            "identificado",
+            DOMINIO_MARTS,
+            AVISO,
+            f"SELECT COUNT(*) AS quantidade, {LIMITE_NAO_IDENTIFICADO} AS limite "
+            f"FROM {EXCLUSOES} WHERE motivo = '{NAO_IDENTIFICADO}' "
+            f"HAVING COUNT(*) > {LIMITE_NAO_IDENTIFICADO}",
         ),
         _regra(
             "marts_painel_data_referencia: data informada",
