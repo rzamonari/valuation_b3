@@ -219,12 +219,15 @@ Cada `sql/marts/<nome>.sql` é um `SELECT` puro (fonte da verdade) e vira a tabe
 
 | Mart | Chave | Linhas | Conteúdo |
 |---|---|---|---|
-| `marts_retorno_total_risco` | `ticker` | 609 | `cagr`, `volatilidade_anualizada`, `max_drawdown` + rastreabilidade (`data_inicial`, `data_final`, `anos`, `qtd_precos_validos`, `qtd_retornos`, `preco_inicial`, `preco_final`) |
+| `marts_retorno_total_risco` | `ticker` | 609 | `cagr`, `volatilidade_anualizada`, `max_drawdown` + rastreabilidade (`data_inicial`, `data_final`, `anos`, `qtd_precos_validos`, `qtd_retornos`, `preco_inicial`, `preco_final`) e `motivo_sem_calculo` |
 | `marts_cotacao` | `(ticker, data)` | 1.920.774 | Histórico OHLC, `fechamento_ajustado`, `volume`, `dividendos`, `desdobramentos`, `ganhos_capital` |
 
 Metodologia: janela de 5 anos até a última cotação; preço válido = `fechamento_ajustado > 0`;
 `cagr = ((final/inicial)^(1/anos) − 1) × 100` com `anos = dias / 365,25`;
 `volatilidade = stddev_samp(ln(Pt/Pt−1)) × √252 × 100`; `max_drawdown = min(Pt / max(P0..Pt) − 1) × 100`.
+Janela com `fechamento_ajustado ≤ 0`, ou com provento ≥ fechamento anterior (ajuste retroativo
+inválido do Yahoo), deixa o ticker sem cálculo: indicadores e preços ficam NULL e
+`motivo_sem_calculo` é preenchido (PPAR3, MMAQ3 e MMAQ4 na base atual).
 
 ### 6.3 Rankings temáticos (`marts_01` … `marts_10`, chave `ticker`)
 
@@ -338,7 +341,7 @@ verificação de **erro** falhar.
 |---|---|
 | `Verificacao(nome, camada, severidade, sql)` | Regra declarada; `severidade` = `ERRO` ou `AVISO` |
 | `Resultado` | `violacoes`, `exemplos`, `falha` (consulta não executou) e `status` (`OK`, `AVISO`, `ERRO`) |
-| `verificacoes()` | Catálogo completo (71 verificações) |
+| `verificacoes()` | Catálogo completo (77 verificações) |
 | `executar(con, catalogo=None)` / `erros(resultados)` | Executa e filtra os erros |
 | `exigir(con)` | Executa e levanta `ErroQualidade` se houver erro (portão da fotografia) |
 
@@ -348,12 +351,12 @@ verificação de **erro** falhar.
 | refined → marts | marts do Fundamentus com os mesmos tickers; `marts_cotacao` com as mesmas chaves; rankings dentro do universo; `marts_50` = universo negociado; painel e cards = `marts_50`; universo + exclusões = Fundamentus, sem sobreposição; contagem por motivo = exclusões | erro |
 | domínio refined | DY ≥ 0, liquidez ≥ 0, crescimento ≥ −100%, fechamento > 0, volume/dividendos/desdobramentos ≥ 0 | erro |
 | domínio refined | cotação > 0 (zero = ausência), percentuais em faixas plausíveis (`FAIXAS_PLAUSIVEIS`), máxima ≥ mínima, fechamento ajustado > 0 | aviso |
-| domínio marts | `marts_50`: cotação > 0, saldo em [−10, 10], faixas somam 10, recomendação coerente com o saldo, faixas válidas; rank ≥ 1; termômetro em [0, 100]; data de referência informada; motivo de exclusão na categoria fechada | erro |
+| domínio marts | `marts_50`: cotação > 0, saldo em [−10, 10], faixas somam 10, recomendação coerente com o saldo, faixas válidas; rank ≥ 1; termômetro em [0, 100]; data de referência informada; motivo de exclusão na categoria fechada; `marts_retorno_total_risco` sem indicador calculado com fechamento ajustado ≤ 0 na janela e sem indicador quando há `motivo_sem_calculo` | erro |
 | domínio marts | mais de `LIMITE_NAO_IDENTIFICADO` (10) exclusões com motivo "Não identificado" | aviso |
 
 As faixas plausíveis são aviso porque o Fundamentus publica extremos reais (ROE acima de
 1.000.000%, margem líquida de 144.637%) e a Silver preserva o dado como veio. Nulo não viola
-regra de domínio. Na base de 02/11/2026: 61 ok, 10 avisos, 0 erros.
+regra de domínio. Na base de 02/11/2026: 67 ok, 10 avisos, 0 erros.
 
 ---
 
@@ -467,7 +470,11 @@ para uma pasta vazia: nenhum teste toca o banco real, a fotografia versionada ne
 - Fora do escopo: Dívida Líquida/EBITDA, Sharpe, valor justo por Gordon e comparação setorial.
 - Rank Valor é uma versão simplificada da Magic Formula; payout é estimado (`DY × P/L`).
 - Classes da mesma emissora (ON/PN) compartilham fundamentos e aparecem empatadas.
-- 8 tickers têm `fechamento_ajustado < 0` em parte do histórico (tratado como inválido).
+- 8 tickers têm `fechamento_ajustado < 0` em parte do histórico, por um provento ≥ fechamento
+  anterior no ajuste retroativo do Yahoo. A Silver preserva o dado; os 3 com o defeito na janela
+  de 5 anos (PPAR3, MMAQ3, MMAQ4) ficam sem retorno e risco, com `motivo_sem_calculo`.
+- MMAQ3/MMAQ4 têm um salto de 3,00 e 163,86 para 2.550,01 no fechamento bruto (2024-12-27), sem
+  desdobramento registrado; pendente de regra própria quando 2024 sair da janela.
 - `marts_retorno_total_risco` pode variar no último bit da volatilidade entre execuções
   (`stddev_samp` paralelo); por isso a materialização compara com a temporária, não com uma reexecução.
 

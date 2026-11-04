@@ -336,7 +336,7 @@ fotografia versionada.
 | Regra de recomendação repetida em vários `.sql` | Números divergentes entre seções | Resolvido: `marts_50` lê os rankings e cards/painel leem `marts_50`; teste de consistência mantido (P8 ✅) |
 | Zeros do Fundamentus significando ausência | Rankings distorcidos | Preservados e excluídos pelos critérios `> 0` |
 | Payout estimado (`DY × P/L`) acima de 100% | Proventos favorece pagadora insustentável | Desempate por menor payout; documentado (56 de 256 elegíveis) |
-| `fechamento_ajustado` negativo (8 tickers) | Métricas de risco erradas | Tratado como inválido no mart e no gráfico |
+| `fechamento_ajustado` negativo (8 tickers) | Métricas de risco erradas | Provento ≥ fechamento anterior inverte o ajuste do Yahoo: ticker sem cálculo no mart, com `motivo_sem_calculo` (D1 da spec de indicadores); ERRO na qualidade se o mart calcular com preço ≤ 0; preço ≤ 0 fora do gráfico |
 | 454 tickers sem emissora na B3 | Ficam fora dos rankings | Explicado por motivo em `marts_exclusoes_universo` e no painel; join alternativo avaliado e descartado (cadastro só de ativas; `otherCodes` não recupera nenhum) |
 | Classes ON/PN da mesma emissora | Aparecem empatadas | Documentado como limitação |
 | Arquivo DuckDB bloqueado | Etapa não grava | Fechar a UI; painel usa `read_only` |

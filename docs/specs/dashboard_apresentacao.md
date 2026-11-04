@@ -294,7 +294,8 @@ mostram o mesmo número (é `DENSE_RANK`); ordenar por `rank` e depois `ticker`.
 - Cabeçalho: ticker, empresa, segmento, município/UF, badge da recomendação, saldo.
 - Linha de mini cartões (`marts_painel_indicadores`, `marts_retorno_total_risco`): cotação, P/L,
   P/VP, DY, ROE, ROIC, DL/PL, CAGR 5 anos, volatilidade anualizada, máximo drawdown.
-  Valor nulo aparece como "—", nunca como zero.
+  Valor nulo aparece como "—", nunca como zero. Ticker sem cálculo de retorno e risco
+  (`motivo_sem_calculo`) mostra o motivo numa legenda abaixo dos cartões.
 - **5 · Perfil nos 10 rankings**: gráfico polar (radar) com os 10 rankings no eixo angular e a
   faixa no radial por um código ordinal fixo vindo de dicionário constante, usado apenas para
   posicionar (Não elegível 0 no centro, Inferior 1, Intermediário 2, Superior 3 na borda),

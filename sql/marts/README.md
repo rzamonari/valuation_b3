@@ -57,7 +57,8 @@ agregado por `ticker` (1:N sobre chave única), sem multiplicação de registros
 | `marts_retorno_total_risco.sql` | `max_drawdown` | `fechamento_ajustado` | DOUBLE | % (0–100, ≤ 0) | Derivado |
 
 O mart 10 também expõe colunas de rastreabilidade: `data_inicial`, `data_final`, `anos`,
-`qtd_precos_validos`, `qtd_retornos`, `preco_inicial`, `preco_final`.
+`qtd_precos_validos`, `qtd_retornos`, `preco_inicial`, `preco_final`, e `motivo_sem_calculo`
+(preenchido quando os indicadores ficam NULL por ajuste retroativo inválido; ver §5).
 
 ## 5. Fórmulas
 
@@ -73,6 +74,13 @@ O mart 10 também expõe colunas de rastreabilidade: `data_inicial`, `data_final
   - `volatilidade_anualizada = stddev_samp(ln(P_t / P_t-1)) * sqrt(252) * 100`; o retorno é NULL
     se qualquer dos dois preços for inválido; NULL com menos de 2 retornos.
   - `max_drawdown = min(P_t / max(P_0..P_t) - 1) * 100`.
+  - **Sem cálculo** (decisão D1 da spec de indicadores, 2026-11-04): se a janela tem alguma
+    data com `fechamento_ajustado ≤ 0`, ou um provento ≥ fechamento do pregão anterior, o fator
+    de ajuste do Yahoo (`1 − provento / fechamento anterior`) inverteu o sinal do passado e a
+    série da janela não é confiável. Ficam NULL `cagr`, `volatilidade_anualizada`,
+    `max_drawdown`, `preco_inicial` e `preco_final`, e `motivo_sem_calculo` é preenchido. Datas
+    e contagens continuam preenchidas. Na base de 2026-10-30 isso vale para PPAR3, MMAQ3 e
+    MMAQ4.
 
 ## 6. Tratamento de nulos e divisões
 
@@ -130,8 +138,15 @@ Ou pela CLI do DuckDB: `duckdb -readonly fundamentalistas.duckdb < sql/marts/mar
   tickers têm `cotacao = 0`. O zero pode representar ausência de dado na origem. Por regra
   (§5.2/§5.3) os zeros foram preservados; tratá-los como NULL exige regra aprovada.
 - **Qualidade das cotações**: 18.350 linhas de 8 tickers têm `fechamento_ajustado < 0` e 1 linha é
-  NULL; são tratadas como inválidas. Há volatilidades extremas (máx. ≈ 2.110% a.a.) que indicam
-  séries ajustadas anômalas na origem — preservadas, sem filtro não especificado.
+  NULL. A causa é um provento maior ou igual ao fechamento anterior, que inverte o sinal do
+  ajuste retroativo do Yahoo (diagnóstico na spec de indicadores, D1). Só PPAR3, MMAQ3 e MMAQ4
+  têm o defeito na janela de 5 anos e ficam sem cálculo (§5). A Silver preserva o dado e a
+  qualidade avisa. Há volatilidades extremas (máx. ≈ 2.110% a.a.) que indicam outras séries
+  ajustadas anômalas na origem, preservadas sem filtro não especificado.
+- **MMAQ3/MMAQ4**: o fechamento bruto salta de 3,00 e 163,86 para 2.550,01 em 2024-12-27, sem
+  desdobramento registrado (provável grupamento não informado pelo Yahoo). Hoje esses tickers
+  ficam sem cálculo pela D1. Quando 2024 sair da janela (~2029), o salto volta a distorcer os
+  indicadores. Pendente de regra própria.
 - 160 tickers têm `cagr` e `volatilidade_anualizada` NULL: todos possuem no máximo uma cotação
   válida na Silver, portanto não há intervalo nem retornos para calcular.
 

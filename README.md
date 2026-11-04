@@ -173,13 +173,16 @@ As 10 primeiras posições do ranking consolidado:
 | 5 | LREN3 | Lojas Renner | Tecidos, Vestuário e Calçados | +7 |
 | 5 | POMO3 | Marcopolo | Material Rodoviário | +7 |
 
-**Qualidade dos dados** (`uv run python -m pipeline.qualidade`): 75 verificações, **0 erros** e
+**Qualidade dos dados** (`uv run python -m pipeline.qualidade`): 77 verificações, **0 erros** e
 10 avisos. Todas as reconciliações raw → refined → marts batem, inclusive universo + exclusões =
 995 tickers do Fundamentus, sem sobreposição. Os avisos são extremos reais da
 fonte, preservados na Silver como vieram: ROE e margens fora de ±100%, 33 cotações zeradas no
-Fundamentus (zero significa ausência) e 18.350 fechamentos ajustados negativos no Yahoo Finance.
+Fundamentus (zero significa ausência) e 18.350 fechamentos ajustados negativos no Yahoo Finance
+(8 tickers). Nenhum retorno ou risco é calculado a partir desses preços: os 3 tickers com o
+defeito na janela de 5 anos (PPAR3, MMAQ3, MMAQ4) ficam sem cálculo, e a qualidade dá ERRO se
+isso mudar.
 
-**Testes:** 222 casos, cobertura de 93%, sem rede e sem tocar o banco real.
+**Testes:** 231 casos, cobertura de 93%, sem rede e sem tocar o banco real.
 
 ## Limitações
 
@@ -192,6 +195,13 @@ Fundamentus (zero significa ausência) e 18.350 fechamentos ajustados negativos 
   negociação há 2 meses. Os 6 negociados (ADHM3, BLUT3, BLUT4, IGBR3, RPMG3, SHOW3) não têm
   emissora com outro código no cadastro nem em `otherCodes`, e a qualidade avisa se passarem de
   10. Detalhes em [sql/marts/README.md](sql/marts/README.md) §13.
+- O Yahoo Finance publica `fechamento_ajustado` negativo antes de proventos maiores que o
+  fechamento anterior: o fator de ajuste `1 − provento / fechamento` fica negativo e inverte o
+  sinal do passado. Os tickers com esse defeito na janela de 5 anos aparecem na ficha sem
+  retorno e risco, com o motivo (`motivo_sem_calculo`, decisão D1 em
+  [docs/specs/marts_sql_indicadores.md](docs/specs/marts_sql_indicadores.md)). MMAQ3 e MMAQ4
+  também têm um salto no fechamento bruto (3,00 e 163,86 → 2.550,01 em 2024-12-27) sem
+  desdobramento registrado, que ainda precisa de regra própria.
 - A fotografia ocupa cerca de 27 MB por versão no histórico do git. Se as atualizações ficarem
   frequentes, vale migrar `fotografia/` para Git LFS.
 

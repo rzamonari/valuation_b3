@@ -643,6 +643,37 @@ O Claude Code deverá identificar essas pendências no diagnóstico e solicitar 
 
 Os demais indicadores deste arquivo só poderão ser implementados depois de formalizadas as regras metodológicas necessárias.
 
+### D1. Ajuste retroativo inválido do Yahoo (aprovada em 2026-11-04)
+
+**Evidência (base de 2026-10-30).** 18.350 linhas de 8 tickers (PPAR3, MMAQ4, MMAQ3, SANB3,
+SANB4, CTAX3, PPLA11, EPAR3) têm `fechamento_ajustado ≤ 0`; o `fechamento` bruto nunca é
+negativo. O Yahoo ajusta o passado pelo fator `1 − provento / fechamento anterior`. Quando o
+provento é maior ou igual ao fechamento anterior, o fator fica ≤ 0 e inverte o sinal de toda a
+série anterior. As 39 trocas de sinal da base coincidem com um provento assim, confirmado em
+`yf.Ticker(t).actions` (ex.: PPAR3 em 2024-11-07, provento 128,05 com fechamento 125,01). Os
+trechos positivos entre duas inversões (MMAQ3, MMAQ4, PPLA11) também estão errados, porque são o
+produto de dois fatores negativos.
+
+**Decisão.** A Silver preserva o dado como veio. Em `marts_retorno_total_risco`, se a janela de
+5 anos tem alguma data com `fechamento_ajustado ≤ 0`, ou algum provento ≥ fechamento do pregão
+anterior, o ticker fica **sem cálculo**:
+
+- `cagr`, `volatilidade_anualizada`, `max_drawdown`, `preco_inicial` e `preco_final` ficam NULL;
+- `motivo_sem_calculo` = `Ajuste retroativo inválido do Yahoo (provento >= fechamento anterior)`;
+- datas e contagens da janela continuam preenchidas, para rastreio.
+
+Na base de 2026-10-30, isso atinge PPAR3, MMAQ3 e MMAQ4. Os outros 5 tickers só têm o defeito
+antes da janela, e os demais 606 tickers não mudam.
+
+**Alternativa descartada.** Começar a janela depois do último provento inválido. Isso daria a um
+indicador de "5 anos" um intervalo variável (PPAR3 ficaria com 1,98 ano) e não corrige MMAQ3 e
+MMAQ4. Esses dois têm um segundo defeito: o fechamento bruto salta de 3,00 e 163,86 para
+2.550,01 em 2024-12-27 sem desdobramento registrado.
+
+**Qualidade.** Continua o AVISO na Silver (`fechamento_ajustado > 0`). É ERRO se algum indicador
+do mart for calculado com `fechamento_ajustado ≤ 0` na janela, ou se um ticker sem cálculo tiver
+algum indicador preenchido.
+
 ---
 
 # 7. MATRIZ CONSOLIDADA DE DISPONIBILIDADE
