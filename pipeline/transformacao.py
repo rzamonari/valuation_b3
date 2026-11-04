@@ -1147,16 +1147,12 @@ class Preparada:
 # --------------------------------------------------------------------------- utilitários
 
 
-def _ident(nome):
-    return db._ident(nome)
-
-
 def _bronze(tabela):
-    return f"{_ident(SCHEMA_ORIGEM)}.{_ident(tabela)}"
+    return f"{db._ident(SCHEMA_ORIGEM)}.{db._ident(tabela)}"
 
 
 def _silver(tabela):
-    return f"{_ident(SCHEMA_DESTINO)}.{_ident(tabela)}"
+    return f"{db._ident(SCHEMA_DESTINO)}.{db._ident(tabela)}"
 
 
 def _rotulo_bronze(tabela):
@@ -1168,7 +1164,7 @@ def _rotulo_silver(tabela):
 
 
 def _temporaria(destino, sufixo):
-    return f"temp.main.{_ident(f'_silver_{destino}_{sufixo}')}"
+    return f"temp.main.{db._ident(f'_silver_{destino}_{sufixo}')}"
 
 
 def _fmt(n):
@@ -1258,7 +1254,7 @@ def _deduplicar_e_validar(con, destino, staging, chave, origem):
     """Remove duplicatas integralmente idênticas e valida a chave lógica (seção 9)."""
     rotulo = _rotulo_silver(destino)
     final = _temporaria(destino, "final")
-    chave_sql = ", ".join(_ident(c) for c in chave)
+    chave_sql = ", ".join(db._ident(c) for c in chave)
     with _contexto("deduplicação", destino=rotulo):
         antes = _contar(con, staging)
         con.execute(
@@ -1269,7 +1265,7 @@ def _deduplicar_e_validar(con, destino, staging, chave, origem):
         depois = _contar(con, final)
 
     with _contexto("validação de chave", destino=rotulo, coluna=", ".join(chave)):
-        filtro_nulo = " OR ".join(f"{_ident(c)} IS NULL" for c in chave)
+        filtro_nulo = " OR ".join(f"{db._ident(c)} IS NULL" for c in chave)
         n_nulas = con.execute(
             f"SELECT COUNT(*) FROM {final} WHERE {filtro_nulo}"
         ).fetchall()[0][0]
@@ -1345,7 +1341,7 @@ def _tipo_decimal(con, tabela, coluna, normalizado):
 def _expressao_coluna(con, tabela, coluna):
     """Valida o formato de todos os valores e devolve a expressão SQL de conversão estrita."""
     origem_sql = _bronze(tabela.origem)
-    bruto = _ident(coluna.origem)
+    bruto = db._ident(coluna.origem)
     valor = coluna.limpeza.replace("{v}", bruto) if coluna.limpeza else bruto
     conversao = coluna.conversao
     if conversao.ausente is not None:
@@ -1397,7 +1393,7 @@ def preparar_tabela_sql(con, tabela):
         origem = _contar(con, _bronze(tabela.origem))
 
     selecao = ", ".join(
-        f"{_expressao_coluna(con, tabela, c)} AS {_ident(c.destino)}"
+        f"{_expressao_coluna(con, tabela, c)} AS {db._ident(c.destino)}"
         for c in tabela.colunas
     )
     staging = _temporaria(tabela.destino, "staging")
@@ -1566,7 +1562,7 @@ def _carregar_staging(con, destino, tabela_arrow):
         try:
             con.execute(
                 f"CREATE OR REPLACE TEMP TABLE {staging} AS "
-                f"SELECT * FROM {_ident(visao)}"
+                f"SELECT * FROM {db._ident(visao)}"
             )
         finally:
             con.unregister(visao)
@@ -1716,7 +1712,7 @@ def _coletar_relatorio(con, preparadas):
             ]
             contagens = con.execute(
                 "SELECT COUNT(*), "
-                + ", ".join(f"COUNT(*) - COUNT({_ident(c)})" for c in colunas)
+                + ", ".join(f"COUNT(*) - COUNT({db._ident(c)})" for c in colunas)
                 + f" FROM {_silver(p.destino)}"
             ).fetchall()[0]
         relatorio.append(

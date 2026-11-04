@@ -2,45 +2,57 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Rename aggregation specifications and references",
+			"label": "Pipeline: 1. Bronze (ingestão)",
 			"type": "shell",
-			"command": "git",
-			"args": [
-				"mv",
-				".venv/.specs/sql_indicadores.md",
-				".venv/.specs/marts_agregacao_indicadores.md"
+			"command": "uv",
+			"args": ["run", "python", "-m", "pipeline.ingestao"],
+			"group": "build"
+		},
+		{
+			"label": "Pipeline: 2. Silver (transformação)",
+			"type": "shell",
+			"command": "uv",
+			"args": ["run", "python", "-m", "pipeline.transformacao"],
+			"group": "build"
+		},
+		{
+			"label": "Pipeline: 3. Gold (materialização)",
+			"type": "shell",
+			"command": "uv",
+			"args": ["run", "python", "-m", "pipeline.materializacao"],
+			"group": "build"
+		},
+		{
+			"label": "Pipeline: completo",
+			"dependsOrder": "sequence",
+			"dependsOn": [
+				"Pipeline: 1. Bronze (ingestão)",
+				"Pipeline: 2. Silver (transformação)",
+				"Pipeline: 3. Gold (materialização)"
 			],
 			"group": "build"
 		},
 		{
-			"label": "Rename aggregation specs",
+			"label": "Painel (Streamlit)",
 			"type": "shell",
-			"command": "powershell",
-			"args": [
-				"-NoProfile",
-				"-Command",
-				"Rename-Item -LiteralPath .venv/.specs/sql_indicadores.md -NewName marts_agregacao_indicadores.md; Rename-Item -LiteralPath .venv/.specs/sql_rank.md -NewName marts_agregacao_rank.md"
-			],
-			"group": "build"
+			"command": "uv",
+			"args": ["run", "streamlit", "run", "app.py"],
+			"isBackground": true,
+			"problemMatcher": []
 		},
 		{
-			"label": "Update aggregation spec references",
+			"label": "Testes com cobertura",
 			"type": "shell",
-			"command": "python",
-			"args": [
-				"-c",
-				"from pathlib import Path\nfor p in Path('.').rglob('*.md'):\n    try: text=p.read_text(encoding='utf-8')\n    except UnicodeDecodeError: continue\n    updated=text.replace('sql_indicadores.md','marts_agregacao_indicadores.md').replace('sql_rank.md','marts_agregacao_rank.md')\n    if updated != text: p.write_text(updated,encoding='utf-8')"
-			],
-			"group": "build"
+			"command": "uv",
+			"args": ["run", "pytest", "--cov"],
+			"group": "test"
 		},
 		{
-			"label": "Apply spec reference renames",
+			"label": "Ruff (lint)",
 			"type": "shell",
-			"command": "python",
-			"args": [
-				"C:\\Users\\Usuario\\.copilot\\session-state\\049959c6-8fec-40c2-bcc9-147b71ecdbe4\\files\\update_spec_refs.py"
-			],
-			"group": "build"
+			"command": "uv",
+			"args": ["run", "ruff", "check", "."],
+			"group": "test"
 		}
 	]
 }

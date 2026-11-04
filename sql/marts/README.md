@@ -1,6 +1,6 @@
 ﻿# Camada Gold (Marts) — Indicadores Fundamentalistas
 
-Especificação de origem: `.venv/.specs/marts_agregacao_indicadores.md` (v1.0).
+Especificação de origem: `docs/specs/marts_sql_indicadores.md` (v1.0).
 
 ## 1. Objetivo e escopo
 
@@ -137,7 +137,7 @@ Ou pela CLI do DuckDB: `duckdb -readonly fundamentalistas.duckdb < sql/marts/mar
 
 ## 12. Materialização no schema `marts`
 
-Spec: `.venv/.specs/marts.agregacao.md` (ajuste "Materialização dos resultados na camada Gold").
+Spec: `docs/specs/marts.agregacao.md` (ajuste "Materialização dos resultados na camada Gold").
 
 ```
 uv run python -m pipeline.materializacao

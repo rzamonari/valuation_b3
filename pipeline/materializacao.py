@@ -2,7 +2,7 @@
 
 Execução: uv run python -m pipeline.materializacao
 
-Spec: .venv/.specs/marts.agregacao.md (ajuste "Materialização dos resultados na camada Gold").
+Spec: docs/specs/marts.agregacao.md (ajuste "Materialização dos resultados na camada Gold").
 
 # DECISÕES DE IMPLEMENTAÇÃO
 
@@ -134,12 +134,8 @@ class Preparada:
 # --------------------------------------------------------------------------- utilitários
 
 
-def _ident(nome):
-    return db._ident(nome)
-
-
 def _gold(nome):
-    return f"{_ident(SCHEMA_DESTINO)}.{_ident(nome)}"
+    return f"{db._ident(SCHEMA_DESTINO)}.{db._ident(nome)}"
 
 
 def _rotulo_gold(nome):
@@ -147,7 +143,7 @@ def _rotulo_gold(nome):
 
 
 def _temporaria(nome):
-    return f"temp.main.{_ident(f'_marts_{nome}')}"
+    return f"temp.main.{db._ident(f'_marts_{nome}')}"
 
 
 def _fmt(n):
@@ -219,10 +215,10 @@ def _validar_chave(con, tabela, mart, rotulo):
                 destino=rotulo,
             )
         return
-    colunas = ", ".join(_ident(c) for c in mart.chave)
+    colunas = ", ".join(db._ident(c) for c in mart.chave)
     nulos = con.execute(
         f"SELECT COUNT(*) FROM {tabela} WHERE "
-        + " OR ".join(f"{_ident(c)} IS NULL" for c in mart.chave)
+        + " OR ".join(f"{db._ident(c)} IS NULL" for c in mart.chave)
     ).fetchall()[0][0]
     if nulos:
         raise ErroMaterializacao(

@@ -1,7 +1,7 @@
 """Painel de recomendações B3 Valuation.
 
 Execução: uv run streamlit run app.py
-Regras e motivos: docstring de painel.py (spec .venv/.specs/dashboard_apresentacao.md).
+Regras e motivos: docstring de painel.py (spec docs/specs/dashboard_apresentacao.md).
 """
 
 import streamlit as st
