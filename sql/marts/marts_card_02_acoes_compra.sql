@@ -13,18 +13,18 @@ WITH recomendacoes AS (
 -- 2. Faixa por ranking (posição relativa do rank, aritmética inteira, empates na mesma faixa):
 --      Superior      (+1): (rank - 1) * 3 <  max_rank - 1, ou max_rank = 1  (terço melhor)
 --      Intermediário  (0): demais elegíveis                                (terço do meio)
---      Inferior      (âˆ’1): (rank - 1) * 3 >  2 * (max_rank - 1)            (terço pior)
---      Não elegível  (âˆ’1): não atende à  elegibilidade do ranking (perspectiva desfavorável)
+--      Inferior      (−1): (rank - 1) * 3 >  2 * (max_rank - 1)            (terço pior)
+--      Não elegível  (−1): não atende à elegibilidade do ranking (perspectiva desfavorável)
 --
--- 3. saldo = qtd_superior - qtd_inferior - qtd_nao_elegivel (âˆ’10 a +10; rankings com peso igual).
+-- 3. saldo = qtd_superior - qtd_inferior - qtd_nao_elegivel (−10 a +10; rankings com peso igual).
 --    Recomendação: saldo > 0 -> Compra | saldo = 0 -> Manter | saldo < 0 -> Venda.
 --
 -- 4. Saída: apenas tickers com liquidez_2_meses > 0 (negociados nos últimos dois meses).
 --    posicao = DENSE_RANK por saldo decrescente e qtd_superior decrescente.
 --
--- Limitação: sinal relativo e mecà¢nico, derivado apenas dos 10 rankings sobre uma única
+-- Limitação: sinal relativo e mecânico, derivado apenas dos 10 rankings sobre uma única
 -- fotografia do Fundamentus. Não considera preço-alvo, valor intrínseco, histórico, governança,
--- contexto setorial nem o perfil do investidor. NàƒO constitui recomendação de investimento.
+-- contexto setorial nem o perfil do investidor. NÃO constitui recomendação de investimento.
 --
 -- Grão: uma linha por ticker negociado.
 WITH base AS (

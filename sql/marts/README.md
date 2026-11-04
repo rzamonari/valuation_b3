@@ -89,7 +89,7 @@ O mart 10 também expõe colunas de rastreabilidade: `data_inicial`, `data_final
 | Dívida líquida/EBITDA | Silver não possui dívida líquida nem EBITDA em valores monetários |
 | Sharpe | Sem taxa livre de risco nem metodologia aprovada |
 | Comparação setorial de margens | `b3_empresas.segmento` é segmento de listagem, não setor econômico |
-| Valor justo por Gordon | Ke e crescimento perpétuo sem parà¢metros aprovados |
+| Valor justo por Gordon | Ke e crescimento perpétuo sem parâmetros aprovados |
 
 ## 8. Dependências
 
@@ -130,7 +130,7 @@ Ou pela CLI do DuckDB: `duckdb -readonly fundamentalistas.duckdb < sql/marts/mar
   tickers têm `cotacao = 0`. O zero pode representar ausência de dado na origem. Por regra
   (§5.2/§5.3) os zeros foram preservados; tratá-los como NULL exige regra aprovada.
 - **Qualidade das cotações**: 18.350 linhas de 8 tickers têm `fechamento_ajustado < 0` e 1 linha é
-  NULL; são tratadas como inválidas. Há volatilidades extremas (máx. ≤ˆ 2.110% a.a.) que indicam
+  NULL; são tratadas como inválidas. Há volatilidades extremas (máx. ≈ 2.110% a.a.) que indicam
   séries ajustadas anômalas na origem — preservadas, sem filtro não especificado.
 - 160 tickers têm `cagr` e `volatilidade_anualizada` NULL: todos possuem no máximo uma cotação
   válida na Silver, portanto não há intervalo nem retornos para calcular.

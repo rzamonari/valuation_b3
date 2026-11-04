@@ -303,7 +303,7 @@ RANKINGS = [
      "barras": ["roic"], "tooltip": ["enterprise_value_ebit"],
      "tabela": ["roic", "enterprise_value_ebit"]},
     {"chave": "proventos", "mart": "marts_02_rank_proventos", "aba": "💰 Proventos",
-     "nome": "Proventos", "frase": "Maiores pagadoras com payout saudável",
+     "nome": "Proventos", "frase": "Maiores pagadoras de dividendos, com menor payout no desempate",
      "barras": ["dividend_yield"], "tooltip": ["payout"],
      "tabela": ["dividend_yield", "preco_lucro", "payout"]},
     {"chave": "eficiencia", "mart": "marts_03_rank_eficiencia", "aba": "⚙️ Eficiência",
