@@ -1,0 +1,99 @@
+# Contrato das fontes (test/contrato/): uma chamada real e pequena a B3, Fundamentus, Minha
+# Receita e Yahoo Finance, contra o formato que a ingestão e a Silver esperam. Roda toda segunda
+# e sob demanda; uma falha abre uma issue (ou comenta na que já está aberta) com a mensagem de
+# cada teste: "[<fonte>] <o que mudou>". Não grava banco nem fotografia.
+# workflow_dispatch e schedule só valem com o arquivo na main; até lá, o push que altera este
+# arquivo ou os testes de contrato dispara a execução (sem abrir issue).
+name: Contrato das fontes
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # segunda, 06:00 em Brasília
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/contrato-fontes.yml
+      - test/contrato/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contrato-fontes
+  cancel-in-progress: false
+
+jobs:
+  contrato:
+    name: contrato (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    env:
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked
+
+      - name: pytest -m contrato
+        id: contrato
+        run: |
+          set -o pipefail
+          uv run pytest test/contrato -m contrato --no-cov -rf -W ignore \
+            --junitxml=contrato.xml 2>&1 | tee contrato.log
+
+      # Mensagens "[<fonte>] <o que mudou>" de cada teste que falhou, lidas do JUnit (o -rf
+      # do pytest não repete a mensagem de pytest.fail(pytrace=False) na linha FAILED).
+      - name: Resumo
+        if: always()
+        run: |
+          python3 - <<'EOF' > falhas.md
+          import pathlib
+          import xml.etree.ElementTree as ET
+
+          arquivo = pathlib.Path("contrato.xml")
+          if not arquivo.exists():
+              print("- a execução não gerou contrato.xml (falha antes dos testes)")
+          else:
+              for caso in ET.parse(arquivo).iter("testcase"):
+                  for falha in [*caso.iter("failure"), *caso.iter("error")]:
+                      texto = (falha.text or falha.get("message") or "").strip()
+                      print(f"- `{caso.get('name')}`: {texto.splitlines()[-1] if texto else '?'}")
+          EOF
+          {
+            echo "## Contrato das fontes"
+            echo
+            if [ -s falhas.md ]; then cat falhas.md; else tail -n 1 contrato.log; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Abrir ou atualizar a issue
+        if: failure() && steps.contrato.outcome == 'failure' && github.event_name != 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          rotulo="contrato-fontes"
+          gh label create "$rotulo" --color B60205 \
+            --description "Formato de uma fonte externa mudou ou ela ficou indisponível" --force
+          {
+            echo "O teste de contrato das fontes falhou em $(date -u +%Y-%m-%d) ([execução]($RUN_URL))."
+            echo
+            echo "Cada linha diz a fonte e o que mudou:"
+            echo
+            cat falhas.md
+            echo
+            echo "Reproduzir localmente: \`uv run pytest test/contrato -m contrato --no-cov -rf\`."
+            echo "Antes de rodar a ingestão, ajuste o contrato da Silver (pipeline/transformacao/)."
+          } > corpo.md
+          aberta=$(gh issue list --label "$rotulo" --state open --json number --jq '.[0].number')
+          if [ -n "$aberta" ]; then
+            gh issue comment "$aberta" --body-file corpo.md
+          else
+            gh issue create --title "Contrato das fontes falhou ($(date -u +%Y-%m-%d))" \
+              --label "$rotulo" --body-file corpo.md
+          fi
