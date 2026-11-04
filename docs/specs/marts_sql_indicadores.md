@@ -668,11 +668,69 @@ antes da janela, e os demais 606 tickers não mudam.
 **Alternativa descartada.** Começar a janela depois do último provento inválido. Isso daria a um
 indicador de "5 anos" um intervalo variável (PPAR3 ficaria com 1,98 ano) e não corrige MMAQ3 e
 MMAQ4. Esses dois têm um segundo defeito: o fechamento bruto salta de 3,00 e 163,86 para
-2.550,01 em 2024-12-27 sem desdobramento registrado.
+2.550,01 em 2024-12-27 sem desdobramento registrado (tratado na D2).
 
 **Qualidade.** Continua o AVISO na Silver (`fechamento_ajustado > 0`). É ERRO se algum indicador
 do mart for calculado com `fechamento_ajustado ≤ 0` na janela, ou se um ticker sem cálculo tiver
 algum indicador preenchido.
+
+### D2. Salto sem evento no fechamento (aprovada em 2026-11-04)
+
+**Evidência (base de 2026-10-30).** O `fechamento` do Yahoo já vem ajustado por desdobramento: nos
+762 dias com desdobramento registrado, a razão `fechamento / fechamento anterior` tem mediana
+exatamente 1,0. Um salto no fechamento bruto, portanto, não vem de um desdobramento registrado. Vem
+de um grupamento ou desdobramento que o Yahoo não registrou, ou de uma cotação errada, e passa
+inteiro para o `fechamento_ajustado`. Distribuição da razão diária (609 tickers, 1.920.164 razões):
+
+| Dias | n | p0,01 | p0,1 | p1 | p99 | p99,9 | p99,99 |
+|---|---|---|---|---|---|---|---|
+| Sem evento (sem desdobramento nem provento) | 1.908.275 | 0,312 | 0,757 | 0,913 | 1,100 | 1,349 | 2,818 |
+| Com evento | 11.889 | 0,0002 | 0,100 | 0,848 | 1,077 | 1,615 | 10,9 |
+
+| Limite | Saltos sem evento na base | Na janela de 5 anos | Tickers na janela |
+|---|---|---|---|
+| 2× | 657 | 49 | 36 |
+| 3× | 371 | 15 | 11 |
+| **5×** | **278** | **7** | **5** |
+| 10× | 216 | 5 | 3 |
+
+**Limite: razão > 5 ou < 0,2** (`|ln r| > ln 5`), num dia sem desdobramento (`desdobramentos > 0`) e
+sem provento (`dividendos > 0`). Por que esse limite:
+
+- Fica muito além das caudas normais dos dias sem evento (p99,99 em 2,82 e 0,31). Só 0,015% desses
+  dias passam dele.
+- Preserva os maiores movimentos reais da janela: AMER3 em 2023-01-12 (0,227), MAPT4 (4,0) e a queda
+  de 0,35 a 0,5× de 50 tickers em 2026-10-26. Um limite de 3× ou 2× pegaria esses dias.
+- Nenhum dia com evento passa de 5× dentro da janela.
+
+Os 7 saltos da janela atingem AZUL3 (2026-02-10, 2026-04-09 e 2026-04-20; razões 46, 141.013 e ≈ 0),
+FIGE3 (2022-08-22, 0,14), MMAQ3 e MMAQ4 (2024-12-27, 850 e 15,6) e PINE3 (2023-07-28, 0,157).
+
+**Decisão.** A Silver preserva o dado como veio. Em `marts_retorno_total_risco`, se a janela de
+5 anos tem um salto sem evento, o ticker fica **sem cálculo**, como na D1. A razão do primeiro dia da
+janela é calculada com o pregão anterior, mesmo que ele esteja fora da janela.
+`motivo_sem_calculo` distingue os casos:
+
+- só D2: `Salto sem evento no fechamento (razão diária > 5 ou < 0,2)`;
+- D1 e D2: o motivo da D1, `; ` e o da D2 com inicial minúscula (MMAQ3 e MMAQ4 na base atual).
+
+Na base de 2026-10-30, AZUL3, FIGE3 e PINE3 passam a ficar sem cálculo; MMAQ3 e MMAQ4 já estavam pela
+D1. Ficam com cálculo 443 dos 609 tickers (antes, 446). Antes da regra, AZUL3 tinha volatilidade de
+2.110% a.a. e drawdown de −100%.
+
+**Alternativa descartada.** Reiniciar a janela no dia seguinte ao último salto. MMAQ3 e MMAQ4
+voltariam a ter cálculo (CAGR de 63%), mas sobre um fechamento parado em 2.550,01 nos 460 pregões
+desde o salto: o resultado viria só dos proventos aplicados a um preço sem negociação. FIGE3 tem o
+mesmo problema (6 preços distintos em 460 pregões, drawdown de −0,2%), e AZUL3 teria uma janela de
+6 meses anualizada. Além disso, a janela teria duração variável, o motivo que já levou a descartar
+essa alternativa na D1.
+
+**Limitação.** Um salto espalhado por vários pregões, cada um abaixo do limite, não é detectado. Por
+exemplo, CCTY3 passa de 0,77 a 25,06 entre 2025-05-05 e 2025-05-07, com razões diárias de 2,3, 3,8
+e 3,7.
+
+**Qualidade.** AVISO na Silver, com uma linha por salto sem evento (278 na base). É ERRO se um ticker
+com algum indicador calculado tiver um salto sem evento na janela.
 
 ---
 

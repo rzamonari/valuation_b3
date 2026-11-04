@@ -58,7 +58,8 @@ agregado por `ticker` (1:N sobre chave única), sem multiplicação de registros
 
 O mart 10 também expõe colunas de rastreabilidade: `data_inicial`, `data_final`, `anos`,
 `qtd_precos_validos`, `qtd_retornos`, `preco_inicial`, `preco_final`, e `motivo_sem_calculo`
-(preenchido quando os indicadores ficam NULL por ajuste retroativo inválido; ver §5).
+(preenchido quando os indicadores ficam NULL por ajuste retroativo inválido ou salto sem evento;
+ver §5).
 
 ## 5. Fórmulas
 
@@ -81,6 +82,12 @@ O mart 10 também expõe colunas de rastreabilidade: `data_inicial`, `data_final
     `max_drawdown`, `preco_inicial` e `preco_final`, e `motivo_sem_calculo` é preenchido. Datas
     e contagens continuam preenchidas. Na base de 2026-10-30 isso vale para PPAR3, MMAQ3 e
     MMAQ4.
+  - **Sem cálculo por salto sem evento** (decisão D2, 2026-11-04): o `fechamento` do Yahoo já
+    vem ajustado por desdobramento, então uma razão diária `fechamento / fechamento anterior`
+    > 5 ou < 0,2 num dia sem desdobramento nem provento é grupamento não registrado ou cotação
+    errada. Com um salto assim na janela, o ticker fica sem cálculo como na D1. A razão do 1º
+    dia da janela usa o pregão anterior. `motivo_sem_calculo` diz se o motivo é a D1, a D2 ou
+    as duas. Na base de 2026-10-30: AZUL3, FIGE3 e PINE3 (só D2) e MMAQ3 e MMAQ4 (D1 e D2).
 
 ## 6. Tratamento de nulos e divisões
 
@@ -141,12 +148,12 @@ Ou pela CLI do DuckDB: `duckdb -readonly fundamentalistas.duckdb < sql/marts/mar
   NULL. A causa é um provento maior ou igual ao fechamento anterior, que inverte o sinal do
   ajuste retroativo do Yahoo (diagnóstico na spec de indicadores, D1). Só PPAR3, MMAQ3 e MMAQ4
   têm o defeito na janela de 5 anos e ficam sem cálculo (§5). A Silver preserva o dado e a
-  qualidade avisa. Há volatilidades extremas (máx. ≈ 2.110% a.a.) que indicam outras séries
-  ajustadas anômalas na origem, preservadas sem filtro não especificado.
-- **MMAQ3/MMAQ4**: o fechamento bruto salta de 3,00 e 163,86 para 2.550,01 em 2024-12-27, sem
-  desdobramento registrado (provável grupamento não informado pelo Yahoo). Hoje esses tickers
-  ficam sem cálculo pela D1. Quando 2024 sair da janela (~2029), o salto volta a distorcer os
-  indicadores. Pendente de regra própria.
+  qualidade avisa.
+- **Saltos sem evento**: 278 razões diárias > 5 ou < 0,2 sem desdobramento nem provento, em 90
+  tickers, quase todos entre 2000 e 2011. Os 7 da janela de 5 anos (AZUL3, FIGE3, MMAQ3, MMAQ4,
+  PINE3) deixam o ticker sem cálculo (D2, §5). Entre eles está a volatilidade de 2.110% a.a. do
+  AZUL3. A Silver preserva o dado e a qualidade avisa. Um salto espalhado por vários pregões,
+  cada um abaixo do limite, não é detectado (ex.: CCTY3 de 0,77 a 25,06 entre 2025-05-05 e 07).
 - 160 tickers têm `cagr` e `volatilidade_anualizada` NULL: todos possuem no máximo uma cotação
   válida na Silver, portanto não há intervalo nem retornos para calcular.
 
