@@ -1,0 +1,1854 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Pipeline de indicadores fundamentalistas de ações da B3 (Bronze → Silver → Gold) sobre DuckDB, com painel em Streamlit.">
+      
+      
+      
+      
+        <link rel="prev" href="../raw_ingestao/">
+      
+      
+        <link rel="next" href="../marts.agregacao/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Silver — transformação - B3 Valuation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#spec-tecnica-final-implementacao-da-camada-silver" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href="../.." title="B3 Valuation" class="md-header__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            B3 Valuation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Silver — transformação
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema claro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Tema claro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema escuro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Tema escuro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="B3 Valuation" class="md-nav__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    B3 Valuation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../uso/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instalação e uso
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../arquitetura/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referência da API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Marts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Marts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/marts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicadores e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/rankings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rankings e recomendação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decisões
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisoes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../raw_ingestao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bronze — ingestão
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Silver — transformação
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Silver — transformação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#projeto-pipeline-de-indicadores-fundamentalistas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Projeto: Pipeline de Indicadores Fundamentalistas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts.agregacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — agregação e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts_sql_indicadores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — indicadores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts_sql_rank/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — rankings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboard_apresentacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apresentação — painel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testes_codigo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#projeto-pipeline-de-indicadores-fundamentalistas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Projeto: Pipeline de Indicadores Fundamentalistas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="spec-tecnica-final-implementacao-da-camada-silver">SPEC TÉCNICA FINAL — IMPLEMENTAÇÃO DA CAMADA SILVER<a class="headerlink" href="#spec-tecnica-final-implementacao-da-camada-silver" title="Permanent link">&para;</a></h1>
+<h2 id="projeto-pipeline-de-indicadores-fundamentalistas">Projeto: Pipeline de Indicadores Fundamentalistas<a class="headerlink" href="#projeto-pipeline-de-indicadores-fundamentalistas" title="Permanent link">&para;</a></h2>
+<h1 id="1-instrucao-principal-ao-claude-code">1. INSTRUÇÃO PRINCIPAL AO CLAUDE CODE<a class="headerlink" href="#1-instrucao-principal-ao-claude-code" title="Permanent link">&para;</a></h1>
+<p>Atue como engenheiro de dados sênior, especialista em Python, DuckDB, SQL, arquitetura Medallion e desenvolvimento orientado a especificações (Spec-Driven Development).</p>
+<p>Sua tarefa é implementar a camada Silver do projeto de indicadores fundamentalistas, respeitando integralmente esta especificação.</p>
+<p><strong>Esta especificação é a fonte da verdade para a implementação.</strong></p>
+<p>Regras obrigatórias:</p>
+<ol>
+<li>Não inventar regras de negócio.</li>
+<li>Não alterar decisões funcionais estabelecidas nesta especificação.</li>
+<li>Não modificar a camada Bronze.</li>
+<li>Não criar funcionalidades que não tenham sido solicitadas.</li>
+<li>Não descartar colunas, propriedades ou registros silenciosamente.</li>
+<li>Não substituir conversões estritas por conversões tolerantes a erros.</li>
+<li>Não escolher arbitrariamente registros conflitantes.</li>
+<li>Reutilizar a infraestrutura já existente no projeto.</li>
+<li>Inspecionar os arquivos e dados reais antes de implementar.</li>
+<li>Se encontrar uma incompatibilidade entre esta especificação e a estrutura real do projeto, interromper a implementação da parte afetada, apresentar o problema e propor uma solução antes de alterar a regra.</li>
+</ol>
+<p>Não faça uma implementação baseada em suposições sobre arquivos, funções, tabelas ou estruturas que ainda não tenham sido examinados.</p>
+<h1 id="2-contexto-do-projeto">2. CONTEXTO DO PROJETO<a class="headerlink" href="#2-contexto-do-projeto" title="Permanent link">&para;</a></h1>
+<p>O projeto utiliza arquitetura Medallion para construir um pipeline de dados fundamentalistas.</p>
+<p>A camada Bronze já realiza a ingestão dos dados originais.</p>
+<p>A camada Silver deverá realizar:</p>
+<ul>
+<li>Padronização dos nomes das colunas.</li>
+<li>Conversão e validação de tipos.</li>
+<li>Limpeza estrutural restrita.</li>
+<li>Normalização de estruturas JSON.</li>
+<li>Validação de chaves.</li>
+<li>Tratamento de duplicidades.</li>
+<li>Preservação de valores nulos.</li>
+<li>Disponibilização de tabelas estruturadas para as etapas analíticas posteriores.</li>
+</ul>
+<p>A camada Silver não deverá realizar cálculos fundamentalistas, análises financeiras, correções de informações de negócio ou preenchimento artificial de dados.</p>
+<p>A camada Bronze deverá continuar preservando os dados originais.</p>
+<h1 id="3-stack-tecnologica">3. STACK TECNOLÓGICA<a class="headerlink" href="#3-stack-tecnologica" title="Permanent link">&para;</a></h1>
+<ul>
+<li>Linguagem: Python 3.13.</li>
+<li>Gerenciador de dependências: uv.</li>
+<li>Banco de dados: DuckDB.</li>
+<li>Arquitetura: Medallion.</li>
+<li>Schema Bronze: raw.</li>
+<li>Schema Silver: refined.</li>
+<li>Banco: fundamentalistas.duckdb.</li>
+<li>Localização do banco: raiz do projeto.</li>
+</ul>
+<h1 id="4-inspecao-obrigatoria-do-projeto">4. INSPEÇÃO OBRIGATÓRIA DO PROJETO<a class="headerlink" href="#4-inspecao-obrigatoria-do-projeto" title="Permanent link">&para;</a></h1>
+<p>Antes de escrever qualquer código:</p>
+<ol>
+<li>Inspecione a estrutura de diretórios do projeto.</li>
+<li>Leia integralmente o arquivo pipeline/db.py.</li>
+<li>Identifique as funções existentes para conexão, criação de schemas e gravação.</li>
+<li>Identifique como o caminho do banco é determinado.</li>
+<li>Confira as dependências declaradas no projeto.</li>
+<li>Confira a existência das tabelas Bronze.</li>
+<li>Examine o DESCRIBE das tabelas Bronze.</li>
+<li>Examine os tipos e valores reais das colunas.</li>
+<li>Examine a estrutura dos JSON da Minha Receita considerando todos os registros.</li>
+<li>Identifique limitações técnicas do DuckDB relacionadas às conversões e transações necessárias.</li>
+</ol>
+<p>Não criar uma nova infraestrutura de conexão com o banco se a existente atender à necessidade.</p>
+<p>Não alterar pipeline/db.py sem necessidade comprovada e sem apresentar previamente a justificativa.</p>
+<p>Se alguma informação indispensável não puder ser confirmada, apresente a pendência antes de implementar.</p>
+<h1 id="5-artefato-a-produzir">5. ARTEFATO A PRODUZIR<a class="headerlink" href="#5-artefato-a-produzir" title="Permanent link">&para;</a></h1>
+<p>Arquivo:</p>
+<p>pipeline/transformacao.py</p>
+<p>Comando de execução:</p>
+<p>uv run python -m pipeline.transformacao</p>
+<p>A especificação completa deverá ser registrada como docstring no início do arquivo.</p>
+<p>A implementação deverá ser organizada, modular, documentada e compatível com a arquitetura existente.</p>
+<h1 id="6-tabelas-de-origem-e-destino">6. TABELAS DE ORIGEM E DESTINO<a class="headerlink" href="#6-tabelas-de-origem-e-destino" title="Permanent link">&para;</a></h1>
+<p>O processo deverá produzir exatamente sete tabelas Silver:</p>
+<table>
+<thead>
+<tr>
+<th>Origem</th>
+<th>Destino</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>raw.b3_empresas</td>
+<td>refined.b3_empresas</td>
+</tr>
+<tr>
+<td>raw.fundamentus_acoes</td>
+<td>refined.fundamentus_acoes</td>
+</tr>
+<tr>
+<td>raw.yfinance_cotacoes</td>
+<td>refined.yfinance_cotacoes</td>
+</tr>
+<tr>
+<td>raw.minhareceita_empresas</td>
+<td>refined.minhareceita_empresas</td>
+</tr>
+<tr>
+<td>JSON qsa</td>
+<td>refined.minhareceita_qsa</td>
+</tr>
+<tr>
+<td>JSON regime_tributario</td>
+<td>refined.minhareceita_regime_tributario</td>
+</tr>
+<tr>
+<td>JSON cnaes_secundarios</td>
+<td>refined.minhareceita_cnaes_secundarios</td>
+</tr>
+</tbody>
+</table>
+<p>As três últimas tabelas serão derivadas dos arrays presentes em raw.minhareceita_empresas.payload_json.</p>
+<h1 id="7-mapeamento-e-transformacao-das-tabelas">7. MAPEAMENTO E TRANSFORMAÇÃO DAS TABELAS<a class="headerlink" href="#7-mapeamento-e-transformacao-das-tabelas" title="Permanent link">&para;</a></h1>
+<h2 id="71-b3-empresas">7.1. B3 — Empresas<a class="headerlink" href="#71-b3-empresas" title="Permanent link">&para;</a></h2>
+<p>Origem: raw.b3_empresas</p>
+<p>Destino: refined.b3_empresas</p>
+<table>
+<thead>
+<tr>
+<th>Coluna Bronze</th>
+<th>Coluna Silver</th>
+<th>Tipo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>codeCVM</td>
+<td>codigo_cvm</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>issuingCompany</td>
+<td>empresa_emissora</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>companyName</td>
+<td>razao_social</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>tradingName</td>
+<td>nome_pregao</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>cnpj</td>
+<td>cnpj</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>marketIndicator</td>
+<td>indicador_mercado</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>typeBDR</td>
+<td>tipo_bdr</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>dateListing</td>
+<td>data_listagem</td>
+<td>DATE</td>
+</tr>
+<tr>
+<td>status</td>
+<td>situacao</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>segment</td>
+<td>segmento</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>segmentEng</td>
+<td>segmento_ingles</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>type</td>
+<td>tipo_empresa</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>market</td>
+<td>mercado</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>_timestamp_ingestao</td>
+<td>_timestamp_ingestao</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>_source_origin</td>
+<td>_source_origin</td>
+<td>VARCHAR</td>
+</tr>
+</tbody>
+</table>
+<h3 id="regras">Regras<a class="headerlink" href="#regras" title="Permanent link">&para;</a></h3>
+<ul>
+<li>codeCVM deverá permanecer VARCHAR.</li>
+<li>cnpj deverá permanecer VARCHAR.</li>
+<li>cnpj deverá ser padronizado conforme a regra geral de CNPJ (seção 7.8): sempre 14 dígitos, completando com zeros à esquerda quando houver menos de 14.</li>
+<li>Exemplos: '191' → '00000000000191'; '973749000115' → '00973749000115'; '0' → '00000000000000'.</li>
+<li>Não aplicar máscaras.</li>
+<li>Não corrigir identificadores além da padronização de CNPJ (não validar nem recalcular dígitos verificadores).</li>
+<li>Converter dateListing de DD/MM/YYYY para DATE, utilizando %d/%m/%Y.</li>
+<li>Preservar 31/12/9999 como 9999-12-31.</li>
+<li>Não interpretar ou corrigir datas futuras.</li>
+<li>Preservar a distinção entre string vazia e NULL.</li>
+<li>Preservar os metadados de ingestão.</li>
+</ul>
+<h3 id="chave-logica">Chave lógica<a class="headerlink" href="#chave-logica" title="Permanent link">&para;</a></h3>
+<p>codigo_cvm</p>
+<p>Validar:</p>
+<ul>
+<li>Ausência de valores nulos na chave.</li>
+<li>Unicidade da chave após remoção de duplicatas integralmente idênticas.</li>
+</ul>
+<p>Se a mesma chave possuir conteúdos divergentes, interromper a execução e apresentar os registros conflitantes.</p>
+<h2 id="72-fundamentus-indicadores">7.2. Fundamentus — Indicadores<a class="headerlink" href="#72-fundamentus-indicadores" title="Permanent link">&para;</a></h2>
+<p>Origem: raw.fundamentus_acoes</p>
+<p>Destino: refined.fundamentus_acoes</p>
+<table>
+<thead>
+<tr>
+<th>Coluna Bronze</th>
+<th>Coluna Silver</th>
+<th>Tipo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Papel</td>
+<td>ticker</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>Cotação</td>
+<td>cotacao</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>P/L</td>
+<td>preco_lucro</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>P/VP</td>
+<td>preco_valor_patrimonial</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>PSR</td>
+<td>preco_vendas</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>Div.Yield</td>
+<td>dividend_yield</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>P/Ativo</td>
+<td>preco_ativo</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>P/Cap.Giro</td>
+<td>preco_capital_giro</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>P/EBIT</td>
+<td>preco_ebit</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>P/Ativ Circ.Liq</td>
+<td>preco_ativo_circulante_liquido</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>EV/EBIT</td>
+<td>enterprise_value_ebit</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>EV/EBITDA</td>
+<td>enterprise_value_ebitda</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>Mrg Bruta</td>
+<td>margem_bruta</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>Mrg Ebit</td>
+<td>margem_ebit</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>Mrg. Líq.</td>
+<td>margem_liquida</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>Liq. Corr.</td>
+<td>liquidez_corrente</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>ROIC</td>
+<td>roic</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>ROE</td>
+<td>roe</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>Liq.2meses</td>
+<td>liquidez_2_meses</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>Patrim. Líq</td>
+<td>patrimonio_liquido</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>Dív.Líq/ Patrim.</td>
+<td>divida_liquida_patrimonio</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>Cresc. Rec.5a</td>
+<td>crescimento_receita_5_anos</td>
+<td>DECIMAL(p,s)</td>
+</tr>
+<tr>
+<td>_timestamp_ingestao</td>
+<td>_timestamp_ingestao</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>_source_origin</td>
+<td>_source_origin</td>
+<td>VARCHAR</td>
+</tr>
+</tbody>
+</table>
+<h3 id="conversao-numerica">Conversão numérica<a class="headerlink" href="#conversao-numerica" title="Permanent link">&para;</a></h3>
+<p>Os dados utilizam notação brasileira:</p>
+<ul>
+<li>Ponto como separador de milhar.</li>
+<li>Vírgula como separador decimal.</li>
+<li>Valores negativos.</li>
+<li>Símbolo de percentual em campos percentuais.</li>
+</ul>
+<p>Exemplos:</p>
+<table>
+<thead>
+<tr>
+<th>Valor original</th>
+<th style="text-align: right;">Valor convertido</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.083.050.000,00</td>
+<td style="text-align: right;">1083050000.00</td>
+</tr>
+<tr>
+<td>6,91%</td>
+<td style="text-align: right;">6.91</td>
+</tr>
+<tr>
+<td>-208,15%</td>
+<td style="text-align: right;">-208.15</td>
+</tr>
+<tr>
+<td>3,423</td>
+<td style="text-align: right;">3.423</td>
+</tr>
+</tbody>
+</table>
+<p>Regras:</p>
+<ol>
+<li>Interpretar corretamente os separadores brasileiros.</li>
+<li>Remover o símbolo % quando presente, sem dividir por 100.</li>
+<li>Preservar valores negativos.</li>
+<li>Preservar zeros.</li>
+<li>Preservar NULL.</li>
+<li>Não arredondar.</li>
+<li>Não truncar.</li>
+<li>Não transformar valores inválidos em NULL.</li>
+</ol>
+<h3 id="precisao-e-escala-decimal">Precisão e escala DECIMAL<a class="headerlink" href="#precisao-e-escala-decimal" title="Permanent link">&para;</a></h3>
+<p>Determinar a precisão e escala individualmente para cada coluna, examinando todos os registros Bronze.</p>
+<p>O procedimento deverá:</p>
+<ol>
+<li>Identificar o maior número de dígitos inteiros.</li>
+<li>Identificar o maior número de casas decimais.</li>
+<li>Determinar a precisão e escala necessárias.</li>
+<li>Criar cada coluna com DECIMAL(p,s) adequado.</li>
+<li>Garantir representação exata de todos os valores.</li>
+<li>Interromper a execução se a precisão necessária ultrapassar o limite do DuckDB.</li>
+</ol>
+<p>Não utilizar uma precisão arbitrária e uniforme para todas as colunas.</p>
+<h3 id="tratamento-especifico-da-coluna-divliq-patrim">Tratamento específico da coluna Dív.Líq/ Patrim.<a class="headerlink" href="#tratamento-especifico-da-coluna-divliq-patrim" title="Permanent link">&para;</a></h3>
+<p>Foi identificada a presença de quebras de linha e tabulações nas extremidades dos valores.</p>
+<p>Exemplo:</p>
+<p>0A09090909302C3130090909</p>
+<p>Representação:</p>
+<p>\n\t\t\t\t0,10\t\t\t</p>
+<p>Remover exclusivamente os caracteres de formatação externos identificados.</p>
+<p>Não executar limpeza genérica que possa alterar o conteúdo numérico.</p>
+<h3 id="chave-logica_1">Chave lógica<a class="headerlink" href="#chave-logica_1" title="Permanent link">&para;</a></h3>
+<p>ticker</p>
+<p>Validar ausência de nulos e unicidade após a deduplicação integral.</p>
+<p>Se houver o mesmo ticker com conteúdos divergentes, interromper a execução e apresentar os registros conflitantes.</p>
+<h2 id="73-yfinance-cotacoes">7.3. YFinance — Cotações<a class="headerlink" href="#73-yfinance-cotacoes" title="Permanent link">&para;</a></h2>
+<p>Origem: raw.yfinance_cotacoes</p>
+<p>Destino: refined.yfinance_cotacoes</p>
+<table>
+<thead>
+<tr>
+<th>Coluna Bronze</th>
+<th>Coluna Silver</th>
+<th>Tipo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ticker</td>
+<td>ticker</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>Date</td>
+<td>data</td>
+<td>TIMESTAMP WITH TIME ZONE</td>
+</tr>
+<tr>
+<td>Open</td>
+<td>abertura</td>
+<td>DOUBLE</td>
+</tr>
+<tr>
+<td>High</td>
+<td>maxima</td>
+<td>DOUBLE</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>minima</td>
+<td>DOUBLE</td>
+</tr>
+<tr>
+<td>Close</td>
+<td>fechamento</td>
+<td>DOUBLE</td>
+</tr>
+<tr>
+<td>Adj Close</td>
+<td>fechamento_ajustado</td>
+<td>DOUBLE</td>
+</tr>
+<tr>
+<td>Volume</td>
+<td>volume</td>
+<td>BIGINT</td>
+</tr>
+<tr>
+<td>Dividends</td>
+<td>dividendos</td>
+<td>DOUBLE</td>
+</tr>
+<tr>
+<td>Stock Splits</td>
+<td>desdobramentos</td>
+<td>DOUBLE</td>
+</tr>
+<tr>
+<td>_source_origin</td>
+<td>_source_origin</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>_timestamp_ingestao</td>
+<td>_timestamp_ingestao</td>
+<td>VARCHAR</td>
+</tr>
+<tr>
+<td>Capital Gains</td>
+<td>ganhos_capital</td>
+<td>DOUBLE</td>
+</tr>
+</tbody>
+</table>
+<h3 id="regras_1">Regras<a class="headerlink" href="#regras_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>ticker permanece VARCHAR.</li>
+<li>Date deverá ser convertido para TIMESTAMP WITH TIME ZONE.</li>
+<li>Preservar o instante temporal.</li>
+<li>Não exigir preservação literal do offset textual original.</li>
+<li>Preços e valores financeiros deverão ser DOUBLE.</li>
+<li>Volume deverá ser BIGINT.</li>
+<li>Preservar zeros.</li>
+<li>Preservar NULL.</li>
+<li>Não preencher Capital Gains com zero.</li>
+</ul>
+<p>Exemplo de data:</p>
+<p>2026-10-29 00:00:00-03:00</p>
+<h3 id="diagnostico-conhecido-da-bronze">Diagnóstico conhecido da Bronze<a class="headerlink" href="#diagnostico-conhecido-da-bronze" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Total: 1.920.774 registros.</li>
+<li>Capital Gains nulos: 1.908.781.</li>
+<li>Capital Gains vazios: 0.</li>
+<li>Date nulos: 0.</li>
+<li>Capital Gains preenchidos: 11.993.</li>
+</ul>
+<p>Esses valores são referências do levantamento. Recalcular as contagens durante cada execução.</p>
+<h3 id="chave-logica_2">Chave lógica<a class="headerlink" href="#chave-logica_2" title="Permanent link">&para;</a></h3>
+<p>(ticker, data)</p>
+<p>Regras:</p>
+<ol>
+<li>Validar que os dois componentes da chave não sejam nulos.</li>
+<li>Remover duplicatas integralmente idênticas.</li>
+<li>Verificar conflitos de conteúdo para a mesma chave.</li>
+<li>Interromper a execução se existirem registros divergentes.</li>
+<li>Apresentar a chave e os registros conflitantes.</li>
+<li>Não selecionar arbitrariamente uma cotação.</li>
+</ol>
+<h2 id="74-minha-receita-empresas">7.4. Minha Receita — Empresas<a class="headerlink" href="#74-minha-receita-empresas" title="Permanent link">&para;</a></h2>
+<p>Origem: raw.minhareceita_empresas</p>
+<p>Destino: refined.minhareceita_empresas</p>
+<p>A coluna payload_json contém propriedades escalares e arrays.</p>
+<p>A tabela principal deverá conter todas as propriedades escalares do JSON.</p>
+<h3 id="regras_2">Regras<a class="headerlink" href="#regras_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Uma linha por CNPJ.</li>
+<li>Chave lógica: cnpj.</li>
+<li>CNPJ deverá ser VARCHAR.</li>
+<li>CNPJ deverá ser padronizado conforme a regra geral de CNPJ (seção 7.8), tanto na coluna cnpj da linha Bronze quanto na propriedade cnpj do JSON.</li>
+<li>Preservar todas as propriedades escalares.</li>
+<li>Manter propriedades mesmo quando apresentarem NULL.</li>
+<li>Não incluir arrays na tabela principal.</li>
+<li>Não replicar payload_json na Silver.</li>
+<li>O JSON original continuará preservado integralmente na Bronze.</li>
+<li>Preservar os metadados de origem na tabela principal.</li>
+<li>Validar a correspondência entre o CNPJ da linha Bronze e a propriedade cnpj do JSON, ambos já padronizados com 14 dígitos. Divergências deverão gerar erro, sem escolher um valor arbitrariamente.</li>
+</ul>
+<h3 id="tipagem">Tipagem<a class="headerlink" href="#tipagem" title="Permanent link">&para;</a></h3>
+<p>A tipagem deverá ser determinada após a inspeção de todos os registros.</p>
+<p>Regras:</p>
+<ul>
+<li>Identificadores deverão permanecer textuais quando necessário preservar zeros e representação.</li>
+<li>Campos de data deverão utilizar DATE quando o formato e a semântica forem confirmados.</li>
+<li>Campos numéricos deverão receber tipos compatíveis com os valores encontrados.</li>
+<li>Campos booleanos deverão utilizar BOOLEAN quando confirmados.</li>
+<li>Campos que aparecem NULL na amostra deverão continuar presentes e receber tipo compatível com a estrutura global.</li>
+<li>Não inferir tipos definitivos utilizando somente cinco registros.</li>
+</ul>
+<p>A implementação deverá validar a estrutura global do JSON antes da publicação das tabelas.</p>
+<h2 id="75-minha-receita-qsa">7.5. Minha Receita — QSA<a class="headerlink" href="#75-minha-receita-qsa" title="Permanent link">&para;</a></h2>
+<p>Destino: refined.minhareceita_qsa</p>
+<p>Origem: array qsa do payload_json.</p>
+<p>Granularidade: uma linha por sócio de cada empresa.</p>
+<p>Chave lógica:</p>
+<p>(cnpj, sequencia_socio)</p>
+<p>A coluna sequencia_socio deverá representar a posição original do objeto no array.</p>
+<p>Propriedades observadas:</p>
+<ul>
+<li>pais</li>
+<li>nome_socio</li>
+<li>codigo_pais</li>
+<li>faixa_etaria</li>
+<li>cnpj_cpf_do_socio</li>
+<li>qualificacao_socio</li>
+<li>codigo_faixa_etaria</li>
+<li>data_entrada_sociedade</li>
+<li>identificador_de_socio</li>
+<li>cpf_representante_legal</li>
+<li>nome_representante_legal</li>
+<li>codigo_qualificacao_socio</li>
+<li>qualificacao_representante_legal</li>
+<li>codigo_qualificacao_representante_legal</li>
+</ul>
+<p>Incluir também:</p>
+<ul>
+<li>cnpj</li>
+<li>sequencia_socio</li>
+</ul>
+<p>Preservar os valores nulos das propriedades.</p>
+<h2 id="76-minha-receita-regime-tributario">7.6. Minha Receita — Regime Tributário<a class="headerlink" href="#76-minha-receita-regime-tributario" title="Permanent link">&para;</a></h2>
+<p>Destino: refined.minhareceita_regime_tributario</p>
+<p>Origem: array regime_tributario do payload_json.</p>
+<p>Granularidade: uma linha por ocorrência de regime tributário de cada empresa.</p>
+<p>Chave lógica:</p>
+<p>(cnpj, ano)</p>
+<p>Propriedades observadas:</p>
+<ul>
+<li>ano</li>
+<li>cnpj_da_scp</li>
+<li>forma_de_tributacao</li>
+<li>quantidade_de_escrituracoes</li>
+</ul>
+<p>Incluir também cnpj.</p>
+<h2 id="77-minha-receita-cnaes-secundarios">7.7. Minha Receita — CNAEs Secundários<a class="headerlink" href="#77-minha-receita-cnaes-secundarios" title="Permanent link">&para;</a></h2>
+<p>Destino: refined.minhareceita_cnaes_secundarios</p>
+<p>Origem: array cnaes_secundarios do payload_json.</p>
+<p>Granularidade: uma linha por CNAE secundário de cada empresa.</p>
+<p>Chave lógica:</p>
+<p>(cnpj, codigo_cnae)</p>
+<p>Mapeamento:</p>
+<table>
+<thead>
+<tr>
+<th>JSON</th>
+<th>Silver</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>codigo</td>
+<td>codigo_cnae</td>
+</tr>
+<tr>
+<td>descricao</td>
+<td>descricao</td>
+</tr>
+</tbody>
+</table>
+<p>Incluir também cnpj.</p>
+<h3 id="regras-gerais-para-as-tabelas-auxiliares">Regras gerais para as tabelas auxiliares<a class="headerlink" href="#regras-gerais-para-as-tabelas-auxiliares" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Preservar a associação com o CNPJ da empresa.</li>
+<li>Não gerar linhas artificiais para arrays vazios.</li>
+<li>Não gerar linhas artificiais para arrays nulos.</li>
+<li>Preservar a ordem original do QSA.</li>
+<li>Validar as chaves lógicas.</li>
+<li>Não descartar propriedades existentes nos objetos.</li>
+<li>Não descartar objetos inválidos silenciosamente.</li>
+<li>Estruturas incompatíveis deverão gerar erro explícito.</li>
+</ul>
+<p>Os tipos das propriedades deverão ser definidos após a inspeção global dos dados, respeitando a natureza de cada campo.</p>
+<h3 id="metadados-nas-tabelas-auxiliares">Metadados nas tabelas auxiliares<a class="headerlink" href="#metadados-nas-tabelas-auxiliares" title="Permanent link">&para;</a></h3>
+<p>Não presumir a inclusão ou exclusão de _timestamp_ingestao e _source_origin nas tabelas auxiliares.</p>
+<p>Antes da implementação, verificar a necessidade de propagação desses metadados para os registros derivados e apresentar a proposta, caso a decisão ainda não esteja definida.</p>
+<h2 id="78-regra-geral-de-padronizacao-de-cnpj">7.8. Regra geral de padronização de CNPJ<a class="headerlink" href="#78-regra-geral-de-padronizacao-de-cnpj" title="Permanent link">&para;</a></h2>
+<p>Aplica-se a todas as colunas Silver que contêm CNPJ:</p>
+<table>
+<thead>
+<tr>
+<th>Tabela</th>
+<th>Coluna</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>refined.b3_empresas</td>
+<td>cnpj</td>
+</tr>
+<tr>
+<td>refined.minhareceita_empresas</td>
+<td>cnpj</td>
+</tr>
+<tr>
+<td>refined.minhareceita_qsa</td>
+<td>cnpj</td>
+</tr>
+<tr>
+<td>refined.minhareceita_regime_tributario</td>
+<td>cnpj, cnpj_da_scp</td>
+</tr>
+<tr>
+<td>refined.minhareceita_cnaes_secundarios</td>
+<td>cnpj</td>
+</tr>
+</tbody>
+</table>
+<p>Regras:</p>
+<ol>
+<li>O CNPJ deverá ter sempre 14 dígitos.</li>
+<li>Quando a quantidade de dígitos for menor que 14, completar com zeros à esquerda até 14 dígitos.</li>
+<li>Exemplos: '191' → '00000000000191'; '0' → '00000000000000'; '33000167000101' permanece igual.</li>
+<li>O tipo permanece VARCHAR, para preservar os zeros à esquerda.</li>
+<li>O valor de origem deverá conter somente dígitos. Valores com pontuação, máscara, espaços ou outros caracteres deverão gerar erro de conversão; não remover caracteres para "consertar" o valor.</li>
+<li>Valores com mais de 14 dígitos deverão gerar erro de conversão; não truncar.</li>
+<li>NULL permanece NULL.</li>
+<li>String vazia permanece string vazia: não há dígitos a padronizar, e completá-la com zeros a tornaria indistinguível de '0'.</li>
+<li>Não aplicar máscara (pontos, barra, hífen) e não validar ou recalcular dígitos verificadores.</li>
+</ol>
+<p>Não se aplica a cnpj_cpf_do_socio e cpf_representante_legal do QSA, que contêm CPFs mascarados ou CNPJs de sócios em formatos variados.</p>
+<h1 id="8-conversoes-e-validacoes-estritas">8. CONVERSÕES E VALIDAÇÕES ESTRITAS<a class="headerlink" href="#8-conversoes-e-validacoes-estritas" title="Permanent link">&para;</a></h1>
+<p>Não utilizar:</p>
+<ul>
+<li>TRY_CAST.</li>
+<li>TRY_STRPTIME.</li>
+<li>errors="coerce".</li>
+<li>Qualquer mecanismo que converta silenciosamente dados inválidos em NULL.</li>
+</ul>
+<p>As conversões deverão falhar quando o valor não puder ser representado no tipo de destino.</p>
+<p>Em caso de erro, apresentar:</p>
+<ul>
+<li>Tabela de origem.</li>
+<li>Tabela de destino.</li>
+<li>Coluna.</li>
+<li>Valor inválido de exemplo.</li>
+<li>Motivo da falha.</li>
+</ul>
+<p>Encerrar a execução com sys.exit(1).</p>
+<p>A implementação não deverá confundir valor inválido com valor ausente.</p>
+<h1 id="9-regras-gerais-de-duplicidade">9. REGRAS GERAIS DE DUPLICIDADE<a class="headerlink" href="#9-regras-gerais-de-duplicidade" title="Permanent link">&para;</a></h1>
+<p>Aplicar a seguinte ordem:</p>
+<ol>
+<li>Identificar registros integralmente idênticos.</li>
+<li>Manter uma única ocorrência de cada registro idêntico.</li>
+<li>Contabilizar quantos registros foram removidos.</li>
+<li>Validar as chaves lógicas.</li>
+<li>Identificar chaves nulas.</li>
+<li>Identificar chaves repetidas com conteúdos divergentes.</li>
+<li>Interromper a execução em caso de conflito.</li>
+</ol>
+<p>Não utilizar DISTINCT indiscriminadamente para resolver conflitos de negócio.</p>
+<h3 id="quadro-de-chaves-logicas">Quadro de chaves lógicas<a class="headerlink" href="#quadro-de-chaves-logicas" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Tabela</th>
+<th>Chave</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>b3_empresas</td>
+<td>codigo_cvm</td>
+</tr>
+<tr>
+<td>fundamentus_acoes</td>
+<td>ticker</td>
+</tr>
+<tr>
+<td>yfinance_cotacoes</td>
+<td>ticker + data</td>
+</tr>
+<tr>
+<td>minhareceita_empresas</td>
+<td>cnpj</td>
+</tr>
+<tr>
+<td>minhareceita_qsa</td>
+<td>cnpj + sequencia_socio</td>
+</tr>
+<tr>
+<td>minhareceita_regime_tributario</td>
+<td>cnpj + ano</td>
+</tr>
+<tr>
+<td>minhareceita_cnaes_secundarios</td>
+<td>cnpj + codigo_cnae</td>
+</tr>
+</tbody>
+</table>
+<p>Chaves nulas deverão gerar erro.</p>
+<p>Chaves repetidas com conteúdo divergente deverão gerar erro.</p>
+<p>A mensagem deverá apresentar a chave e os registros conflitantes.</p>
+<h1 id="10-tratamento-de-nulos">10. TRATAMENTO DE NULOS<a class="headerlink" href="#10-tratamento-de-nulos" title="Permanent link">&para;</a></h1>
+<p>Nenhuma linha deverá ser eliminada somente por apresentar valores nulos.</p>
+<p>Nenhum valor nulo deverá ser preenchido artificialmente.</p>
+<p>Não converter zero em NULL.</p>
+<p>Não converter NULL em zero.</p>
+<p>Preservar a distinção entre NULL e string vazia.</p>
+<p>Os nulos deverão permanecer na Silver para tratamento nas camadas analíticas, quando houver regra de negócio específica.</p>
+<p>A ausência de elementos em arrays não deverá gerar registros fictícios nas tabelas auxiliares.</p>
+<h1 id="11-relatorio-de-execucao">11. RELATÓRIO DE EXECUÇÃO<a class="headerlink" href="#11-relatorio-de-execucao" title="Permanent link">&para;</a></h1>
+<p>Ao final da execução, apresentar um relatório no terminal para cada tabela.</p>
+<p>O relatório deverá conter:</p>
+<ul>
+<li>Nome da tabela.</li>
+<li>Quantidade de registros de origem.</li>
+<li>Quantidade de registros considerados antes da deduplicação.</li>
+<li>Quantidade de duplicatas integralmente idênticas removidas.</li>
+<li>Quantidade de registros gravados.</li>
+<li>Quantidade de valores nulos por coluna.</li>
+<li>Total de registros processados.</li>
+</ul>
+<p>Para tabelas auxiliares, a contagem de origem deverá representar a quantidade de elementos válidos extraídos dos arrays antes da deduplicação.</p>
+<p>Apresentar também o total geral de registros gravados nas sete tabelas.</p>
+<p>Os números deverão utilizar separador de milhar com ponto.</p>
+<p>A saída deverá utilizar UTF-8.</p>
+<p>Todas as contagens deverão ser obtidas efetivamente durante a execução. Não utilizar valores fixos ou estimativas.</p>
+<h1 id="12-idempotencia">12. IDEMPOTÊNCIA<a class="headerlink" href="#12-idempotencia" title="Permanent link">&para;</a></h1>
+<p>A execução deverá ser idempotente.</p>
+<p>Utilizar CREATE OR REPLACE TABLE para as tabelas Silver, respeitando a estratégia transacional definida nesta especificação.</p>
+<p>Executar novamente o processo com os mesmos dados Bronze deverá produzir o mesmo conteúdo Silver.</p>
+<p>Não deverá haver duplicação de registros entre execuções.</p>
+<p>A camada Bronze deverá permanecer inalterada.</p>
+<h1 id="13-atomicidade-da-execucao">13. ATOMICIDADE DA EXECUÇÃO<a class="headerlink" href="#13-atomicidade-da-execucao" title="Permanent link">&para;</a></h1>
+<p>A atualização das sete tabelas Silver deverá ocorrer de maneira atômica.</p>
+<p>Todas as transformações e validações deverão ser realizadas antes da publicação definitiva das tabelas.</p>
+<p>Regras:</p>
+<ol>
+<li>Validar a existência das tabelas Bronze.</li>
+<li>Executar as transformações.</li>
+<li>Validar conversões, estruturas, duplicidades e chaves.</li>
+<li>Preparar os resultados das sete tabelas.</li>
+<li>Iniciar a transação de publicação.</li>
+<li>Substituir as sete tabelas Silver.</li>
+<li>Confirmar a transação somente após todas as operações concluídas com sucesso.</li>
+<li>Em caso de erro, executar rollback.</li>
+</ol>
+<p>Se qualquer uma das sete tabelas falhar, nenhuma delas poderá ficar parcialmente atualizada.</p>
+<p>A versão anterior das sete tabelas deverá ser preservada integralmente em caso de falha.</p>
+<p>A estratégia deverá ser implementada de acordo com o comportamento transacional efetivamente suportado pelo DuckDB.</p>
+<p>Não assumir que uma operação é transacional sem validar sua compatibilidade.</p>
+<h1 id="14-tratamento-de-erros">14. TRATAMENTO DE ERROS<a class="headerlink" href="#14-tratamento-de-erros" title="Permanent link">&para;</a></h1>
+<p>Antes do processamento, verificar a existência de todas as tabelas Bronze necessárias.</p>
+<p>Se alguma estiver ausente:</p>
+<ul>
+<li>Informar o nome da tabela.</li>
+<li>Orientar a execução da ingestão Bronze.</li>
+<li>Interromper o processo.</li>
+<li>Encerrar com sys.exit(1).</li>
+</ul>
+<p>Também deverão interromper a execução:</p>
+<ul>
+<li>Falhas de conversão.</li>
+<li>Estruturas JSON incompatíveis.</li>
+<li>Propriedades obrigatórias ausentes.</li>
+<li>Chaves lógicas nulas.</li>
+<li>Chaves repetidas com conteúdo divergente.</li>
+<li>Precisão DECIMAL insuficiente.</li>
+<li>Falhas de leitura.</li>
+<li>Falhas de gravação.</li>
+<li>Falhas transacionais.</li>
+</ul>
+<p>Não ocultar exceções.</p>
+<p>Não prosseguir com publicação parcial.</p>
+<p>As mensagens deverão identificar a etapa, tabela e coluna envolvidas sempre que aplicável.</p>
+<h1 id="15-criterios-de-aceite">15. CRITÉRIOS DE ACEITE<a class="headerlink" href="#15-criterios-de-aceite" title="Permanent link">&para;</a></h1>
+<p>A implementação será considerada concluída quando:</p>
+<ol>
+<li>Executar corretamente com uv run python -m pipeline.transformacao.</li>
+<li>Reutilizar a infraestrutura existente de pipeline/db.py.</li>
+<li>Criar o schema refined quando necessário.</li>
+<li>Ler exclusivamente as tabelas Bronze previstas.</li>
+<li>Não alterar os dados Bronze.</li>
+<li>Produzir exatamente as sete tabelas Silver definidas.</li>
+<li>Aplicar os mapeamentos de nomes e tipos estabelecidos.</li>
+<li>Converter datas e números com regras estritas.</li>
+<li>Preservar zeros, nulos e valores originais válidos, exceto a padronização de CNPJ com 14 dígitos (seção 7.8).</li>
+<li>Remover e contabilizar duplicatas integralmente idênticas.</li>
+<li>Interromper a execução diante de chaves lógicas nulas.</li>
+<li>Interromper a execução diante de chaves repetidas com conteúdos divergentes.</li>
+<li>Preservar os valores do Fundamentus em DECIMAL, sem arredondamento ou truncamento.</li>
+<li>Preservar os instantes temporais do YFinance em TIMESTAMP WITH TIME ZONE.</li>
+<li>Normalizar os arrays da Minha Receita nas três tabelas auxiliares.</li>
+<li>Preservar todas as propriedades escalares da Minha Receita.</li>
+<li>Validar a estrutura JSON considerando todos os registros.</li>
+<li>Apresentar relatório com contagens reais.</li>
+<li>Ser idempotente.</li>
+<li>Garantir atomicidade na atualização das sete tabelas.</li>
+<li>Preservar integralmente a versão anterior em caso de falha.</li>
+<li>Encerrar com código de erro quando houver falha de validação.</li>
+</ol>
+<h1 id="16-testes-obrigatorios">16. TESTES OBRIGATÓRIOS<a class="headerlink" href="#16-testes-obrigatorios" title="Permanent link">&para;</a></h1>
+<p>Criar ou executar testes para validar, no mínimo:</p>
+<ul>
+<li>Conversão correta de datas B3.</li>
+<li>Preservação de 31/12/9999.</li>
+<li>Preservação de identificadores textuais.</li>
+<li>Padronização de CNPJ com 14 dígitos (zeros à esquerda), preservação de NULL e string vazia, e erro para CNPJ não numérico ou com mais de 14 dígitos.</li>
+<li>Conversão de números brasileiros do Fundamentus.</li>
+<li>Conversão de percentuais sem divisão por 100.</li>
+<li>Preservação de números negativos e zeros.</li>
+<li>Cálculo dinâmico de precisão DECIMAL.</li>
+<li>Falha de conversão diante de valores inválidos.</li>
+<li>Limpeza restrita da coluna Dív.Líq/ Patrim.</li>
+<li>Conversão de datas com fuso horário do YFinance.</li>
+<li>Deduplicação de linhas integralmente idênticas.</li>
+<li>Detecção de chaves divergentes.</li>
+<li>Detecção de chaves nulas.</li>
+<li>Extração dos arrays da Minha Receita.</li>
+<li>Preservação da sequência original do QSA.</li>
+<li>Tratamento de arrays nulos e vazios.</li>
+<li>Preservação de propriedades escalares nulas.</li>
+<li>Rollback quando qualquer tabela falhar.</li>
+<li>Idempotência em duas execuções consecutivas.</li>
+</ul>
+<p>Os testes não deverão alterar os dados reais da Bronze.</p>
+<h1 id="17-procedimento-de-implementacao">17. PROCEDIMENTO DE IMPLEMENTAÇÃO<a class="headerlink" href="#17-procedimento-de-implementacao" title="Permanent link">&para;</a></h1>
+<p>Siga esta ordem:</p>
+<h3 id="etapa-1-inspecao">Etapa 1 — Inspeção<a class="headerlink" href="#etapa-1-inspecao" title="Permanent link">&para;</a></h3>
+<p>Inspecionar o projeto, o banco, o módulo db.py, as tabelas Bronze e os dados reais.</p>
+<h3 id="etapa-2-diagnostico">Etapa 2 — Diagnóstico<a class="headerlink" href="#etapa-2-diagnostico" title="Permanent link">&para;</a></h3>
+<p>Apresentar um resumo contendo:</p>
+<ul>
+<li>Estrutura encontrada.</li>
+<li>Funções disponíveis.</li>
+<li>Dependências existentes.</li>
+<li>Tipos das tabelas Bronze.</li>
+<li>Estrutura completa da Minha Receita.</li>
+<li>Compatibilidade das operações transacionais.</li>
+<li>Pendências que possam impedir a implementação.</li>
+</ul>
+<h3 id="etapa-3-plano-de-implementacao">Etapa 3 — Plano de implementação<a class="headerlink" href="#etapa-3-plano-de-implementacao" title="Permanent link">&para;</a></h3>
+<p>Apresentar um plano objetivo de como cada tabela será transformada e validada.</p>
+<p>Se houver decisão funcional ainda não definida, solicitar confirmação antes de implementá-la.</p>
+<h3 id="etapa-4-implementacao">Etapa 4 — Implementação<a class="headerlink" href="#etapa-4-implementacao" title="Permanent link">&para;</a></h3>
+<p>Implementar pipeline/transformacao.py respeitando integralmente esta especificação.</p>
+<p>Não alterar arquivos fora do escopo sem necessidade justificada.</p>
+<h3 id="etapa-5-testes">Etapa 5 — Testes<a class="headerlink" href="#etapa-5-testes" title="Permanent link">&para;</a></h3>
+<p>Executar os testes previstos e corrigir eventuais falhas.</p>
+<h3 id="etapa-6-validacao-final">Etapa 6 — Validação final<a class="headerlink" href="#etapa-6-validacao-final" title="Permanent link">&para;</a></h3>
+<p>Executar o pipeline e verificar:</p>
+<ul>
+<li>Quantidade de registros.</li>
+<li>Tipos das colunas.</li>
+<li>Chaves.</li>
+<li>Duplicidades.</li>
+<li>Nulos.</li>
+<li>Integridade das sete tabelas.</li>
+<li>Idempotência.</li>
+<li>Atomicidade.</li>
+</ul>
+<h3 id="etapa-7-entrega">Etapa 7 — Entrega<a class="headerlink" href="#etapa-7-entrega" title="Permanent link">&para;</a></h3>
+<p>Apresentar:</p>
+<ul>
+<li>Arquivos criados ou alterados.</li>
+<li>Resumo das implementações.</li>
+<li>Resultado dos testes.</li>
+<li>Resultado da execução.</li>
+<li>Quantidades de registros processados.</li>
+<li>Pendências ou limitações identificadas.</li>
+</ul>
+<h1 id="18-regra-final">18. REGRA FINAL<a class="headerlink" href="#18-regra-final" title="Permanent link">&para;</a></h1>
+<p>Não considere a tarefa concluída apenas porque o código executou sem apresentar exceção.</p>
+<p>A implementação somente estará concluída quando todos os critérios de aceite forem verificados.</p>
+<p>A especificação é a fonte da verdade. Se houver conflito entre uma implementação sugerida e esta especificação, prevalece esta especificação.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>

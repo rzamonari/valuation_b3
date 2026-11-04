@@ -1,0 +1,1015 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Pipeline de indicadores fundamentalistas de ações da B3 (Bronze → Silver → Gold) sobre DuckDB, com painel em Streamlit.">
+      
+      
+      
+      
+        <link rel="prev" href="../refined_transformacao/">
+      
+      
+        <link rel="next" href="../marts_sql_indicadores/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Gold — agregação e materialização - B3 Valuation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#especificaaao-tecnica-camada-gold-marts" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href="../.." title="B3 Valuation" class="md-header__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            B3 Valuation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Gold — agregação e materialização
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema claro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Tema claro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema escuro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Tema escuro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="B3 Valuation" class="md-nav__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    B3 Valuation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../uso/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instalação e uso
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../arquitetura/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referência da API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Marts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Marts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/marts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicadores e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/rankings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rankings e recomendação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decisões
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisoes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../raw_ingestao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bronze — ingestão
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../refined_transformacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Silver — transformação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — agregação e materialização
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — agregação e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-de-indicadores-fundamentalistas-arquitetura-medallion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline de Indicadores Fundamentalistas — Arquitetura Medallion
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts_sql_indicadores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — indicadores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts_sql_rank/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — rankings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboard_apresentacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apresentação — painel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testes_codigo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-de-indicadores-fundamentalistas-arquitetura-medallion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline de Indicadores Fundamentalistas — Arquitetura Medallion
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="especificaaao-tecnica-camada-gold-marts">ESPECIFICAà‡àƒO TÉCNICA — CAMADA GOLD (MARTS)<a class="headerlink" href="#especificaaao-tecnica-camada-gold-marts" title="Permanent link">&para;</a></h1>
+<h2 id="pipeline-de-indicadores-fundamentalistas-arquitetura-medallion">Pipeline de Indicadores Fundamentalistas — Arquitetura Medallion<a class="headerlink" href="#pipeline-de-indicadores-fundamentalistas-arquitetura-medallion" title="Permanent link">&para;</a></h2>
+<p><strong>Versão:</strong> 1.0<br />
+<strong>Linguagem:</strong> Python 3.13 / SQL DuckDB<br />
+<strong>Gerenciador de dependências:</strong> uv<br />
+<strong>Banco de dados:</strong> <code>fundamentalistas.duckdb</code><br />
+<strong>Camada:</strong> Gold (Marts)<br />
+<strong>Diretório obrigatório dos arquivos SQL:</strong> <code>sql/marts/</code></p>
+<hr />
+<h1 id="1-papel-e-diretrizes-do-desenvolvimento">1. PAPEL E DIRETRIZES DO DESENVOLVIMENTO<a class="headerlink" href="#1-papel-e-diretrizes-do-desenvolvimento" title="Permanent link">&para;</a></h1>
+<p>Atue como consultor especialista e perito em Engenharia de Dados, com mais de 20 anos de experiência em arquitetura de dados, modelagem dimensional, SQL analítico, DuckDB e desenvolvimento orientado por especificações (Spec-Driven Development).</p>
+<p>O desenvolvimento deverá seguir rigorosamente esta especificação.</p>
+<p>A especificação é a fonte única da verdade do projeto. O código SQL deverá ser consequência direta das regras aqui documentadas.</p>
+<p>Não invente regras de negócio, fórmulas financeiras, fontes de dados, relacionamentos ou premissas que não estejam documentados.</p>
+<p>Quando uma informação indispensável não estiver definida, não presuma uma resposta. Registre a pendência e solicite confirmação antes de implementar a funcionalidade afetada.</p>
+<h1 id="ajuste-da-spec-materializacao-dos-resultados-na-camada-gold">AJUSTE DA SPEC — MATERIALIZAÇÃO DOS RESULTADOS NA CAMADA GOLD<a class="headerlink" href="#ajuste-da-spec-materializacao-dos-resultados-na-camada-gold" title="Permanent link">&para;</a></h1>
+<h2 id="1-objetivo-adicional">1. Objetivo adicional<a class="headerlink" href="#1-objetivo-adicional" title="Permanent link">&para;</a></h2>
+<p>Além da análise, revisão e validação das consultas SQL existentes em <code>sql/marts/</code>, o trabalho deverá contemplar a implementação da materialização de seus resultados em tabelas físicas no banco de dados <code>fundamentalistas.duckdb</code>, utilizando o schema <code>marts</code>.</p>
+<p>O objetivo é garantir que os resultados produzidos pelas consultas SQL estejam efetivamente disponíveis e atualizados como tabelas persistentes da camada Gold.</p>
+<p>O escopo permanece restrito às consultas SQL existentes em <code>sql/marts/</code>.</p>
+<h2 id="2-materializacao-das-consultas">2. Materialização das consultas<a class="headerlink" href="#2-materializacao-das-consultas" title="Permanent link">&para;</a></h2>
+<p>Para cada arquivo SQL encontrado em <code>sql/marts/</code>, deverá ser avaliada e implementada a correspondente materialização de seu resultado em uma tabela física no schema <code>marts</code>.</p>
+<p>A implementação deverá:</p>
+<ol>
+<li>Identificar a consulta SQL existente.</li>
+<li>Compreender sua finalidade e seu resultado.</li>
+<li>Identificar as colunas retornadas e seus respectivos tipos.</li>
+<li>Identificar a granularidade e a chave lógica do resultado.</li>
+<li>Validar a consulta no DuckDB.</li>
+<li>Definir o nome da tabela de destino, respeitando as convenções existentes no projeto.</li>
+<li>Criar a tabela física correspondente no schema <code>marts</code>.</li>
+<li>Carregar os resultados produzidos pela consulta.</li>
+<li>Validar a consistência entre o resultado da consulta original e os registros materializados.</li>
+</ol>
+<p>Não criar tabelas para funcionalidades ou consultas que não existam no inventário de <code>sql/marts/</code>.</p>
+<h2 id="3-banco-de-dados-e-schema-de-destino">3. Banco de dados e schema de destino<a class="headerlink" href="#3-banco-de-dados-e-schema-de-destino" title="Permanent link">&para;</a></h2>
+<p>Banco de dados:</p>
+<p><code>fundamentalistas.duckdb</code></p>
+<p>Schema de destino:</p>
+<p><code>marts</code></p>
+<p>Todas as tabelas materializadas deverão pertencer ao schema <code>marts</code>.</p>
+<p>Antes de implementar, verificar se o schema já existe e respeitar a estrutura e as convenções atuais do projeto.</p>
+<p>Caso o schema não exista, sua criação deverá ser realizada de maneira controlada, sem modificar os schemas <code>raw</code> e <code>refined</code>.</p>
+<h2 id="4-estrategia-de-atualizacao-das-tabelas">4. Estratégia de atualização das tabelas<a class="headerlink" href="#4-estrategia-de-atualizacao-das-tabelas" title="Permanent link">&para;</a></h2>
+<p>As tabelas Gold deverão refletir os resultados atuais das respectivas consultas SQL.</p>
+<p>A estratégia de atualização deverá evitar registros duplicados, dados obsoletos e inconsistências entre execuções.</p>
+<p>Para consultas que representam uma fotografia atual dos indicadores, rankings, recomendações ou cards, avaliar a substituição integral dos dados da tabela de destino a cada atualização.</p>
+<p>Para consultas que representam séries históricas, como cotações, respeitar a granularidade temporal e a regra de atualização efetivamente definida pela consulta existente.</p>
+<p>Não presumir que todas as tabelas devam utilizar a mesma estratégia de atualização.</p>
+<p>A estratégia deverá ser definida considerando a finalidade, a granularidade e a natureza dos dados de cada consulta.</p>
+<h2 id="5-integridade-e-consistencia-da-materializacao">5. Integridade e consistência da materialização<a class="headerlink" href="#5-integridade-e-consistencia-da-materializacao" title="Permanent link">&para;</a></h2>
+<p>Após a carga, executar validações para garantir que:</p>
+<ul>
+<li>A quantidade de registros materializados corresponda à quantidade de registros retornados pela consulta de origem.</li>
+<li>As colunas da tabela de destino correspondam às colunas retornadas pelo SQL.</li>
+<li>Os tipos de dados sejam compatíveis.</li>
+<li>Não existam duplicações indevidas.</li>
+<li>Os valores materializados correspondam aos valores produzidos pela consulta.</li>
+<li>Os valores nulos sejam preservados conforme o resultado original.</li>
+<li>A granularidade da tabela seja respeitada.</li>
+<li>Uma nova execução não provoque duplicação de registros.</li>
+</ul>
+<p>A validação deverá considerar a chave lógica de cada resultado, quando identificável.</p>
+<h2 id="6-seguranca-e-atomicidade-da-atualizacao">6. Segurança e atomicidade da atualização<a class="headerlink" href="#6-seguranca-e-atomicidade-da-atualizacao" title="Permanent link">&para;</a></h2>
+<p>A atualização das tabelas deverá ser realizada de forma controlada.</p>
+<p>Sempre que tecnicamente aplicável, utilizar transações para garantir que uma falha durante a atualização não deixe a tabela de destino em estado inconsistente.</p>
+<p>Não remover os dados anteriores antes de garantir que a consulta de origem foi executada e validada com sucesso.</p>
+<p>Em caso de falha:</p>
+<ul>
+<li>Preservar os dados anteriormente materializados sempre que possível.</li>
+<li>Registrar o erro.</li>
+<li>Identificar a consulta responsável.</li>
+<li>Não declarar a atualização como concluída.</li>
+</ul>
+<h2 id="7-integracao-com-a-estrutura-existente-do-projeto">7. Integração com a estrutura existente do projeto<a class="headerlink" href="#7-integracao-com-a-estrutura-existente-do-projeto" title="Permanent link">&para;</a></h2>
+<p>Antes de implementar o mecanismo de materialização, analisar a estrutura atual do projeto para identificar:</p>
+<ul>
+<li>Como o DuckDB é inicializado.</li>
+<li>Como o banco <code>fundamentalistas.duckdb</code> é acessado.</li>
+<li>Como os arquivos SQL são executados.</li>
+<li>Se já existe algum mecanismo de atualização de tabelas.</li>
+<li>Se existe uma convenção para nomes de tabelas Gold.</li>
+<li>Se existe um fluxo de execução ou orquestração das consultas.</li>
+</ul>
+<p>Reutilizar os mecanismos existentes sempre que possível.</p>
+<p>Não inventar APIs, funções, módulos ou padrões de execução sem antes verificar o que já existe no projeto.</p>
+<p>A implementação deverá manter a arquitetura atual e evitar duplicação desnecessária de código.</p>
+<h2 id="8-restricoes">8. Restrições<a class="headerlink" href="#8-restricoes" title="Permanent link">&para;</a></h2>
+<p>A materialização deverá utilizar exclusivamente os resultados das consultas SQL existentes em <code>sql/marts/</code>.</p>
+<p>Não criar novas regras de negócio.</p>
+<p>Não adicionar cálculos ou indicadores que não estejam nas consultas existentes.</p>
+<p>Não alterar os dados das tabelas <code>raw</code> e <code>refined</code>.</p>
+<p>Não modificar os processos de ingestão ou transformação.</p>
+<p>Não criar tabelas fora do schema <code>marts</code> para atender a esta etapa.</p>
+<p>Não substituir consultas existentes por novas implementações sem justificativa e autorização.</p>
+<h2 id="9-criterios-adicionais-de-aceite">9. Critérios adicionais de aceite<a class="headerlink" href="#9-criterios-adicionais-de-aceite" title="Permanent link">&para;</a></h2>
+<p>A etapa de materialização será considerada concluída quando:</p>
+<ol>
+<li>Todas as consultas existentes em <code>sql/marts/</code> tiverem sido inventariadas.</li>
+<li>Todas as consultas aplicáveis tiverem sido validadas.</li>
+<li>Cada consulta elegível possuir sua correspondente tabela física no schema <code>marts</code>.</li>
+<li>Os resultados tiverem sido efetivamente carregados no banco <code>fundamentalistas.duckdb</code>.</li>
+<li>A quantidade de registros e os valores materializados tiverem sido validados.</li>
+<li>A estratégia de atualização de cada tabela estiver documentada.</li>
+<li>A execução repetida não provocar duplicações indevidas.</li>
+<li>Falhas de execução não comprometerem os dados anteriormente materializados.</li>
+<li>Os schemas <code>raw</code> e <code>refined</code> permanecerem inalterados.</li>
+</ol>
+<p><strong>Resultado esperado:</strong> o banco <code>fundamentalistas.duckdb</code> deverá possuir uma camada Gold (<code>marts</code>) materializada, composta pelas tabelas correspondentes às consultas SQL efetivamente existentes em <code>sql/marts/</code>, com dados consistentes e atualizáveis.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>

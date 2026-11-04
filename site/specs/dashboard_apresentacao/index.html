@@ -1,0 +1,1597 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Pipeline de indicadores fundamentalistas de ações da B3 (Bronze → Silver → Gold) sobre DuckDB, com painel em Streamlit.">
+      
+      
+      
+      
+        <link rel="prev" href="../marts_sql_rank/">
+      
+      
+        <link rel="next" href="../testes_codigo/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Apresentação — painel - B3 Valuation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#especificacao-painel-de-recomendacoes-dashboard" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href="../.." title="B3 Valuation" class="md-header__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            B3 Valuation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Apresentação — painel
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema claro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Tema claro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema escuro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Tema escuro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="B3 Valuation" class="md-nav__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    B3 Valuation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../uso/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instalação e uso
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../arquitetura/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referência da API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Marts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Marts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/marts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicadores e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/rankings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rankings e recomendação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decisões
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisoes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../raw_ingestao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bronze — ingestão
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../refined_transformacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Silver — transformação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts.agregacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — agregação e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts_sql_indicadores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — indicadores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts_sql_rank/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — rankings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apresentação — painel
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apresentação — painel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-de-indicadores-fundamentalistas-b3-camada-de-apresentacao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline de Indicadores Fundamentalistas B3 — Camada de Apresentação
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contexto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CONTEXTO
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        STACK
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#o-que-ja-existe-use-nao-reimplemente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        O QUE JÁ EXISTE (use, não reimplemente)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artefatos-a-produzir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ARTEFATOS A PRODUZIR
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testes_codigo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-de-indicadores-fundamentalistas-b3-camada-de-apresentacao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline de Indicadores Fundamentalistas B3 — Camada de Apresentação
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contexto" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CONTEXTO
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        STACK
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#o-que-ja-existe-use-nao-reimplemente" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        O QUE JÁ EXISTE (use, não reimplemente)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#artefatos-a-produzir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ARTEFATOS A PRODUZIR
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="especificacao-painel-de-recomendacoes-dashboard">ESPECIFICAÇÃO — PAINEL DE RECOMENDAÇÕES (DASHBOARD)<a class="headerlink" href="#especificacao-painel-de-recomendacoes-dashboard" title="Permanent link">&para;</a></h1>
+<h2 id="pipeline-de-indicadores-fundamentalistas-b3-camada-de-apresentacao">Pipeline de Indicadores Fundamentalistas B3 — Camada de Apresentação<a class="headerlink" href="#pipeline-de-indicadores-fundamentalistas-b3-camada-de-apresentacao" title="Permanent link">&para;</a></h2>
+<p><strong>Versão:</strong> 1.5
+<strong>Data de referência dos números desta spec:</strong> 2026-11-02 (conferidos nas tabelas <code>marts</code> em 2026-11-03)
+<strong>Specs relacionadas:</strong> <code>marts_agregacao_indicadores.md</code>, <code>marts_agregacao_rank.md</code>,
+<code>marts.agregacao.md</code> (materialização da camada Gold)</p>
+<p><strong>Histórico</strong>
+- 1.0 (2026-11-02): versão inicial.
+- 1.1 (2026-11-02): removidas a faixa "Onde estão as empresas" (mapa, ranking de estados, clique
+  no mapa como filtro, filtro de UF da barra lateral, mart <code>marts_painel_empresas_uf.sql</code> e
+  <code>assets/br_uf.geojson</code>) e o
+  "Mapa de calor dos rankings"; seções renumeradas; aparência passa a ser o Modo Escuro
+  Profissional (item 8) com paleta ajustada para contraste em fundo escuro; pendências P1 a P4
+  respondidas.
+- 1.2 (2026-11-02): título passa a "🔭 B3 Valuation · Visões de Investimentos"; data de
+  referência lida de <code>refined.fundamentus_acoes</code> como data no fuso de Brasília e exibida como
+  "Dados do Fundamentus de dd/mm/aaaa"; novo texto do aviso, com a ressalva em negrito; coluna UF
+  removida do ranking consolidado.
+- 1.3 (2026-11-02): ícone do título passa a 📈 (gráfico de alta); rótulo da data volta a
+  "Dados de dd/mm/aaaa" (a data continua vindo de <code>refined.fundamentus_acoes</code>).
+- 1.4 (2026-11-03): removida a faixa "Panorama dos sinais" (gráficos "Força dos sinais" e
+  "Recomendações por segmento de listagem" e os marts <code>marts_painel_distribuicao_saldo.sql</code> e
+  <code>marts_painel_recomendacao_segmento.sql</code>, que só ela usava); faixas renumeradas de 1 a 5.
+- 1.5 (2026-11-03): o painel passa a ler as tabelas físicas do schema <code>marts</code> de
+  <code>fundamentalistas.duckdb</code>, materializadas por <code>pipeline/materializacao.py</code>, em vez de executar
+  o texto dos <code>.sql</code> de <code>sql/marts/</code>. Revisados: "O que já existe", itens 1, 2, 3 e 7, critérios
+  de aceite e entrega. Novas regras: a única SQL do painel é <code>SELECT * FROM marts.&lt;tabela&gt;</code>;
+  tabela ausente orienta a rodar a materialização; ordem de exibição sempre explícita no pandas.</p>
+<hr />
+<h2 id="contexto">CONTEXTO<a class="headerlink" href="#contexto" title="Permanent link">&para;</a></h2>
+<p>Estou construindo um pipeline de dados em Python sobre indicadores fundamentalistas de ações da
+B3 (Fundamentus, B3, Minha Receita e YFinance), em arquitetura Medallion (<code>raw</code> → <code>refined</code> →
+<code>marts</code>). As consultas da camada Gold ficam em <code>sql/marts/</code> e são materializadas como tabelas no
+schema <code>marts</code> do mesmo banco. Trabalho com spec-driven development: esta spec é a fonte da verdade e o
+código é consequência dela. Não acrescente requisito que não esteja escrito aqui. Se algo estiver
+ambíguo, pergunte antes de escrever código.</p>
+<p>O público do painel é o <strong>investidor pessoa física</strong>, inclusive iniciante. O painel deve responder,
+nesta ordem, às perguntas que ele faz ao abrir a ferramenta:</p>
+<ol>
+<li>Como está o mercado hoje? (cartões e termômetro)</li>
+<li>Quais ações aparecem melhor e por quê? (ranking de oportunidades)</li>
+<li>Quais ações combinam qualidade e preço justo? (valor × qualidade)</li>
+<li>Quem lidera cada estratégia? (rankings temáticos)</li>
+<li>Como está uma ação específica? (ficha da ação)</li>
+</ol>
+<h2 id="stack">STACK<a class="headerlink" href="#stack" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Python 3.13, uv, DuckDB (<code>fundamentalistas.duckdb</code> na raiz do projeto).</li>
+<li><code>streamlit</code> e <code>plotly</code> (<code>plotly.express</code> e, onde indicado, <code>plotly.graph_objects</code>), já
+  declarados no <code>pyproject.toml</code>. Não adicionar outras bibliotecas de gráfico ou de UI.</li>
+</ul>
+<h2 id="o-que-ja-existe-use-nao-reimplemente">O QUE JÁ EXISTE (use, não reimplemente)<a class="headerlink" href="#o-que-ja-existe-use-nao-reimplemente" title="Permanent link">&para;</a></h2>
+<p>Cada arquivo <code>sql/marts/&lt;nome&gt;.sql</code> é materializado, por <code>uv run python -m pipeline.materializacao</code>,
+na tabela física <code>marts.&lt;nome&gt;</code> de <code>fundamentalistas.duckdb</code>. O nome da tabela é o nome do arquivo
+sem extensão. A materialização substitui todas as tabelas por inteiro, numa única transação, e
+valida cada uma contra a consulta de origem antes de confirmar (<code>sql/marts/README.md</code> §12).
+O <code>.sql</code> continua sendo a fonte da verdade da regra de negócio e a tabela é o que o painel lê.
+As tabelas a usar:</p>
+<table>
+<thead>
+<tr>
+<th>Uso no painel</th>
+<th>Tabela (<code>marts.</code>)</th>
+<th>Grão</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Cartão 1</td>
+<td><code>marts_card_01_acoes_analisadas</code></td>
+<td>1 linha, coluna <code>quantidade</code></td>
+</tr>
+<tr>
+<td>Cartão 2</td>
+<td><code>marts_card_02_acoes_compra</code></td>
+<td>1 linha, coluna <code>quantidade</code></td>
+</tr>
+<tr>
+<td>Cartão 3</td>
+<td><code>marts_card_03_acoes_manter</code></td>
+<td>1 linha, coluna <code>quantidade</code></td>
+</tr>
+<tr>
+<td>Cartão 4</td>
+<td><code>marts_card_04_acoes_venda</code></td>
+<td>1 linha, coluna <code>quantidade</code></td>
+</tr>
+<tr>
+<td>Cartão 5</td>
+<td><code>marts_card_02_acoes_semindicacao</code></td>
+<td>1 linha, coluna <code>quantidade</code></td>
+</tr>
+<tr>
+<td>Termômetro</td>
+<td><code>marts_card_05_termometro_mercado</code></td>
+<td>1 linha</td>
+</tr>
+<tr>
+<td>Data de referência</td>
+<td><code>marts_painel_data_referencia</code></td>
+<td>1 linha</td>
+</tr>
+<tr>
+<td>Valor × qualidade, ficha</td>
+<td><code>marts_painel_indicadores</code></td>
+<td>1 linha por ticker analisado</td>
+</tr>
+<tr>
+<td>Ranking de oportunidades, filtros</td>
+<td><code>marts_50_rank_recomendacoes</code></td>
+<td>1 linha por ticker negociado</td>
+</tr>
+<tr>
+<td>Rankings temáticos</td>
+<td><code>marts_01_rank_valor</code> … <code>marts_10_rank_rentabilidade</code></td>
+<td>1 linha por ticker elegível</td>
+</tr>
+<tr>
+<td>Ficha: risco e retorno</td>
+<td><code>marts_retorno_total_risco</code></td>
+<td>1 linha por ticker</td>
+</tr>
+<tr>
+<td>Ficha: cotações</td>
+<td><code>marts_cotacao</code></td>
+<td>1 linha por (ticker, data)</td>
+</tr>
+</tbody>
+</table>
+<p>Ordem de execução do pipeline antes de abrir o painel:
+<code>pipeline.ingestao</code> → <code>pipeline.transformacao</code> → <code>pipeline.materializacao</code>.
+O painel mostra o que foi materializado por último. Se a Silver mudar e a materialização não for
+executada, ele continua mostrando a fotografia anterior, que é coerente consigo mesma (inclusive a
+data de referência, que também vem de uma tabela <code>marts</code>).</p>
+<p>A conexão já existe em <code>pipeline/db.py</code> (<code>conectar()</code>), mas abre o banco para escrita. O painel
+<strong>não</strong> a usa (ver item 1). O painel também não importa <code>pipeline/materializacao.py</code> e nunca
+dispara a materialização. Motivo: o painel é somente leitura.</p>
+<h2 id="artefatos-a-produzir">ARTEFATOS A PRODUZIR<a class="headerlink" href="#artefatos-a-produzir" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>painel.py</code>, na raiz: leitura, formatação e funções de gráfico. <strong>Não importa streamlit.</strong></li>
+<li><code>app.py</code>, na raiz: a página. Executável com:
+  <code>uv run streamlit run app.py</code></li>
+<li><code>.streamlit/config.toml</code>: tema do painel (item 8).</li>
+<li>Os novos marts listados no item 3, em <code>sql/marts/</code> (já entregues na v1.0 e materializados pela
+  v1.5), seguindo as regras da spec <code>marts_agregacao_indicadores.md</code> (somente leitura, comentário
+  de cabeçalho, grão documentado). Todo mart novo precisa ter a chave lógica declarada em
+  <code>pipeline/materializacao.py</code> (<code>MARTS</code>); sem isso a materialização recusa o arquivo.</li>
+</ul>
+<hr />
+<h1 id="spec">SPEC<a class="headerlink" href="#spec" title="Permanent link">&para;</a></h1>
+<h2 id="1-leitura-painelpy">1. LEITURA (<code>painel.py</code>)<a class="headerlink" href="#1-leitura-painelpy" title="Permanent link">&para;</a></h2>
+<p><code>ler(nomes) -&gt; dict[str, DataFrame]</code>. Para cada nome, executa <code>SELECT * FROM marts."&lt;nome&gt;"</code>
+(identificador entre aspas, vindo só das constantes de <code>painel.py</code>) e devolve a tabela inteira, sem
+seleção de colunas, filtro, junção ou <code>ORDER BY</code>. Nenhuma outra SQL, com uma única exceção
+(<code>ler_cotacao</code>, abaixo).
+Motivo: o número já foi calculado e validado na materialização; ler a tabela pronta evita
+reexecutar os rankings a cada abertura e garante que todas as faixas mostram a mesma fotografia.</p>
+<ul>
+<li><code>painel.py</code> não lê os arquivos de <code>sql/marts/</code>.
+  Motivo: há uma única fonte em tempo de exibição, a tabela.</li>
+<li>Conexão com <code>duckdb.connect("fundamentalistas.duckdb", read_only=True)</code>, aberta e fechada
+  dentro de cada leitura.
+  Motivo: conexão aberta segura o arquivo, e o pipeline (ingestão, transformação e
+  materialização) não consegue gravar com o painel de pé.</li>
+<li>Se o banco estiver bloqueado por outro processo (por exemplo, a DuckDB UI do <code>ui.py</code> ou a
+  materialização em andamento), mostrar erro claro (item 7), sem traceback.</li>
+<li><code>ler_cotacao(ticker) -&gt; DataFrame</code>: executa
+  <code>SELECT * FROM marts."marts_cotacao" WHERE ticker = ?</code>, com parâmetro vinculado.
+  Motivo: a tabela tem cerca de 1,9 milhão de linhas; filtrar linhas é permitido (item 2) e
+  fazê-lo no banco evita carregar tudo em memória.</li>
+<li><code>tabelas_faltando() -&gt; list[str]</code>: devolve, como <code>marts.&lt;nome&gt;</code>, as tabelas obrigatórias (todas
+  as da lista "O QUE JÁ EXISTE") que não existem no banco. Se o arquivo <code>fundamentalistas.duckdb</code>
+  não existir, devolve só o nome dele. A consulta usa o catálogo <code>duckdb_tables()</code> na mesma
+  conexão somente leitura.</li>
+<li><strong>Ordem das linhas.</strong> Tabela não garante ordem de leitura. Toda exibição que depende de ordem
+  ordena explicitamente no pandas (permitido pelo item 2):</li>
+<li>ranking consolidado e lista da ficha por <code>posicao</code>, <code>ticker</code>;</li>
+<li>rankings temáticos por <code>rank</code>, <code>ticker</code>;</li>
+<li>cotação por <code>data</code>.
+  Os cartões, o termômetro e a data de referência têm uma linha só.</li>
+</ul>
+<h2 id="2-nenhum-calculo">2. NENHUM CÁLCULO<a class="headerlink" href="#2-nenhum-calculo" title="Permanent link">&para;</a></h2>
+<p>Proibido em <code>painel.py</code> e <code>app.py</code>: <code>groupby</code>, <code>sum</code>, <code>mean</code>, <code>count</code>, <code>value_counts</code>, <code>merge</code>,
+<code>join</code>, <code>pivot</code>, <code>crosstab</code>, <code>px.histogram</code> (agrega no gráfico), <code>nbins</code>, e qualquer conta entre
+colunas.</p>
+<p>Permitido: ordenar, filtrar linhas, <code>head(n)</code>, renomear coluna, formatar texto e mapear valores
+categóricos para cor, ícone ou rótulo por dicionário constante (item 4.1).</p>
+<p>Motivo: número novo na tela exige um <code>.sql</code> novo em <code>sql/marts/</code>, declarado em
+<code>pipeline/materializacao.py</code> e materializado em <code>marts</code>. Se faltar algum número, pare e diga qual
+mart está faltando.</p>
+<h2 id="3-novos-marts-necessarios">3. NOVOS MARTS NECESSÁRIOS<a class="headerlink" href="#3-novos-marts-necessarios" title="Permanent link">&para;</a></h2>
+<p>Já criados na v1.0. A partir da v1.5, chegam ao painel como as tabelas <code>marts.&lt;nome&gt;</code>
+correspondentes. Mantidos aqui como definição:</p>
+<table>
+<thead>
+<tr>
+<th>Arquivo</th>
+<th>Conteúdo</th>
+<th>Grão</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>marts_card_05_termometro_mercado.sql</code></td>
+<td><code>recomendacao</code> predominante entre as ações analisadas, <code>quantidade</code> dela, <code>total</code> analisado e <code>percentual</code> (0–100)</td>
+<td>1 linha</td>
+</tr>
+<tr>
+<td><code>marts_painel_data_referencia.sql</code></td>
+<td>data da fotografia do Fundamentus: <code>MAX(_timestamp_ingestao)</code> de <code>refined.fundamentus_acoes</code> (única coluna de data da tabela), convertido para o fuso <code>America/Sao_Paulo</code> e truncado para <code>DATE</code>, como <code>data_referencia</code>. Motivo: a data exibida não pode depender do fuso da máquina</td>
+<td>1 linha</td>
+</tr>
+<tr>
+<td><code>marts_painel_indicadores.sql</code></td>
+<td>por ticker analisado: <code>ticker</code>, <code>empresa</code>, <code>segmento</code>, <code>uf</code>, <code>recomendacao</code>, <code>saldo</code>, <code>liquidez_2_meses</code>, <code>cotacao</code>, <code>roic</code>, <code>roe</code>, <code>enterprise_value_ebit</code>, <code>preco_lucro</code>, <code>earnings_yield</code>, <code>preco_valor_patrimonial</code>, <code>dividend_yield</code>, <code>payout</code>, <code>margem_ebit</code>, <code>margem_liquida</code>, <code>divida_liquida_patrimonio</code>, <code>crescimento_receita_5_anos</code></td>
+<td>1 linha por ticker</td>
+</tr>
+</tbody>
+</table>
+<p>Regras:</p>
+<ul>
+<li>Todos partem da mesma consulta-base e da mesma regra de recomendação de
+  <code>marts_50_rank_recomendacoes.sql</code> (universo: ações analisadas, <code>liquidez_2_meses &gt; 0</code>). O mart de
+  recomendações já repete os rankings internamente; seguir o mesmo padrão e documentar no
+  cabeçalho que qualquer mudança na regra deve ser replicada.</li>
+<li>Valores do Fundamentus preservados, na escala original (percentuais 0–100).</li>
+<li>Termômetro: empate na quantidade máxima → <code>Manter</code> (P1, respondida).</li>
+</ul>
+<h2 id="4-layout-apppy-de-cima-para-baixo-layoutwide">4. LAYOUT (<code>app.py</code>) — de cima para baixo, <code>layout="wide"</code><a class="headerlink" href="#4-layout-apppy-de-cima-para-baixo-layoutwide" title="Permanent link">&para;</a></h2>
+<p>Cada seção começa com um título curto e uma linha de subtítulo em linguagem de investidor
+(exemplo: "Quanto maior o saldo, mais rankings a ação lidera"). Cada gráfico tem título numerado
+pela seção ("3 · Qualidade versus preço"), eixos com unidade e tooltip (<code>hover</code>) em português,
+formatado pelas funções do item 5. Usar <code>width="stretch"</code> (<code>use_container_width</code> está
+descontinuado).</p>
+<h3 id="41-linguagem-visual-de-recomendacao">4.1 Linguagem visual de recomendação<a class="headerlink" href="#41-linguagem-visual-de-recomendacao" title="Permanent link">&para;</a></h3>
+<p>Dicionário constante, usado em <strong>todos</strong> os cartões, gráficos, tabelas e badges:</p>
+<table>
+<thead>
+<tr>
+<th>Recomendação</th>
+<th>Ícone</th>
+<th>Rótulo</th>
+<th>Cor (sobre fundo escuro, item 8)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compra</td>
+<td>🟢</td>
+<td>Compra / Oportunidade</td>
+<td>verde <code>#22C55E</code></td>
+</tr>
+<tr>
+<td>Manter</td>
+<td>🟡</td>
+<td>Manter / Neutro</td>
+<td>amarelo <code>#FACC15</code></td>
+</tr>
+<tr>
+<td>Venda</td>
+<td>🔴</td>
+<td>Venda / Risco</td>
+<td>vermelho <code>#F87171</code></td>
+</tr>
+<tr>
+<td>Sem indicação</td>
+<td>⚪</td>
+<td>Sem indicação</td>
+<td>cinza <code>#94A3B8</code></td>
+</tr>
+</tbody>
+</table>
+<p>Motivo das cores: os tons claros e saturados mantêm contraste de pelo menos 4,5:1 contra o fundo
+escuro do item 8, para que números e marcas se destaquem.</p>
+<p>Faixas dos rankings: Superior = verde, Intermediário = amarelo, Inferior = vermelho,
+Não elegível = cinza.</p>
+<p>A cor nunca é a única pista: sempre acompanhar ícone e rótulo. Motivo: acessibilidade para quem
+não distingue verde de vermelho.</p>
+<h3 id="42-cabecalho">4.2 Cabeçalho<a class="headerlink" href="#42-cabecalho" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Esquerda: título "📈 B3 Valuation · Visões de Investimentos" (ícone de gráfico de alta) e,
+  abaixo, "Dados de <data_referencia>"
+  (<code>marts_painel_data_referencia</code>, formato <code>dd/mm/aaaa</code>; nunca data fixa no código).</li>
+<li>Direita: botão "Recarregar dados" (item 7).</li>
+<li>Faixa de aviso discreta (<code>st.caption</code>), sempre visível, com a ressalva final em negrito:
+  "Sinais relativos derivados de 10 rankings fundamentalistas sobre fotografia de dados.
+  <strong>Não constitui recomendação de investimento</strong>."
+  Motivo: é a limitação documentada em <code>marts_50_rank_recomendacoes.sql</code>.</li>
+</ul>
+<h3 id="43-faixa-1-pulso-do-mercado-seis-cartoes">4.3 Faixa 1 — Pulso do mercado: seis cartões<a class="headerlink" href="#43-faixa-1-pulso-do-mercado-seis-cartoes" title="Permanent link">&para;</a></h3>
+<p>Seis colunas iguais, nesta ordem. Cada cartão é um bloco HTML estilizado
+(<code>st.markdown(..., unsafe_allow_html=True)</code>), com borda superior na cor do item 4.1, número grande,
+rótulo e uma linha de definição curta:</p>
+<ol>
+<li><strong>Ações analisadas</strong> — <code>marts_card_01_acoes_analisadas.quantidade</code>.
+   Definição: "tickers negociados nos últimos 2 meses". Cor neutra (azul da marca, item 8).</li>
+<li><strong>🟢 Compra</strong> — <code>marts_card_02_acoes_compra.quantidade</code>. Definição: "saldo positivo nos 10 rankings".</li>
+<li><strong>🟡 Manter</strong> — <code>marts_card_03_acoes_manter.quantidade</code>. Definição: "saldo zero".</li>
+<li><strong>🔴 Venda</strong> — <code>marts_card_04_acoes_venda.quantidade</code>. Definição: "saldo negativo".</li>
+<li><strong>⚪ Sem indicação</strong> — <code>marts_card_02_acoes_semindicacao.quantidade</code>.
+   Definição: "sem negociação nos últimos 2 meses".</li>
+<li><strong>Termômetro de mercado</strong> — <code>marts_card_05_termometro_mercado</code>. O cartão inteiro assume o
+   fundo suave e a borda da cor da recomendação predominante, com:</li>
+<li>ícone e rótulo do item 4.1 em destaque (ex.: "🔴 Venda / Risco");</li>
+<li>linha "<code>&lt;percentual&gt;</code> das ações analisadas" (ex.: "70,6% das ações analisadas");</li>
+<li>barra horizontal empilhada fina (Compra | Manter | Venda) com as quantidades dos cartões 2 a
+     4, nas cores do item 4.1, sem eixos. É só desenho das quantidades, não cálculo.</li>
+</ol>
+<p>Nos cartões 2 a 4, mostrar abaixo do número o percentual sobre as analisadas <strong>somente se</strong> vier
+de mart. Nesta versão não vem: não mostrar.</p>
+<h3 id="44-faixa-2-ranking-de-oportunidades-largura-inteira">4.4 Faixa 2 — Ranking de oportunidades: largura inteira<a class="headerlink" href="#44-faixa-2-ranking-de-oportunidades-largura-inteira" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>2 · Ranking consolidado</strong> (<code>marts_50_rank_recomendacoes</code>, filtrado pelo item 6): <code>st.dataframe</code>
+  com <code>column_config</code>:</li>
+<li><code>posicao</code>; recomendação como badge com ícone (item 4.1); <code>ticker</code>; <code>empresa</code>; <code>segmento</code>;</li>
+<li><code>cotacao</code> em reais; <code>liquidez_2_meses</code> em reais compactos (item 5);</li>
+<li><code>saldo</code> como <code>ProgressColumn</code> de −10 a +10;</li>
+<li>as dez colunas <code>faixa_*</code> como ícones de faixa (🟢 Superior, 🟡 Intermediário, 🔴 Inferior,
+    ⚪ Não elegível), com cabeçalho igual ao nome curto do ranking (Valor, Proventos, …).
+  Ordenação padrão: <code>posicao</code>. Altura para cerca de 15 linhas, com rolagem.</li>
+</ul>
+<h3 id="45-faixa-3-valor-qualidade-largura-inteira">4.5 Faixa 3 — Valor × qualidade: largura inteira<a class="headerlink" href="#45-faixa-3-valor-qualidade-largura-inteira" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>3 · Qualidade versus preço</strong> (<code>marts_painel_indicadores</code>, filtrado pelo item 6): dispersão com
+  eixo X = EV/EBIT (múltiplo, "x"), eixo Y = ROIC (%), cor = recomendação, tamanho do ponto =
+  <code>liquidez_2_meses</code>, tooltip com ticker, empresa, P/L, DY e ROE.
+  Mostrar apenas linhas com EV/EBIT e ROIC maiores que zero (filtro de linhas) e recortar o eixo X
+  em 0–30 e o Y em 0–60, avisando na legenda quantas ações ficaram fora do recorte só se o número
+  vier de mart; nesta versão, escrever "Valores extremos fora da área visível".
+  Linhas de referência tracejadas: ROIC = 15% ("custo de capital de referência", spec de marts
+  §6.1) e EV/EBIT = 10. Rótulo dos quadrantes, em cinza: superior esquerdo "Qualidade a bom preço",
+  inferior direito "Cara e pouco rentável".
+  Motivo: é a leitura da Magic Formula, base do Rank Valor, que o investidor entende sem fórmula.
+  EV/EBIT = 10 aprovado pelo usuário (P3).</li>
+</ul>
+<h3 id="46-faixa-4-rankings-tematicos-largura-inteira-sttabs">4.6 Faixa 4 — Rankings temáticos: largura inteira, <code>st.tabs</code><a class="headerlink" href="#46-faixa-4-rankings-tematicos-largura-inteira-sttabs" title="Permanent link">&para;</a></h3>
+<p>Uma aba por ranking, nesta ordem e com estes nomes e frases (o investidor escolhe a estratégia,
+não a sigla):</p>
+<table>
+<thead>
+<tr>
+<th>Aba</th>
+<th>Arquivo</th>
+<th>Frase de apoio</th>
+<th>Gráfico (top 15 por <code>rank</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>💎 Valor</td>
+<td><code>marts_01</code></td>
+<td>Rentáveis e baratas (Magic Formula simplificada)</td>
+<td>barras de ROIC com EV/EBIT no tooltip</td>
+</tr>
+<tr>
+<td>💰 Proventos</td>
+<td><code>marts_02</code></td>
+<td>Maiores pagadoras com payout saudável</td>
+<td>barras de DY</td>
+</tr>
+<tr>
+<td>⚙️ Eficiência</td>
+<td><code>marts_03</code></td>
+<td>Melhores margens</td>
+<td>barras agrupadas margem EBIT e líquida</td>
+</tr>
+<tr>
+<td>📈 Retorno</td>
+<td><code>marts_04</code></td>
+<td>ROE alto com dívida controlada</td>
+<td>barras de ROE</td>
+</tr>
+<tr>
+<td>🏷️ Pechincha</td>
+<td><code>marts_05</code></td>
+<td>Menores múltiplos de preço</td>
+<td>barras de P/L</td>
+</tr>
+<tr>
+<td>🏛️ Patrimônio</td>
+<td><code>marts_06</code></td>
+<td>Menor preço por ponto de rentabilidade</td>
+<td>barras de P/VP ÷ ROE</td>
+</tr>
+<tr>
+<td>🚀 Crescimento</td>
+<td><code>marts_07</code></td>
+<td>Receita crescendo com ROIC &gt; 10%</td>
+<td>barras de crescimento 5 anos</td>
+</tr>
+<tr>
+<td>🏭 Operacional</td>
+<td><code>marts_08</code></td>
+<td>Maior margem operacional</td>
+<td>barras de margem EBIT</td>
+</tr>
+<tr>
+<td>🛡️ Seguro</td>
+<td><code>marts_09</code></td>
+<td>Menor alavancagem com rentabilidade</td>
+<td>barras de DL/PL</td>
+</tr>
+<tr>
+<td>🎯 Rentabilidade</td>
+<td><code>marts_10</code></td>
+<td>Maior lucro por real investido</td>
+<td>barras de earnings yield</td>
+</tr>
+</tbody>
+</table>
+<p>Cada aba: barras horizontais, melhor em cima, uma cor só (azul da marca), valor rotulado na barra,
+e ao lado uma tabela com <code>rank</code>, <code>ticker</code>, <code>empresa</code> e os indicadores do arquivo. Empates de rank
+mostram o mesmo número (é <code>DENSE_RANK</code>); ordenar por <code>rank</code> e depois <code>ticker</code>.</p>
+<h3 id="47-faixa-5-ficha-da-acao-largura-inteira">4.7 Faixa 5 — Ficha da ação: largura inteira<a class="headerlink" href="#47-faixa-5-ficha-da-acao-largura-inteira" title="Permanent link">&para;</a></h3>
+<p><code>st.selectbox</code> com os tickers de <code>marts_50_rank_recomendacoes</code> (rótulo "TICKER · empresa"), padrão
+= <code>posicao</code> 1. Mostra:</p>
+<ul>
+<li>Cabeçalho: ticker, empresa, segmento, município/UF, badge da recomendação, saldo.</li>
+<li>Linha de mini cartões (<code>marts_painel_indicadores</code>, <code>marts_retorno_total_risco</code>): cotação, P/L,
+  P/VP, DY, ROE, ROIC, DL/PL, CAGR 5 anos, volatilidade anualizada, máximo drawdown.
+  Valor nulo aparece como "—", nunca como zero.</li>
+<li><strong>5 · Perfil nos 10 rankings</strong>: gráfico polar (radar) com os 10 rankings no eixo angular e a
+  faixa no radial por um código ordinal fixo vindo de dicionário constante, usado apenas para
+  posicionar (Não elegível 0 no centro, Inferior 1, Intermediário 2, Superior 3 na borda),
+  preenchido na cor da recomendação. Rótulos radiais com os nomes das faixas, nunca os códigos.</li>
+<li><strong>5 · Cotação histórica</strong> (<code>ler_cotacao</code>): linha de <code>fechamento_ajustado</code> com seletor de período
+  (botões 1A, 3A, 5A, Tudo, via <code>rangeselector</code> do plotly) e barras de <code>volume</code> em um segundo painel
+  abaixo, eixo X compartilhado. As datas com <code>dividendos &gt; 0</code> recebem um marcador "💰" sobre a
+  linha (filtro de linhas, sem conta), com o valor do provento no tooltip.
+  Preços nulos ou menores ou iguais a zero ficam fora do desenho (filtro de linhas) e a ficha avisa
+  "N cotações inválidas ocultas" só se o número vier de mart; nesta versão, não avisar.
+  Motivo: a Silver tem preços ajustados negativos em alguns tickers (<code>sql/marts/README.md</code>).</li>
+</ul>
+<h2 id="5-formato-painelpy-funcoes-puras-sem-streamlit-e-sem-banco">5. FORMATO (<code>painel.py</code>), funções puras, sem streamlit e sem banco<a class="headerlink" href="#5-formato-painelpy-funcoes-puras-sem-streamlit-e-sem-banco" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>reais(valor, casas=2)</code> → <code>"R$ 1.003.862,14"</code></li>
+<li><code>reais_compacto(valor)</code> → <code>"R$ 12,3 mi"</code>, <code>"R$ 1,2 bi"</code>, <code>"R$ 850 mil"</code></li>
+<li><code>pct(valor, casas=1)</code> → <code>"6,9%"</code>. <strong>Não multiplica por 100</strong>: os percentuais do projeto já estão
+  na escala 0–100.</li>
+<li><code>multiplo(valor, casas=1)</code> → <code>"8,4x"</code></li>
+<li><code>numero(valor, casas=0)</code> → <code>"1.920.774"</code></li>
+<li><code>data_br(valor)</code> → <code>"02/11/2026"</code></li>
+<li>Qualquer função recebendo <code>None</code>/<code>NaN</code> devolve <code>"—"</code>.</li>
+</ul>
+<p>Milhar com ponto, decimal com vírgula, sempre. Não usar locale do sistema.
+Motivo: o resultado não pode depender da máquina de quem roda.</p>
+<p>Uma função por gráfico, recebendo DataFrame(s) e devolvendo a figura plotly, com o mesmo template
+visual (item 8).
+Motivo: um relatório HTML futuro reaproveita as mesmas funções, e os gráficos ficam testáveis sem
+streamlit.</p>
+<h2 id="6-filtros">6. FILTROS<a class="headerlink" href="#6-filtros" title="Permanent link">&para;</a></h2>
+<p>Barra lateral (<code>st.sidebar</code>), com o título "Filtros":</p>
+<ul>
+<li>Recomendação (<code>st.pills</code>, seleção múltipla, com ícones; padrão: todas).</li>
+<li>Segmento de listagem (<code>st.multiselect</code>).</li>
+<li>Liquidez mínima em 2 meses (<code>st.select_slider</code> com faixas fixas: Todas, R$ 100 mil, R$ 1 mi,
+  R$ 10 mi). Motivo: o investidor pessoa física deve poder esconder papéis sem liquidez.</li>
+<li>Botão "Limpar filtros".</li>
+</ul>
+<p>Os filtros só recortam linhas das faixas 2, 3 e 5 (lista do seletor). Os cartões e as abas de
+rankings <strong>não mudam</strong>, e a barra lateral diz isso embaixo dos filtros:
+"Os cartões e os rankings temáticos valem para o mercado inteiro."
+Motivo: recortar linha é filtro; recalcular cartão ou contagem por filtro seria regra de negócio
+fora do SQL.</p>
+<p>Se o filtro deixar zero linhas, mostrar <code>st.info("Nenhuma ação atende aos filtros.")</code> no lugar do
+gráfico ou da tabela.</p>
+<h2 id="7-cache-e-erro">7. CACHE E ERRO<a class="headerlink" href="#7-cache-e-erro" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Leitura com <code>st.cache_data</code>. O botão "Recarregar dados" limpa o cache e recarrega a página.
+  <code>ler_cotacao</code> também em cache, por ticker.</li>
+<li>Sem <code>fundamentalistas.duckdb</code>, ou faltando qualquer tabela obrigatória (<code>tabelas_faltando()</code>):
+  <code>st.error</code> com o título "Tabelas obrigatórias não encontradas:", a lista do que falta e a
+  orientação "Gere a camada Gold com <code>uv run python -m pipeline.materializacao</code> e clique em
+  Recarregar dados.", seguido de <code>st.stop()</code>. A verificação roda a cada carregamento da página, fora
+  do cache, para que o botão "Recarregar dados" reconheça as tabelas recém-criadas.</li>
+<li>Banco bloqueado por outro processo (inclusive durante a verificação de tabelas): <code>st.error</code> com
+  o texto "O banco está em uso por outro processo. Feche a DuckDB UI (<code>ui.py</code>), a ingestão ou a
+  materialização e clique em Recarregar dados." e <code>st.stop()</code>.</li>
+<li>Erro do DuckDB ao ler uma tabela: <code>st.error</code> com o nome da tabela (<code>marts.&lt;nome&gt;</code>) e a mensagem
+  do DuckDB, seguido de <code>st.stop()</code>.</li>
+</ul>
+<h2 id="8-aparencia-modo-escuro-profissional">8. APARÊNCIA — Modo Escuro Profissional<a class="headerlink" href="#8-aparencia-modo-escuro-profissional" title="Permanent link">&para;</a></h2>
+<p>Motivo: o painel é usado para análise intensiva; fundo escuro reduz a fadiga visual e faz os
+números e as séries coloridas se destacarem, com contraste alto em gráficos múltiplos.</p>
+<p>Paleta (constantes únicas em <code>painel.py</code>, espelhadas no <code>config.toml</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Papel</th>
+<th>Cor</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fundo da página</td>
+<td><code>#0B1120</code></td>
+</tr>
+<tr>
+<td>Fundo secundário (barra lateral, cartões, tooltip)</td>
+<td><code>#111827</code></td>
+</tr>
+<tr>
+<td>Borda e grade</td>
+<td><code>#1F2A3C</code></td>
+</tr>
+<tr>
+<td>Texto principal</td>
+<td><code>#E5E7EB</code></td>
+</tr>
+<tr>
+<td>Texto secundário (definições, anotações, legendas de eixo)</td>
+<td><code>#94A3B8</code></td>
+</tr>
+<tr>
+<td>Azul da marca (botões, séries de uma cor, cartão 1)</td>
+<td><code>#3B82F6</code></td>
+</tr>
+<tr>
+<td>Azul claro (segunda série e volume)</td>
+<td><code>#93C5FD</code></td>
+</tr>
+<tr>
+<td>Recomendações e faixas</td>
+<td>item 4.1</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>.streamlit/config.toml</code>: <code>base = "dark"</code>, <code>primaryColor</code> azul da marca, fundo, fundo
+  secundário e texto da tabela acima, fonte sans-serif padrão.</li>
+<li>Template plotly único em <code>painel.py</code>: fundo transparente (herda o da página), grade horizontal na
+  cor de borda, sem grade vertical, texto principal claro, tooltip com fundo secundário, margens
+  enxutas, legenda horizontal acima do gráfico, <code>hovermode</code> unificado nas séries temporais.
+  <code>st.plotly_chart(..., theme=None)</code> para o template mandar nas cores.</li>
+<li>Cartões em fundo secundário com borda; o termômetro usa fundo suave da cor predominante
+  (transparência) e borda inteira nessa cor.</li>
+<li>Espaçamento consistente entre faixas (<code>st.divider</code> entre seções) e títulos de seção com ícone
+  discreto. Nada de cores fora desta tabela e do item 4.1.</li>
+<li>Página com <code>page_title="B3 Valuation"</code>, <code>page_icon="📊"</code>.</li>
+</ul>
+<hr />
+<h1 id="divergencias-conhecidas-nao-corrigir-nesta-entrega">DIVERGÊNCIAS CONHECIDAS (não corrigir nesta entrega)<a class="headerlink" href="#divergencias-conhecidas-nao-corrigir-nesta-entrega" title="Permanent link">&para;</a></h1>
+<ul>
+<li><strong>D1 — Universos dos cartões.</strong> "Ações analisadas" (391) vem da consulta-base com join na B3
+  (541 tickers) e <code>liquidez_2_meses &gt; 0</code>. "Ações sem indicação" (598) conta direto em
+  <code>refined.fundamentus_acoes</code> (995 tickers). Por isso 391 + 598 = 989 ≠ 995: 6 tickers negociados
+  sem emissora na B3 não aparecem em nenhum dos dois cartões. O painel mostra os números dos marts
+  como estão e, no tooltip do cartão 5, explica "contado sobre todos os tickers do Fundamentus".
+  Mantido como está por decisão do usuário (P4).</li>
+<li><strong>D2 — Nome do arquivo do cartão 5.</strong> <code>marts_card_02_acoes_semindicacao.sql</code> repete o prefixo
+  <code>02</code> por decisão registrada na spec de marts §14.2. Não renomear.</li>
+</ul>
+<h1 id="pendencias-respondidas-pelo-usuario-em-2026-11-02">PENDÊNCIAS (respondidas pelo usuário em 2026-11-02)<a class="headerlink" href="#pendencias-respondidas-pelo-usuario-em-2026-11-02" title="Permanent link">&para;</a></h1>
+<ul>
+<li><strong>P1 — Empate no termômetro.</strong> Empate na quantidade máxima → 🟡 Manter / Neutro.</li>
+<li><strong>P2 — Malha do mapa.</strong> Obsoleta na v1.1: a faixa do mapa foi removida.</li>
+<li><strong>P3 — Referência EV/EBIT = 10</strong> na faixa 3: aprovada; desenhar as linhas de ROIC 15% e
+  EV/EBIT 10.</li>
+<li><strong>P4 — Universo do cartão "Sem indicação"</strong> (D1): manter como está.</li>
+</ul>
+<hr />
+<h1 id="criterios-de-aceite">CRITÉRIOS DE ACEITE<a class="headerlink" href="#criterios-de-aceite" title="Permanent link">&para;</a></h1>
+<p>Valores da base em 2026-11-02, conferidos nas tabelas <code>marts</code> em 2026-11-03. Se a base for
+recarregada e materializada de novo, os números da tela devem ser iguais aos das tabelas <code>marts</code>
+naquele momento:</p>
+<ul>
+<li>Os cinco primeiros cartões mostram: <strong>391 · 95 · 20 · 276 · 598</strong>.</li>
+<li>O termômetro mostra <strong>🔴 Venda / Risco</strong> com <strong>70,6% das ações analisadas</strong>, em vermelho.</li>
+<li>O painel não mostra mapa, ranking de estados, mapa de calor dos rankings nem o panorama dos
+  sinais (força dos sinais e recomendações por segmento).</li>
+<li>O painel abre no Modo Escuro Profissional (item 8), com as cores do item 4.1.</li>
+<li>A tabela do ranking consolidado abre com 391 linhas, ordenada por <code>posicao</code>, com Compra no topo.</li>
+<li>Cada aba de ranking abre com o rank 1 do arquivo correspondente no topo.</li>
+<li>A ficha de uma ação sem cotação no YFinance mostra "—" nos indicadores de risco e a mensagem
+  "Sem histórico de cotação para este ticker" no lugar do gráfico.</li>
+<li>Uma busca por <code>groupby</code>, <code>.sum(</code>, <code>.mean(</code>, <code>.count(</code>, <code>value_counts</code>, <code>merge</code>, <code>pivot</code> e
+  <code>px.histogram</code> em <code>painel.py</code> e <code>app.py</code> não encontra nada.</li>
+<li>Com o painel de pé, a ingestão roda sem erro de lock; com a DuckDB UI (<code>ui.py</code>) aberta, o painel
+  mostra a mensagem de banco bloqueado em vez de traceback.</li>
+<li>Toda SQL de <code>painel.py</code> e <code>app.py</code> é <code>SELECT * FROM marts."&lt;nome&gt;"</code>, com <code>WHERE ticker = ?</code> só
+  na cotação, mais a consulta de catálogo de <code>tabelas_faltando()</code>. Nenhuma referência a <code>raw.</code>,
+  <code>refined.</code> ou ao texto de <code>sql/marts/*.sql</code>.</li>
+<li>Sem as tabelas <code>marts</code> (por exemplo, num banco ainda não materializado), o painel lista as
+  tabelas faltantes e orienta a rodar <code>pipeline.materializacao</code>, sem traceback. Depois de
+  materializar, "Recarregar dados" abre o painel normalmente.</li>
+<li>Com a materialização rodando, o painel mostra a mensagem de banco bloqueado. Com o painel de pé,
+  a materialização roda sem erro de lock.</li>
+<li>Nenhum arquivo de <code>raw</code>/<code>refined</code>, do <code>pipeline/</code> ou SQL já existente é alterado.</li>
+</ul>
+<h1 id="entrega">ENTREGA<a class="headerlink" href="#entrega" title="Permanent link">&para;</a></h1>
+<ol>
+<li>A spec como docstring no topo de <code>painel.py</code>, com o motivo de cada regra.</li>
+<li>O código, comentado só onde a decisão não é óbvia.</li>
+<li>Os novos marts do item 3, cada um validado no DuckDB (linhas, unicidade do grão, soma
+   consistente com os cartões).</li>
+<li>Uma lista final do que foi assumido e que não estava na spec.</li>
+<li>(v1.5) Testes automatizados de <code>painel.py</code> sem streamlit, sobre um banco temporário, cobrindo:</li>
+<li>leitura das tabelas <code>marts</code>;</li>
+<li><code>tabelas_faltando()</code>;</li>
+<li>filtro da cotação por ticker;</li>
+<li>erro de leitura com o nome da tabela;</li>
+<li>banco bloqueado.</li>
+</ol>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>

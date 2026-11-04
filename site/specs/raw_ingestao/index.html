@@ -1,0 +1,1547 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Pipeline de indicadores fundamentalistas de ações da B3 (Bronze → Silver → Gold) sobre DuckDB, com painel em Streamlit.">
+      
+      
+      
+      
+        <link rel="prev" href="../../decisoes/">
+      
+      
+        <link rel="next" href="../refined_transformacao/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Bronze — ingestão - B3 Valuation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#spec-tecnica-camada-raw-bronze" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href="../.." title="B3 Valuation" class="md-header__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            B3 Valuation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Bronze — ingestão
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema claro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Tema claro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema escuro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Tema escuro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="B3 Valuation" class="md-nav__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    B3 Valuation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../uso/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instalação e uso
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../arquitetura/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referência da API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Marts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Marts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/marts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicadores e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../referencia/rankings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rankings e recomendação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decisões
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisoes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bronze — ingestão
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bronze — ingestão
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-de-indicadores-fundamentalistas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline de Indicadores Fundamentalistas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../refined_transformacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Silver — transformação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts.agregacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — agregação e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts_sql_indicadores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — indicadores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../marts_sql_rank/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — rankings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dashboard_apresentacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apresentação — painel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testes_codigo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-de-indicadores-fundamentalistas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline de Indicadores Fundamentalistas
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="spec-tecnica-camada-raw-bronze">SPEC TÉCNICA — CAMADA RAW (BRONZE)<a class="headerlink" href="#spec-tecnica-camada-raw-bronze" title="Permanent link">&para;</a></h1>
+<h2 id="pipeline-de-indicadores-fundamentalistas">Pipeline de Indicadores Fundamentalistas<a class="headerlink" href="#pipeline-de-indicadores-fundamentalistas" title="Permanent link">&para;</a></h2>
+<p><strong>Versão:</strong> 1.1 (M6.1–M6.4: consulta Minha Receita com CNPJ complementado apenas na URL)<br />
+<strong>Stack:</strong> Python 3.13 + uv + DuckDB<br />
+<strong>Arquitetura:</strong> Medallion Architecture<br />
+<strong>Escopo:</strong> Exclusivamente camada Raw/Bronze</p>
+<hr />
+<h1 id="1-contexto-e-stack-tecnologica">1. CONTEXTO E STACK TECNOLÓGICA<a class="headerlink" href="#1-contexto-e-stack-tecnologica" title="Permanent link">&para;</a></h1>
+<p>Estou construindo um pipeline de Engenharia de Dados em Python para consolidação de informações fundamentalistas e cadastrais das empresas listadas na B3, incluindo histórico diário de cotações.</p>
+<p>O projeto segue a arquitetura Medallion, com separação entre as camadas:</p>
+<ul>
+<li><strong>Bronze (Raw):</strong> ingestão e preservação dos dados recebidos das fontes originais.</li>
+<li><strong>Silver (Refined):</strong> tratamento, limpeza, tipagem, padronização e validação dos dados.</li>
+<li><strong>Gold (Marts):</strong> construção de indicadores, agregações e estruturas analíticas para consumo.</li>
+</ul>
+<p>Esta especificação contempla exclusivamente a camada Bronze.</p>
+<p><strong>Princípio fundamental:</strong> a camada Bronze deve preservar os dados em seu estado mais bruto possível, sem tratamento de negócio, limpeza, normalização ou alteração dos valores recebidos.</p>
+<p>A especificação é a fonte da verdade para o desenvolvimento. Nenhuma regra de negócio ou transformação não documentada poderá ser introduzida durante a implementação.</p>
+<h2 id="11-stack-tecnologica">1.1. Stack tecnológica<a class="headerlink" href="#11-stack-tecnologica" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Python 3.13.</li>
+<li>Gerenciamento de dependências com <code>uv</code>.</li>
+<li>DuckDB como banco de dados analítico local.</li>
+<li>Arquivo de banco: <code>fundamentalistas.duckdb</code>, localizado na raiz do projeto.</li>
+<li>Biblioteca <code>yfinance</code> para extração do histórico de cotações.</li>
+<li>Requisições HTTP para as fontes B3 e Fundamentus.</li>
+<li>Consumo da API pública Minha Receita.</li>
+<li>Execução por linha de comando.</li>
+<li>Nenhum orquestrador complexo.</li>
+</ul>
+<h2 id="12-estrutura-de-diretorios">1.2. Estrutura de diretórios<a class="headerlink" href="#12-estrutura-de-diretorios" title="Permanent link">&para;</a></h2>
+<p>Estrutura de referência:</p>
+<div class="highlight"><pre><span></span><code>projeto/
+│
+├── pipeline/
+│   ├── __init__.py
+│   ├── db.py
+│   └── ingestao.py
+│
+├── raw/
+│   └── (artefatos brutos ou locais de apoio)
+│
+├── fundamentalistas.duckdb
+│
+├── pyproject.toml
+└── uv.lock
+</code></pre></div>
+<p>O arquivo DuckDB deverá ser criado automaticamente na raiz do projeto quando a conexão for solicitada.</p>
+<h2 id="13-responsabilidades">1.3. Responsabilidades<a class="headerlink" href="#13-responsabilidades" title="Permanent link">&para;</a></h2>
+<p>O projeto terá dois módulos independentes:</p>
+<p><strong>pipeline/db.py</strong></p>
+<p>Responsável exclusivamente pela infraestrutura de conexão, criação de schemas e persistência genérica dos dados.</p>
+<p><strong>pipeline/ingestao.py</strong></p>
+<p>Responsável pela extração das fontes externas, aplicação das regras de preservação Bronze, gerenciamento das falhas e gravação dos dados.</p>
+<p>O módulo de banco não poderá conhecer regras específicas das fontes de dados.</p>
+<hr />
+<h1 id="2-spec-do-modulo-pipelinedbpy">2. SPEC DO MÓDULO pipeline/db.py<a class="headerlink" href="#2-spec-do-modulo-pipelinedbpy" title="Permanent link">&para;</a></h1>
+<h2 id="21-o-que-o-modulo-expoe">2.1. O que o módulo expõe<a class="headerlink" href="#21-o-que-o-modulo-expoe" title="Permanent link">&para;</a></h2>
+<p>O módulo deverá expor exatamente:</p>
+<div class="highlight"><pre><span></span><code><span class="n">PASTA_RAW</span>
+<span class="n">conectar</span><span class="p">()</span>
+<span class="n">criar_schema</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">nome</span><span class="p">)</span>
+<span class="n">gravar</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">schema</span><span class="p">,</span> <span class="n">tabela</span><span class="p">)</span>
+</code></pre></div>
+<p>Não deverá conter regras de negócio, mapeamentos de fontes ou rotinas de ingestão.</p>
+<h2 id="d1-resolucao-dos-caminhos">D1. RESOLUÇÃO DOS CAMINHOS<a class="headerlink" href="#d1-resolucao-dos-caminhos" title="Permanent link">&para;</a></h2>
+<p><code>PASTA_RAW</code> e o arquivo <code>fundamentalistas.duckdb</code> deverão ser resolvidos a partir da localização física do próprio <code>db.py</code>, considerando a raiz do projeto como a pasta imediatamente acima de <code>pipeline/</code>.</p>
+<p>O diretório corrente do terminal não poderá influenciar a localização do banco.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>Evita que a execução do pipeline a partir de outra pasta crie arquivos DuckDB vazios ou duplicados em locais diferentes, mascarando falhas de ingestão e comprometendo a confiabilidade do ambiente.</p>
+<h2 id="d2-isolamento-de-responsabilidades">D2. ISOLAMENTO DE RESPONSABILIDADES<a class="headerlink" href="#d2-isolamento-de-responsabilidades" title="Permanent link">&para;</a></h2>
+<p>O módulo <code>db.py</code> não poderá:</p>
+<ul>
+<li>Realizar requisições HTTP.</li>
+<li>Consumir APIs.</li>
+<li>Ler ou interpretar HTML.</li>
+<li>Conhecer nomes de tabelas específicas das fontes.</li>
+<li>Executar transformações nos dados.</li>
+<li>Imprimir mensagens no terminal.</li>
+<li>Manter conexões globais.</li>
+<li>Implementar regras de negócio.</li>
+</ul>
+<p><strong>Motivação técnica:</strong></p>
+<p>O módulo deve funcionar como infraestrutura reutilizável. A concentração de regras específicas de ingestão em um módulo compartilhado cria dependências ocultas e dificulta a evolução independente das etapas do pipeline.</p>
+<h2 id="d3-funcao-conectar">D3. FUNÇÃO conectar()<a class="headerlink" href="#d3-funcao-conectar" title="Permanent link">&para;</a></h2>
+<p>Deverá abrir uma conexão com o arquivo:</p>
+<p><code>fundamentalistas.duckdb</code></p>
+<p>Se o arquivo não existir, deverá criá-lo automaticamente na raiz do projeto.</p>
+<p>A função deverá devolver a conexão aberta.</p>
+<p>O responsável por chamar <code>conectar()</code> será também responsável por fechar a conexão, inclusive em caso de exceção.</p>
+<p>Não deverá existir conexão global compartilhada.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>O controle explícito do ciclo de vida da conexão evita conexões esquecidas, conflitos de escrita e problemas de bloqueio do arquivo DuckDB.</p>
+<h2 id="d4-funcao-criar_schema">D4. FUNÇÃO criar_schema()<a class="headerlink" href="#d4-funcao-criar_schema" title="Permanent link">&para;</a></h2>
+<p>Assinatura:</p>
+<div class="highlight"><pre><span></span><code><span class="n">criar_schema</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">nome</span><span class="p">)</span>
+</code></pre></div>
+<p>Deverá executar:</p>
+<div class="highlight"><pre><span></span><code><span class="k">CREATE</span><span class="w"> </span><span class="k">SCHEMA</span><span class="w"> </span><span class="k">IF</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">EXISTS</span><span class="w"> </span><span class="n">nome</span><span class="p">;</span>
+</code></pre></div>
+<p>O schema de destino desta especificação será:</p>
+<div class="highlight"><pre><span></span><code><span class="n">raw</span>
+</code></pre></div>
+<p>A função deverá ser genérica, sem assumir nomes específicos de schemas.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>Permite a criação idempotente da estrutura de armazenamento sem introduzir dependências entre a infraestrutura e as fontes de dados.</p>
+<h2 id="d5-funcao-gravar">D5. FUNÇÃO gravar()<a class="headerlink" href="#d5-funcao-gravar" title="Permanent link">&para;</a></h2>
+<p>Assinatura:</p>
+<div class="highlight"><pre><span></span><code><span class="n">gravar</span><span class="p">(</span><span class="n">con</span><span class="p">,</span> <span class="n">df</span><span class="p">,</span> <span class="n">schema</span><span class="p">,</span> <span class="n">tabela</span><span class="p">)</span>
+</code></pre></div>
+<p>Responsabilidades:</p>
+<ol>
+<li>Receber uma estrutura tabular contendo os dados extraídos.</li>
+<li>Gravar os dados no schema e tabela informados.</li>
+<li>Utilizar a política <code>CREATE OR REPLACE TABLE</code>.</li>
+<li>Preservar nomes de colunas e valores recebidos.</li>
+<li>Garantir que as colunas de negócio sejam persistidas como <code>VARCHAR</code>.</li>
+<li>Preservar valores nulos como <code>NULL</code>.</li>
+<li>Não criar tabelas ou views temporárias permanentes.</li>
+<li>Retornar a quantidade efetivamente gravada, consultada diretamente no DuckDB.</li>
+</ol>
+<p>A contagem deverá ser obtida por consulta equivalente a:</p>
+<div class="highlight"><pre><span></span><code><span class="k">SELECT</span><span class="w"> </span><span class="k">COUNT</span><span class="p">(</span><span class="o">*</span><span class="p">)</span>
+<span class="k">FROM</span><span class="w"> </span><span class="k">schema</span><span class="p">.</span><span class="n">tabela</span><span class="p">;</span>
+</code></pre></div>
+<p>A função não poderá devolver simplesmente a quantidade de linhas existente no DataFrame em memória.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>A contagem precisa refletir o resultado efetivamente persistido no banco, e não uma estimativa baseada nos dados recebidos. Isso permite validar a integridade da gravação.</p>
+<h2 id="d6-politica-de-reexecucao">D6. POLÍTICA DE REEXECUÇÃO<a class="headerlink" href="#d6-politica-de-reexecucao" title="Permanent link">&para;</a></h2>
+<p>Todas as gravações deverão utilizar substituição integral da tabela:</p>
+<div class="highlight"><pre><span></span><code><span class="k">CREATE</span><span class="w"> </span><span class="k">OR</span><span class="w"> </span><span class="k">REPLACE</span><span class="w"> </span><span class="k">TABLE</span>
+</code></pre></div>
+<p>Não será permitido utilizar inserções cumulativas para manter os registros de execuções anteriores.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>Garante idempotência. Uma nova execução representa uma nova fotografia dos dados disponibilizados pelas fontes, sem duplicação de registros.</p>
+<h2 id="d7-tipagem">D7. TIPAGEM<a class="headerlink" href="#d7-tipagem" title="Permanent link">&para;</a></h2>
+<p>Todas as colunas de negócio deverão ser armazenadas como <code>VARCHAR</code>.</p>
+<p>Nenhuma inferência automática de tipos poderá ocorrer durante a persistência.</p>
+<p>Os metadados de ingestão também deverão possuir representação textual.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>A inferência automática pode causar perdas irreversíveis, como remoção de zeros à esquerda, conversões indevidas de identificadores e alteração de representações originais.</p>
+<p>A conversão para tipos analíticos pertence exclusivamente à camada Silver.</p>
+<h2 id="d8-transacoes-e-conexoes">D8. TRANSAÇÕES E CONEXÕES<a class="headerlink" href="#d8-transacoes-e-conexoes" title="Permanent link">&para;</a></h2>
+<p>O módulo deverá permitir que o processo de ingestão controle uma transação envolvendo as gravações das quatro fontes.</p>
+<p>O módulo não deverá iniciar ou confirmar transações automaticamente dentro de <code>gravar()</code>.</p>
+<p>A conexão será fechada pelo módulo responsável pela execução.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>Permite que o processo de ingestão controle a atomicidade do conjunto de tabelas, impedindo que uma falha deixe uma atualização parcialmente persistida.</p>
+<h2 id="criterios-de-aceite-dbpy">CRITÉRIOS DE ACEITE — db.py<a class="headerlink" href="#criterios-de-aceite-dbpy" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Importar <code>pipeline.db</code> não deverá criar o arquivo DuckDB.</li>
+<li>A função <code>conectar()</code> deverá criar o banco na raiz do projeto.</li>
+<li>A execução a partir de outro diretório deverá utilizar o mesmo arquivo.</li>
+<li><code>criar_schema()</code> deverá criar o schema quando inexistente.</li>
+<li>Executar <code>criar_schema()</code> repetidamente não deverá provocar erro.</li>
+<li><code>gravar()</code> deverá substituir a tabela existente.</li>
+<li>A contagem retornada deverá corresponder ao <code>COUNT(*)</code> do banco.</li>
+<li>As colunas de negócio deverão ser <code>VARCHAR</code>.</li>
+<li>Valores nulos deverão continuar nulos.</li>
+<li>Nenhuma conexão deverá permanecer aberta após o encerramento do processo.</li>
+</ul>
+<hr />
+<h1 id="3-spec-da-ingestao-pipelineingestaopy">3. SPEC DA INGESTÃO — pipeline/ingestao.py<a class="headerlink" href="#3-spec-da-ingestao-pipelineingestaopy" title="Permanent link">&para;</a></h1>
+<h2 id="31-escopo-e-execucao">3.1. Escopo e execução<a class="headerlink" href="#31-escopo-e-execucao" title="Permanent link">&para;</a></h2>
+<p>O módulo deverá ser executável por linha de comando:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>pipeline.ingestao
+</code></pre></div>
+<p>Schema de destino:</p>
+<div class="highlight"><pre><span></span><code><span class="n">raw</span>
+</code></pre></div>
+<p>Tabelas de destino:</p>
+<div class="highlight"><pre><span></span><code>raw.b3_empresas
+raw.fundamentus_acoes
+raw.minhareceita_empresas
+raw.yfinance_cotacoes
+</code></pre></div>
+<p>O script deverá executar a ingestão integral das quatro fontes.</p>
+<p>Não deverá importar ou executar qualquer funcionalidade pertencente às futuras camadas Silver ou Gold.</p>
+<h2 id="32-mapeamento-das-fontes">3.2. MAPEAMENTO DAS FONTES<a class="headerlink" href="#32-mapeamento-das-fontes" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Identificador</th>
+<th>Origem</th>
+<th>Destino</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>b3_empresas</td>
+<td>Site oficial B3</td>
+<td>raw.b3_empresas</td>
+</tr>
+<tr>
+<td>fundamentus_acoes</td>
+<td>Fundamentus</td>
+<td>raw.fundamentus_acoes</td>
+</tr>
+<tr>
+<td>minhareceitaorg_dadosempresas</td>
+<td>API Minha Receita</td>
+<td>raw.minhareceita_empresas</td>
+</tr>
+<tr>
+<td>yfinance_cotacoes</td>
+<td>Yahoo Finance via yfinance</td>
+<td>raw.yfinance_cotacoes</td>
+</tr>
+</tbody>
+</table>
+<h2 id="33-ordem-de-execucao">3.3. ORDEM DE EXECUÇÃO<a class="headerlink" href="#33-ordem-de-execucao" title="Permanent link">&para;</a></h2>
+<p>O fluxo deverá respeitar as seguintes etapas:</p>
+<ol>
+<li>Configuração do ambiente de execução.</li>
+<li>Validação prévia das fontes e dos pré-requisitos de extração.</li>
+<li>Extração dos dados da B3.</li>
+<li>Extração dos dados do Fundamentus.</li>
+<li>Identificação dos CNPJs e tickers disponíveis na listagem da B3.</li>
+<li>Consulta individual dos CNPJs na Minha Receita.</li>
+<li>Consulta do histórico de cotações de cada ticker no yfinance.</li>
+<li>Validação de sucesso integral das extrações.</li>
+<li>Abertura da conexão de escrita no DuckDB.</li>
+<li>Criação do schema <code>raw</code>.</li>
+<li>Gravação transacional das quatro tabelas.</li>
+<li>Commit da transação.</li>
+<li>Impressão do relatório de execução.</li>
+<li>Fechamento da conexão.</li>
+</ol>
+<p><strong>Motivação técnica:</strong></p>
+<p>Separar extração de persistência evita que uma falha em uma fonte externa deixe apenas parte das tabelas atualizadas.</p>
+<hr />
+<h1 id="4-especificacao-individual-das-fontes">4. ESPECIFICAÇÃO INDIVIDUAL DAS FONTES<a class="headerlink" href="#4-especificacao-individual-das-fontes" title="Permanent link">&para;</a></h1>
+<h2 id="41-fonte-b3_empresas">4.1. FONTE: b3_empresas<a class="headerlink" href="#41-fonte-b3_empresas" title="Permanent link">&para;</a></h2>
+<p><strong>Identificador:</strong> <code>b3_empresas</code></p>
+<p><strong>Origem:</strong></p>
+<div class="highlight"><pre><span></span><code>https://www.b3.com.br/pt_br/produtos-e-servicos/negociacao/renda-variavel/empresas-listadas.htm
+</code></pre></div>
+<p><strong>Método:</strong> HTTP GET.</p>
+<p><strong>Destino:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">raw</span><span class="p">.</span><span class="n">b3_empresas</span>
+</code></pre></div>
+<h3 id="regras-de-extracao">Regras de extração<a class="headerlink" href="#regras-de-extracao" title="Permanent link">&para;</a></h3>
+<p>B1. Realizar requisição HTTP GET para o endereço oficial informado.</p>
+<p>B2. Obter o conteúdo HTML disponibilizado pela fonte.</p>
+<p>B3. Interpretar estruturalmente a tabela HTML para extrair seus registros e colunas.</p>
+<p>B4. Preservar os nomes originais das colunas.</p>
+<p>B5. Preservar os valores originais dos campos, sem correção ou padronização.</p>
+<p>B6. Não realizar filtros, deduplicações ou descarte de registros.</p>
+<p>B7. Persistir todas as colunas de negócio como <code>VARCHAR</code>.</p>
+<p>B8. Disponibilizar os CNPJs e tickers extraídos da listagem para alimentar as consultas das fontes dependentes.</p>
+<p>B9. Os dados originais da tabela persistida deverão permanecer inalterados. A identificação dos CNPJs e tickers deverá utilizar os campos correspondentes da fonte, sem modificar os valores armazenados.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>A listagem da B3 representa a referência cadastral utilizada pelas demais fontes. Sua preservação permite rastrear a origem dos identificadores utilizados na construção da base fundamentalista.</p>
+<h3 id="metadados">Metadados<a class="headerlink" href="#metadados" title="Permanent link">&para;</a></h3>
+<p>Adicionar:</p>
+<ul>
+<li><code>_timestamp_ingestao</code></li>
+<li><code>_source_origin</code></li>
+</ul>
+<h3 id="criterio-de-aceite">Critério de aceite<a class="headerlink" href="#criterio-de-aceite" title="Permanent link">&para;</a></h3>
+<p>A tabela deverá conter todos os registros tabulares obtidos da resposta processada da B3, com colunas de negócio <code>VARCHAR</code> e metadados de ingestão.</p>
+<hr />
+<h2 id="42-fonte-fundamentus_acoes">4.2. FONTE: fundamentus_acoes<a class="headerlink" href="#42-fonte-fundamentus_acoes" title="Permanent link">&para;</a></h2>
+<p><strong>Identificador:</strong> <code>fundamentus_acoes</code></p>
+<p><strong>Origem:</strong></p>
+<div class="highlight"><pre><span></span><code>https://www.fundamentus.com.br/resultado.php
+</code></pre></div>
+<p><strong>Método:</strong> HTTP GET.</p>
+<p><strong>Destino:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">raw</span><span class="p">.</span><span class="n">fundamentus_acoes</span>
+</code></pre></div>
+<h3 id="regras-de-extracao_1">Regras de extração<a class="headerlink" href="#regras-de-extracao_1" title="Permanent link">&para;</a></h3>
+<p>F1. Realizar requisição HTTP GET para o endereço informado.</p>
+<p>F2. Obter o HTML original retornado pelo servidor.</p>
+<p>F3. Interpretar estruturalmente a tabela de indicadores fundamentalistas disponibilizada na página.</p>
+<p>F4. Preservar os nomes originais das colunas.</p>
+<p>F5. Preservar os valores apresentados pela fonte, inclusive suas representações textuais.</p>
+<p>F6. Não converter indicadores financeiros em números.</p>
+<p>F7. Não converter percentuais, múltiplos, datas ou demais campos.</p>
+<p>F8. Não remover registros duplicados.</p>
+<p>F9. Não realizar filtros ou seleção de indicadores.</p>
+<p>F10. Persistir todas as colunas de negócio como <code>VARCHAR</code>.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>Os indicadores fundamentalistas constituem dados de origem. Converter valores, percentuais ou múltiplos durante a ingestão introduziria decisões de interpretação antes da camada responsável pelo tratamento analítico.</p>
+<h3 id="metadados_1">Metadados<a class="headerlink" href="#metadados_1" title="Permanent link">&para;</a></h3>
+<p>Adicionar:</p>
+<ul>
+<li><code>_timestamp_ingestao</code></li>
+<li><code>_source_origin</code></li>
+</ul>
+<h3 id="criterio-de-aceite_1">Critério de aceite<a class="headerlink" href="#criterio-de-aceite_1" title="Permanent link">&para;</a></h3>
+<p>A tabela deverá reproduzir os registros tabulares disponibilizados pela fonte, preservando as representações originais dos indicadores e utilizando <code>VARCHAR</code> nas colunas de negócio.</p>
+<hr />
+<h2 id="43-fonte-minhareceitaorg_dadosempresas">4.3. FONTE: minhareceitaorg_dadosempresas<a class="headerlink" href="#43-fonte-minhareceitaorg_dadosempresas" title="Permanent link">&para;</a></h2>
+<p><strong>Identificador:</strong> <code>minhareceitaorg_dadosempresas</code></p>
+<p><strong>Origem:</strong></p>
+<div class="highlight"><pre><span></span><code>https://minhareceita.org/
+</code></pre></div>
+<p><strong>Método:</strong> consumo da API pública por CNPJ.</p>
+<p><strong>Destino:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">raw</span><span class="p">.</span><span class="n">minhareceita_empresas</span>
+</code></pre></div>
+<h3 id="regras-de-extracao_2">Regras de extração<a class="headerlink" href="#regras-de-extracao_2" title="Permanent link">&para;</a></h3>
+<p>M1. Utilizar os CNPJs obtidos da fonte <code>b3_empresas</code>.</p>
+<p>M2. Realizar uma consulta individual para cada CNPJ identificado.</p>
+<p>M3. Preservar o payload JSON retornado pela API.</p>
+<p>M4. Não renomear os campos originais do JSON.</p>
+<p>M5. Não converter tipos de dados.</p>
+<p>M6. Não formatar ou corrigir CNPJs. O CNPJ persistido deverá ser idêntico ao valor obtido da fonte <code>b3_empresas</code> (ex.: <code>191</code> permanece <code>191</code>).</p>
+<p>M6.1. A API Minha Receita exige o CNPJ com 14 dígitos, enquanto a B3 disponibiliza o campo sem os zeros à esquerda (ex.: <code>191</code> para <code>00000000000191</code>). Exclusivamente na montagem da URL de consulta, valores compostos apenas por dígitos e com menos de 14 posições deverão ser complementados com zeros à esquerda até 14 posições. O complemento é um requisito do mecanismo de consulta, equivalente ao sufixo <code>.SA</code> do yfinance (Y3), e não integra o identificador persistido. Valores com caracteres não numéricos deverão ser consultados exatamente como recebidos.</p>
+<p>M6.2. O endereço efetivamente consultado (ex.: <code>https://minhareceita.org/00000000000191</code>) deverá ser registrado em <code>_source_origin</code>, garantindo a rastreabilidade entre o valor de origem e a consulta realizada.</p>
+<p>M6.3. Valores vazios ou nulos não identificam um CNPJ e não deverão ser consultados. Valores idênticos deverão gerar uma única consulta.</p>
+<p>M6.4. Respostas HTTP 400 ou 404 da API indicam que o identificador foi rejeitado pela fonte (ex.: <code>0</code>). Elas não constituem falha permanente da fonte (E2): não serão persistidas, mas a quantidade e a relação dos valores rejeitados deverão ser informadas no terminal. Qualquer outra falha definitiva de uma consulta, após o esgotamento das tentativas (E1), constitui falha permanente da fonte e deverá seguir E2.</p>
+<p>M7. Não eliminar campos nulos.</p>
+<p>M8. Não remover registros duplicados.</p>
+<p>M9. Não realizar enriquecimento ou cruzamento com outras fontes durante a persistência.</p>
+<p>M10. Armazenar o payload JSON original em representação textual, utilizando coluna <code>VARCHAR</code>.</p>
+<p>M11. Identificar o CNPJ consultado e associar o respectivo payload à sua origem, sem modificar o conteúdo original retornado.</p>
+<p>M12. Adicionar os metadados técnicos de ingestão.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>O payload JSON constitui o registro original da resposta da API. Preservá-lo integralmente permite que futuras etapas interpretem os dados de acordo com suas necessidades, sem comprometer a rastreabilidade da resposta original.</p>
+<h3 id="estrutura-logica-de-persistencia">Estrutura lógica de persistência<a class="headerlink" href="#estrutura-logica-de-persistencia" title="Permanent link">&para;</a></h3>
+<p>A tabela deverá possuir uma estrutura capaz de armazenar:</p>
+<ul>
+<li><code>cnpj</code>: identificador exatamente como obtido da fonte <code>b3_empresas</code>, sem complemento de zeros.</li>
+<li>Payload JSON bruto.</li>
+<li><code>_timestamp_ingestao</code>.</li>
+<li><code>_source_origin</code>: URL efetivamente consultada (ex.: <code>https://minhareceita.org/00000000000191</code>).</li>
+</ul>
+<p>O payload JSON deverá ser preservado como texto, sem decomposição ou conversão de seus campos de negócio na camada Bronze.</p>
+<h3 id="criterio-de-aceite_2">Critério de aceite<a class="headerlink" href="#criterio-de-aceite_2" title="Permanent link">&para;</a></h3>
+<p>Cada consulta concluída deverá possuir seu respectivo registro de persistência, mantendo o conteúdo JSON original e os metadados técnicos.</p>
+<p>CNPJs disponibilizados pela B3 sem zeros à esquerda (ex.: <code>191</code>) deverão ser consultados com sucesso e persistidos com o valor original na coluna <code>cnpj</code>.</p>
+<hr />
+<h2 id="44-fonte-yfinance_cotacoes">4.4. FONTE: yfinance_cotacoes<a class="headerlink" href="#44-fonte-yfinance_cotacoes" title="Permanent link">&para;</a></h2>
+<p><strong>Identificador:</strong> <code>yfinance_cotacoes</code></p>
+<p><strong>Origem:</strong> Yahoo Finance, por meio da biblioteca Python <code>yfinance</code>.</p>
+<p><strong>Método:</strong> extração por ticker.</p>
+<p><strong>Destino:</strong></p>
+<div class="highlight"><pre><span></span><code><span class="n">raw</span><span class="p">.</span><span class="n">yfinance_cotacoes</span>
+</code></pre></div>
+<h3 id="regras-de-extracao_3">Regras de extração<a class="headerlink" href="#regras-de-extracao_3" title="Permanent link">&para;</a></h3>
+<p>Y1. Utilizar os tickers identificados na listagem da B3.</p>
+<p>Y2. Iterar individualmente sobre os tickers disponíveis.</p>
+<p>Y3. Acrescentar o sufixo <code>.SA</code> a cada ticker antes da consulta. O sufixo é exclusivamente um requisito de consulta ao Yahoo Finance e não integra o identificador persistido (ver Y16).</p>
+<p>Y4. Utilizar a biblioteca <code>yfinance</code> para obter o histórico de cotações.</p>
+<p>Y5. Solicitar o histórico diário completo disponibilizado pela fonte para cada ticker, sem limitar a consulta aos últimos cinco anos ou a qualquer outra janela temporal fixa.</p>
+<p>Y6. Não realizar cálculos sobre os preços.</p>
+<p>Y7. Não calcular retornos, médias, volatilidade ou indicadores derivados.</p>
+<p>Y8. Não realizar arredondamentos.</p>
+<p>Y9. Não aplicar filtros ou deduplicações.</p>
+<p>Y10. Preservar os nomes das colunas retornadas pela biblioteca.</p>
+<p>Y11. Preservar a representação dos valores retornados, convertendo-os para texto para persistência em <code>VARCHAR</code>, sem arredondamento ou formatação adicional.</p>
+<p>Y12. Preservar valores ausentes como nulos.</p>
+<p>Y13. Não realizar ajustes adicionais nos preços ou nas séries históricas.</p>
+<p>Y14. Não acrescentar registros históricos provenientes de execuções anteriores.</p>
+<p>Y15. Acrescentar os metadados de ingestão.</p>
+<p>Y16. Identificar cada registro pelo ticker exatamente como obtido da fonte <code>b3_empresas</code> (ex.: <code>PETR4</code>), sem o sufixo <code>.SA</code>. O símbolo efetivamente consultado no Yahoo Finance (ex.: <code>PETR4.SA</code>) deverá ser registrado em <code>_source_origin</code>.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>O histórico completo permite construir posteriormente séries temporais abrangentes, análises de valorização, retornos e indicadores de mercado.</p>
+<p>A representação textual impede que a camada Bronze imponha tipos ou regras analíticas antes da camada Silver.</p>
+<p>O ticker persistido deve ser idêntico ao identificador de origem da B3, permitindo o cruzamento direto entre as fontes nas camadas seguintes. O sufixo <code>.SA</code> é um artefato do mecanismo de consulta e, se gravado no identificador, constituiria uma alteração do dado de origem (I1).</p>
+<h3 id="estrutura-logica-de-persistencia_1">Estrutura lógica de persistência<a class="headerlink" href="#estrutura-logica-de-persistencia_1" title="Permanent link">&para;</a></h3>
+<p>A tabela deverá possuir uma estrutura capaz de armazenar:</p>
+<ul>
+<li><code>ticker</code>: identificador do ticker conforme a fonte <code>b3_empresas</code>, sem sufixo.</li>
+<li>Colunas retornadas pela biblioteca <code>yfinance</code>, com seus nomes originais.</li>
+<li><code>_timestamp_ingestao</code>.</li>
+<li><code>_source_origin</code>: identificação da fonte acompanhada do símbolo consultado (ex.: <code>Yahoo Finance via yfinance: PETR4.SA</code>).</li>
+</ul>
+<h3 id="criterio-de-aceite_3">Critério de aceite<a class="headerlink" href="#criterio-de-aceite_3" title="Permanent link">&para;</a></h3>
+<p>A tabela deverá armazenar os registros diários retornados pelo yfinance para todos os tickers processados, respeitando o histórico completo disponibilizado pela fonte e a tipagem textual, com a coluna <code>ticker</code> idêntica ao identificador da B3 (sem o sufixo <code>.SA</code>).</p>
+<hr />
+<h1 id="5-regras-gerais-de-imutabilidade">5. REGRAS GERAIS DE IMUTABILIDADE<a class="headerlink" href="#5-regras-gerais-de-imutabilidade" title="Permanent link">&para;</a></h1>
+<p>Esta seção estabelece as regras obrigatórias para todas as quatro fontes.</p>
+<h2 id="i1-proibicao-de-transformacoes">I1. PROIBIÇÃO DE TRANSFORMAÇÕES<a class="headerlink" href="#i1-proibicao-de-transformacoes" title="Permanent link">&para;</a></h2>
+<p>Não será permitido:</p>
+<ul>
+<li>Alterar nomes de colunas.</li>
+<li>Padronizar nomes de empresas.</li>
+<li>Corrigir valores.</li>
+<li>Corrigir CNPJs.</li>
+<li>Remover espaços.</li>
+<li>Alterar letras maiúsculas ou minúsculas.</li>
+<li>Normalizar acentos.</li>
+<li>Converter datas.</li>
+<li>Converter números.</li>
+<li>Converter percentuais.</li>
+<li>Arredondar valores.</li>
+<li>Preencher valores ausentes.</li>
+<li>Remover registros duplicados.</li>
+<li>Aplicar filtros de negócio.</li>
+<li>Calcular indicadores derivados.</li>
+</ul>
+<p><strong>Motivação técnica:</strong></p>
+<p>A camada Bronze deve representar a fronteira entre o dado recebido e o dado tratado.</p>
+<p>Qualquer modificação prematura dificulta a auditoria e compromete a capacidade de reconstruir o dado original.</p>
+<h2 id="i2-tipagem-estrita">I2. TIPAGEM ESTRITA<a class="headerlink" href="#i2-tipagem-estrita" title="Permanent link">&para;</a></h2>
+<p>Todas as colunas de negócio deverão ser persistidas como:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">VARCHAR</span>
+</code></pre></div>
+<p>O payload JSON também deverá ser armazenado em texto.</p>
+<p>Os metadados técnicos deverão possuir representação textual.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>A tipagem é uma decisão de interpretação. A Bronze não deverá assumir que determinado valor representa necessariamente um número, uma data ou outro tipo analítico.</p>
+<h2 id="i3-preservacao-de-nulos">I3. PRESERVAÇÃO DE NULOS<a class="headerlink" href="#i3-preservacao-de-nulos" title="Permanent link">&para;</a></h2>
+<p>Valores nulos deverão permanecer nulos.</p>
+<p>Não será permitido substituir valores ausentes por:</p>
+<ul>
+<li>Zero.</li>
+<li>String vazia.</li>
+<li>Texto padrão.</li>
+<li>Valores estimados.</li>
+</ul>
+<p><strong>Motivação técnica:</strong></p>
+<p>A ausência de informação também é um dado. Substituí-la introduziria informação artificial que não existe na fonte.</p>
+<h2 id="i4-metadados-de-auditoria">I4. METADADOS DE AUDITORIA<a class="headerlink" href="#i4-metadados-de-auditoria" title="Permanent link">&para;</a></h2>
+<p>Todas as tabelas deverão conter os seguintes campos técnicos:</p>
+<table>
+<thead>
+<tr>
+<th>Campo</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_timestamp_ingestao</code></td>
+<td>Data e hora UTC da extração</td>
+</tr>
+<tr>
+<td><code>_source_origin</code></td>
+<td>Identificação da URL, API ou fonte de origem</td>
+</tr>
+</tbody>
+</table>
+<p>O timestamp deverá ser gerado em UTC no momento da extração.</p>
+<p>O valor deverá ser representado textualmente em formato ISO 8601.</p>
+<p>O mesmo timestamp deverá ser utilizado para os registros pertencentes ao mesmo lote de extração de uma fonte.</p>
+<p>Os metadados deverão ser adicionados sem alterar os campos originais.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>Permitem rastrear a origem dos registros e identificar quando os dados foram incorporados ao ambiente analítico.</p>
+<h2 id="i5-substituicao-integral">I5. SUBSTITUIÇÃO INTEGRAL<a class="headerlink" href="#i5-substituicao-integral" title="Permanent link">&para;</a></h2>
+<p>Todas as tabelas deverão ser recriadas a cada execução.</p>
+<p>Não será permitido acumular dados de execuções anteriores.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>A substituição integral garante comportamento determinístico e evita duplicidade decorrente de reexecuções.</p>
+<hr />
+<h1 id="6-tratamento-de-excecoes-e-resiliencia">6. TRATAMENTO DE EXCEÇÕES E RESILIÊNCIA<a class="headerlink" href="#6-tratamento-de-excecoes-e-resiliencia" title="Permanent link">&para;</a></h1>
+<h2 id="e1-retry-e-backoff-exponencial">E1. RETRY E BACKOFF EXPONENCIAL<a class="headerlink" href="#e1-retry-e-backoff-exponencial" title="Permanent link">&para;</a></h2>
+<p>As requisições HTTP e chamadas externas deverão implementar tentativas de recuperação.</p>
+<p>Política definida:</p>
+<ul>
+<li>Até três tentativas por operação.</li>
+<li>Intervalos progressivos entre as tentativas.</li>
+<li>Backoff exponencial.</li>
+<li>Falha definitiva após o esgotamento das tentativas.</li>
+</ul>
+<p>A política deverá ser aplicada às operações externas sujeitas a instabilidade de rede ou limitação de requisições.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>Fontes públicas podem apresentar indisponibilidade temporária, lentidão ou limitação de acesso. As tentativas controladas reduzem falhas ocasionais sem mascarar indisponibilidades permanentes.</p>
+<h2 id="e2-falha-de-extracao">E2. FALHA DE EXTRAÇÃO<a class="headerlink" href="#e2-falha-de-extracao" title="Permanent link">&para;</a></h2>
+<p>Caso qualquer uma das quatro fontes apresente falha permanente:</p>
+<ol>
+<li>Encerrar a operação.</li>
+<li>Não iniciar a persistência.</li>
+<li>Informar a origem da falha no terminal.</li>
+<li>Encerrar o processo com:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+<p><strong>Motivação técnica:</strong></p>
+<p>Impede que uma execução incompleta seja confundida com uma atualização integral da camada Bronze.</p>
+<h2 id="e3-falha-de-persistencia">E3. FALHA DE PERSISTÊNCIA<a class="headerlink" href="#e3-falha-de-persistencia" title="Permanent link">&para;</a></h2>
+<p>Caso alguma das quatro gravações apresente erro:</p>
+<ol>
+<li>Interromper a sequência de gravação.</li>
+<li>Executar <code>ROLLBACK</code> da transação.</li>
+<li>Não confirmar nenhuma das quatro tabelas.</li>
+<li>Fechar a conexão.</li>
+<li>Informar a falha.</li>
+<li>Encerrar com código de saída <code>1</code>.</li>
+</ol>
+<p><strong>Motivação técnica:</strong></p>
+<p>Garante atomicidade entre as quatro tabelas. O banco deverá apresentar o estado anterior à execução ou o novo estado integralmente confirmado, nunca uma atualização parcial.</p>
+<h2 id="e4-controle-de-conexao">E4. CONTROLE DE CONEXÃO<a class="headerlink" href="#e4-controle-de-conexao" title="Permanent link">&para;</a></h2>
+<p>A conexão de escrita deverá ser aberta somente após a conclusão bem-sucedida das quatro extrações.</p>
+<p>O processo deverá controlar explicitamente o fechamento da conexão, inclusive em situações de exceção.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>Evita manter o arquivo DuckDB bloqueado durante operações de rede, que podem ser demoradas ou apresentar instabilidade.</p>
+<h2 id="e5-lock-do-duckdb">E5. LOCK DO DUCKDB<a class="headerlink" href="#e5-lock-do-duckdb" title="Permanent link">&para;</a></h2>
+<p>A execução de ingestão deverá utilizar acesso exclusivo de escrita ao arquivo DuckDB.</p>
+<p>Não deverá existir outro processo concorrente realizando escrita no mesmo arquivo durante a execução.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>O DuckDB possui restrições de concorrência entre processos para escrita no mesmo arquivo. O controle evita conflitos de bloqueio e falhas de persistência.</p>
+<hr />
+<h1 id="7-controle-de-execucao-e-saida-no-terminal">7. CONTROLE DE EXECUÇÃO E SAÍDA NO TERMINAL<a class="headerlink" href="#7-controle-de-execucao-e-saida-no-terminal" title="Permanent link">&para;</a></h1>
+<h2 id="l1-configuracao-utf-8">L1. CONFIGURAÇÃO UTF-8<a class="headerlink" href="#l1-configuracao-utf-8" title="Permanent link">&para;</a></h2>
+<p>No início da execução, o stdout deverá ser reconfigurado para UTF-8.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>Garante a apresentação correta de acentos e caracteres especiais, especialmente em terminais Windows.</p>
+<h2 id="l2-relatorio-de-ingestao">L2. RELATÓRIO DE INGESTÃO<a class="headerlink" href="#l2-relatorio-de-ingestao" title="Permanent link">&para;</a></h2>
+<p>Após a confirmação da transação, imprimir uma linha por tabela contendo:</p>
+<ul>
+<li>Nome qualificado da tabela.</li>
+<li>Quantidade de registros efetivamente gravados no DuckDB.</li>
+</ul>
+<p>Formato de referência:</p>
+<div class="highlight"><pre><span></span><code>raw.b3_empresas                  000.000
+raw.fundamentus_acoes            000.000
+raw.minhareceita_empresas        000.000
+raw.yfinance_cotacoes            000.000
+------------------------------------------------
+TOTAL                            000.000
+</code></pre></div>
+<p>Os números deverão utilizar ponto como separador de milhar.</p>
+<p>A contagem deverá ser obtida diretamente do banco, por consulta <code>COUNT(*)</code>.</p>
+<p>A linha TOTAL deverá representar a soma das quatro contagens confirmadas.</p>
+<p><strong>Motivação técnica:</strong></p>
+<p>O relatório constitui o instrumento de conferência da execução, permitindo verificar a quantidade de registros efetivamente persistidos.</p>
+<h2 id="l3-encerramento">L3. ENCERRAMENTO<a class="headerlink" href="#l3-encerramento" title="Permanent link">&para;</a></h2>
+<p>Após a impressão do relatório, o script deverá finalizar automaticamente e devolver o controle ao terminal.</p>
+<p>Não deverá permanecer nenhum processo de ingestão em execução.</p>
+<hr />
+<h1 id="8-criterios-de-aceite-gerais">8. CRITÉRIOS DE ACEITE GERAIS<a class="headerlink" href="#8-criterios-de-aceite-gerais" title="Permanent link">&para;</a></h1>
+<p>A implementação será considerada aprovada quando atender a todos os critérios abaixo.</p>
+<h2 id="a-integridade-e-tipagem">A. Integridade e tipagem<a class="headerlink" href="#a-integridade-e-tipagem" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Todas as quatro tabelas deverão existir no schema <code>raw</code>.</li>
+<li>Todas as colunas de negócio deverão ser <code>VARCHAR</code>.</li>
+<li>Os metadados técnicos deverão estar presentes em todas as tabelas.</li>
+<li>Nenhum campo de negócio poderá sofrer conversão ou normalização.</li>
+<li>Os valores nulos deverão ser preservados.</li>
+<li>Os registros não poderão ser deduplicados ou filtrados.</li>
+</ul>
+<h2 id="b-b3">B. B3<a class="headerlink" href="#b-b3" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A requisição HTTP deverá utilizar o endereço especificado.</li>
+<li>A tabela deverá conter os registros tabulares extraídos.</li>
+<li>Os CNPJs e tickers deverão estar disponíveis para as fontes dependentes.</li>
+<li>Os nomes originais das colunas deverão ser preservados.</li>
+</ul>
+<h2 id="c-fundamentus">C. Fundamentus<a class="headerlink" href="#c-fundamentus" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A requisição deverá utilizar o endereço especificado.</li>
+<li>A tabela deverá conter os indicadores disponibilizados pela fonte.</li>
+<li>Os valores deverão permanecer em representação textual.</li>
+<li>Não poderão ocorrer conversões numéricas.</li>
+</ul>
+<h2 id="d-minha-receita">D. Minha Receita<a class="headerlink" href="#d-minha-receita" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Deverão ser consultados os CNPJs obtidos da B3.</li>
+<li>A coluna <code>cnpj</code> deverá conter o valor da B3 sem alteração (ex.: <code>191</code>).</li>
+<li>O complemento com zeros à esquerda deverá ocorrer somente na URL de consulta, registrada em <code>_source_origin</code>.</li>
+<li>Identificadores rejeitados pela API (HTTP 400/404) deverão ser informados no terminal.</li>
+<li>Os payloads JSON deverão ser preservados em texto.</li>
+<li>Cada resposta deverá possuir seus respectivos metadados.</li>
+<li>Não poderá ocorrer transformação dos campos originais.</li>
+</ul>
+<h2 id="e-yfinance">E. yfinance<a class="headerlink" href="#e-yfinance" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Todos os tickers identificados deverão ser processados.</li>
+<li>O sufixo <code>.SA</code> deverá ser aplicado na consulta.</li>
+<li>A coluna <code>ticker</code> deverá conter o identificador da B3 sem o sufixo <code>.SA</code>.</li>
+<li>O símbolo consultado deverá constar em <code>_source_origin</code>.</li>
+<li>O histórico completo disponibilizado deverá ser solicitado.</li>
+<li>A persistência deverá preservar os registros retornados pela biblioteca.</li>
+<li>Não poderão ocorrer cálculos ou arredondamentos.</li>
+</ul>
+<h2 id="f-idempotencia">F. Idempotência<a class="headerlink" href="#f-idempotencia" title="Permanent link">&para;</a></h2>
+<p>Executar o pipeline duas vezes consecutivas deverá:</p>
+<ul>
+<li>Substituir integralmente as quatro tabelas.</li>
+<li>Não duplicar registros.</li>
+<li>Não acumular dados de execuções anteriores.</li>
+<li>Produzir contagens correspondentes aos dados obtidos em cada execução.</li>
+</ul>
+<p>As contagens poderão variar entre execuções caso as fontes tenham atualizado seus dados.</p>
+<h2 id="g-atomicidade">G. Atomicidade<a class="headerlink" href="#g-atomicidade" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Simular falha em qualquer fonte deverá impedir a persistência.</li>
+<li>Simular falha durante uma gravação deverá provocar rollback.</li>
+<li>Nenhuma das quatro tabelas poderá ficar parcialmente atualizada.</li>
+<li>O processo deverá retornar código de erro <code>1</code> nas falhas permanentes.</li>
+</ul>
+<h2 id="h-conexoes">H. Conexões<a class="headerlink" href="#h-conexoes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A conexão deverá ser fechada após a execução.</li>
+<li>Nenhum lock deverá permanecer após o encerramento.</li>
+<li>Uma nova execução deverá conseguir acessar o banco normalmente.</li>
+</ul>
+<h2 id="i-saida">I. Saída<a class="headerlink" href="#i-saida" title="Permanent link">&para;</a></h2>
+<ul>
+<li>O terminal deverá apresentar quatro linhas de tabelas.</li>
+<li>Deverá apresentar uma linha final com o total.</li>
+<li>As contagens deverão vir do DuckDB.</li>
+<li>Os números deverão utilizar separador de milhar com ponto.</li>
+<li>A codificação deverá ser UTF-8.</li>
+</ul>
+<hr />
+<h1 id="9-relacao-de-premissas-e-pontos-nao-especificados">9. RELAÇÃO DE PREMISSAS E PONTOS NÃO ESPECIFICADOS<a class="headerlink" href="#9-relacao-de-premissas-e-pontos-nao-especificados" title="Permanent link">&para;</a></h1>
+<p>As premissas abaixo não deverão ser confundidas com requisitos já definidos.</p>
+<ol>
+<li>
+<p><strong>Disponibilidade das fontes:</strong> assume-se que B3, Fundamentus, Minha Receita e Yahoo Finance disponibilizam os dados durante a execução.</p>
+</li>
+<li>
+<p><strong>Estrutura da B3:</strong> assume-se que a página disponibiliza informações suficientes para identificar os CNPJs e tickers das empresas.</p>
+</li>
+<li>
+<p><strong>Estrutura da API:</strong> assume-se que a API Minha Receita disponibiliza respostas JSON para os CNPJs válidos consultados com 14 dígitos. Identificadores inválidos são tratados conforme M6.4.</p>
+</li>
+<li>
+<p><strong>Compatibilidade dos tickers:</strong> assume-se que os identificadores obtidos na B3 podem receber o sufixo <code>.SA</code> e ser utilizados pelo yfinance.</p>
+</li>
+<li>
+<p><strong>Histórico completo:</strong> entende-se por histórico completo todo o histórico diário disponibilizado pelo yfinance para cada ticker no momento da consulta.</p>
+</li>
+<li>
+<p><strong>Comportamento do yfinance:</strong> a preservação será relativa aos dados estruturados retornados pela biblioteca, e não ao payload HTTP original do Yahoo Finance.</p>
+</li>
+<li>
+<p><strong>Mapeamento dos campos:</strong> os nomes técnicos exatos das colunas de CNPJ e ticker na resposta da B3 ainda precisam ser identificados na implementação. Não deverão ser inventados ou presumidos.</p>
+</li>
+<li>
+<p><strong>Dependências auxiliares:</strong> as bibliotecas específicas para requisições HTTP e interpretação de HTML ainda não foram determinadas nesta especificação.</p>
+</li>
+<li>
+<p><strong>Parâmetros do yfinance:</strong> opções adicionais da biblioteca, além do período histórico completo e da periodicidade diária, não foram especificadas e não deverão receber decisões de negócio implícitas.</p>
+</li>
+<li>
+<p><strong>Concorrência:</strong> assume-se que não haverá outro processo de escrita concorrente no arquivo DuckDB durante a ingestão.</p>
+</li>
+</ol>
+<hr />
+<h1 id="10-principio-de-encerramento-da-especificacao">10. PRINCÍPIO DE ENCERRAMENTO DA ESPECIFICAÇÃO<a class="headerlink" href="#10-principio-de-encerramento-da-especificacao" title="Permanent link">&para;</a></h1>
+<p>A camada Bronze deverá ser tratada como a representação persistida dos dados recebidos das fontes, respeitando os limites de cada mecanismo de extração.</p>
+<p>Nenhuma transformação analítica deverá ser introduzida nesta etapa.</p>
+<p>A responsabilidade desta camada termina na obtenção, preservação, rastreabilidade e persistência dos dados.</p>
+<p>A interpretação, tipagem definitiva, padronização, limpeza, validação de negócio e construção de indicadores serão responsabilidades exclusivas das próximas camadas da arquitetura Medallion.</p>
+<p><strong>REGRA FUNDAMENTAL: O dado que chegou à Bronze deve continuar identificável e auditável como dado de origem. A transformação começa somente na Silver.</strong></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>

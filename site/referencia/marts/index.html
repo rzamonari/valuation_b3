@@ -1,0 +1,1516 @@
+
+<!doctype html>
+<html lang="pt" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Pipeline de indicadores fundamentalistas de ações da B3 (Bronze → Silver → Gold) sobre DuckDB, com painel em Streamlit.">
+      
+      
+      
+      
+        <link rel="prev" href="../api/">
+      
+      
+        <link rel="next" href="../rankings/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Indicadores e materialização - B3 Valuation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.fb2fffe2.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#camada-gold-marts-indicadores-fundamentalistas" class="md-skip">
+          Pular para conteúdo
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Cabeçalho">
+    <a href="../.." title="B3 Valuation" class="md-header__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            B3 Valuation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Indicadores e materialização
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema claro"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Tema claro" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Tema escuro"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Tema escuro" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Buscar" placeholder="Buscar" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Pesquisar">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Limpar" aria-label="Limpar" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Inicializando busca
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navegação" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="B3 Valuation" class="md-nav__button md-logo" aria-label="B3 Valuation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    B3 Valuation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Início
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../uso/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Instalação e uso
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../arquitetura/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arquitetura
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Referência da API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Marts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Marts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicadores e materialização
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Indicadores e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-objetivo-e-escopo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Objetivo e escopo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-arquitetura" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Arquitetura
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-fontes-silver-utilizadas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Fontes Silver utilizadas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-mapeamento-de-colunas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Mapeamento de colunas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-formulas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Fórmulas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-tratamento-de-nulos-e-divisoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Tratamento de nulos e divisões
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-indicadores-desconsiderados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Indicadores desconsiderados
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-dependencias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Dependências
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-execucao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Execução
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-validacao-realizada-2026-11-02-conexao-read_only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Validação realizada (2026-11-02, conexão read_only)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-observacoes-e-pendencias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Observações e pendências
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-materializacao-no-schema-marts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Materialização no schema marts
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rankings/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rankings e recomendação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Decisões
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../decisoes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisões
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specs/raw_ingestao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Bronze — ingestão
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specs/refined_transformacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Silver — transformação
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specs/marts.agregacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — agregação e materialização
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specs/marts_sql_indicadores/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — indicadores
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specs/marts_sql_rank/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gold — rankings
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specs/dashboard_apresentacao/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Apresentação — painel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../specs/testes_codigo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Índice">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Índice
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-objetivo-e-escopo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Objetivo e escopo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-arquitetura" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Arquitetura
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-fontes-silver-utilizadas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Fontes Silver utilizadas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-mapeamento-de-colunas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Mapeamento de colunas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-formulas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Fórmulas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-tratamento-de-nulos-e-divisoes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Tratamento de nulos e divisões
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-indicadores-desconsiderados" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Indicadores desconsiderados
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-dependencias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Dependências
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-execucao" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Execução
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-validacao-realizada-2026-11-02-conexao-read_only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Validação realizada (2026-11-02, conexão read_only)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-observacoes-e-pendencias" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Observações e pendências
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-materializacao-no-schema-marts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Materialização no schema marts
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="camada-gold-marts-indicadores-fundamentalistas">Camada Gold (Marts) — Indicadores Fundamentalistas<a class="headerlink" href="#camada-gold-marts-indicadores-fundamentalistas" title="Permanent link">&para;</a></h1>
+<p>Especificação de origem: <code>docs/specs/marts_sql_indicadores.md</code> (v1.0).</p>
+<h2 id="1-objetivo-e-escopo">1. Objetivo e escopo<a class="headerlink" href="#1-objetivo-e-escopo" title="Permanent link">&para;</a></h2>
+<p>Disponibilizar consultas SQL independentes (DuckDB) para os indicadores fundamentalistas e de
+retorno/risco, usando <strong>somente leitura</strong> da camada Silver (<code>refined</code>) do banco
+<code>fundamentalistas.duckdb</code>.</p>
+<p>As camadas Bronze (<code>raw</code>) e Silver (<code>refined</code>) <strong>não foram modificadas</strong>: nenhuma tabela, coluna,
+registro ou arquivo de ingestão/transformação foi alterado. Nenhuma fonte externa foi usada.</p>
+<h2 id="2-arquitetura">2. Arquitetura<a class="headerlink" href="#2-arquitetura" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Camada</th>
+<th>Schema</th>
+<th>Papel</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bronze</td>
+<td><code>raw</code></td>
+<td>Dados brutos ingeridos (<code>pipeline/ingestao.py</code>)</td>
+</tr>
+<tr>
+<td>Silver</td>
+<td><code>refined</code></td>
+<td>Dados tipados e deduplicados (<code>pipeline/transformacao/</code>)</td>
+</tr>
+<tr>
+<td>Gold</td>
+<td><code>marts</code></td>
+<td>Indicadores analíticos: consultas em <code>sql/marts/</code>, materializadas por <code>pipeline/materializacao.py</code></td>
+</tr>
+</tbody>
+</table>
+<p>Os arquivos <code>.sql</code> continuam sendo consultas <code>SELECT</code> puras e a fonte da verdade de cada mart.
+A persistência é feita à parte pelo módulo de materialização (seção 12), sem alterar o texto
+das consultas.</p>
+<h2 id="3-fontes-silver-utilizadas">3. Fontes Silver utilizadas<a class="headerlink" href="#3-fontes-silver-utilizadas" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Tabela</th>
+<th>Chave lógica</th>
+<th>Uso</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>refined.fundamentus_acoes</code></td>
+<td><code>ticker</code> (995 linhas, 995 distintos)</td>
+<td>Marts 1–9</td>
+</tr>
+<tr>
+<td><code>refined.yfinance_cotacoes</code></td>
+<td><code>(ticker, data)</code> (1.920.774 linhas, 609 tickers, sem duplicatas)</td>
+<td>Mart 10</td>
+</tr>
+</tbody>
+</table>
+<p><code>refined.b3_empresas</code> e as tabelas <code>refined.minhareceita_*</code> não são usadas: nenhum indicador
+definido depende delas e não há relacionamento comprovado ticker → setor econômico.</p>
+<p>Nenhum mart faz join entre tabelas diferentes; o único join (mart 10) é da tabela com seu próprio
+agregado por <code>ticker</code> (1:N sobre chave única), sem multiplicação de registros.</p>
+<h2 id="4-mapeamento-de-colunas">4. Mapeamento de colunas<a class="headerlink" href="#4-mapeamento-de-colunas" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Arquivo</th>
+<th>Coluna de saída</th>
+<th>Origem</th>
+<th>Tipo</th>
+<th>Unidade</th>
+<th>Natureza</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>marts_roic.sql</code></td>
+<td><code>roic</code></td>
+<td><code>fundamentus_acoes.roic</code></td>
+<td>DECIMAL(6,2)</td>
+<td>% (0–100)</td>
+<td>Pronto</td>
+</tr>
+<tr>
+<td><code>marts_ev_ebit.sql</code></td>
+<td><code>enterprise_value_ebit</code></td>
+<td><code>fundamentus_acoes.enterprise_value_ebit</code></td>
+<td>DECIMAL(6,2)</td>
+<td>vezes</td>
+<td>Pronto</td>
+</tr>
+<tr>
+<td><code>marts_alavancagem.sql</code></td>
+<td><code>divida_liquida_patrimonio</code></td>
+<td><code>fundamentus_acoes.divida_liquida_patrimonio</code></td>
+<td>DECIMAL(7,2)</td>
+<td>vezes</td>
+<td>Pronto</td>
+</tr>
+<tr>
+<td><code>marts_roe.sql</code></td>
+<td><code>roe</code></td>
+<td><code>fundamentus_acoes.roe</code></td>
+<td>DECIMAL(9,2)</td>
+<td>% (0–100)</td>
+<td>Pronto</td>
+</tr>
+<tr>
+<td><code>marts_preco_lucro.sql</code></td>
+<td><code>preco_lucro</code></td>
+<td><code>fundamentus_acoes.preco_lucro</code></td>
+<td>DECIMAL(7,2)</td>
+<td>vezes</td>
+<td>Pronto</td>
+</tr>
+<tr>
+<td><code>marts_preco_lucro.sql</code></td>
+<td><code>earnings_yield</code></td>
+<td><code>100.0 / preco_lucro</code></td>
+<td>DOUBLE</td>
+<td>% (0–100)</td>
+<td>Derivado</td>
+</tr>
+<tr>
+<td><code>marts_margens.sql</code></td>
+<td><code>margem_ebit</code>, <code>margem_liquida</code>, <code>margem_bruta</code></td>
+<td>colunas homônimas</td>
+<td>DECIMAL</td>
+<td>% (0–100)</td>
+<td>Pronto</td>
+</tr>
+<tr>
+<td><code>marts_crescimento_receita_5_anos.sql</code></td>
+<td><code>crescimento_receita_5_anos</code></td>
+<td>coluna homônima</td>
+<td>DECIMAL(6,2)</td>
+<td>% (0–100)</td>
+<td>Pronto</td>
+</tr>
+<tr>
+<td><code>marts_dividend_yield_payout.sql</code></td>
+<td><code>dividend_yield</code></td>
+<td><code>fundamentus_acoes.dividend_yield</code></td>
+<td>DECIMAL(6,2)</td>
+<td>% (0–100)</td>
+<td>Pronto</td>
+</tr>
+<tr>
+<td><code>marts_dividend_yield_payout.sql</code></td>
+<td><code>payout</code></td>
+<td><code>dividend_yield * preco_lucro</code></td>
+<td>DECIMAL(13,4)</td>
+<td>% (0–100)</td>
+<td>Derivado</td>
+</tr>
+<tr>
+<td><code>marts_p_vp.sql</code></td>
+<td><code>preco_valor_patrimonial</code>, <code>roe</code></td>
+<td>colunas homônimas</td>
+<td>DECIMAL</td>
+<td>vezes / %</td>
+<td>Pronto</td>
+</tr>
+<tr>
+<td><code>marts_p_vp.sql</code></td>
+<td><code>p_vp_por_roe</code></td>
+<td><code>preco_valor_patrimonial / roe</code></td>
+<td>DOUBLE</td>
+<td>vezes por p.p. de ROE</td>
+<td>Derivado</td>
+</tr>
+<tr>
+<td><code>marts_retorno_total_risco.sql</code></td>
+<td><code>cagr</code></td>
+<td><code>fechamento_ajustado</code></td>
+<td>DOUBLE</td>
+<td>% (0–100)</td>
+<td>Derivado</td>
+</tr>
+<tr>
+<td><code>marts_retorno_total_risco.sql</code></td>
+<td><code>volatilidade_anualizada</code></td>
+<td><code>fechamento_ajustado</code></td>
+<td>DOUBLE</td>
+<td>% (0–100)</td>
+<td>Derivado</td>
+</tr>
+<tr>
+<td><code>marts_retorno_total_risco.sql</code></td>
+<td><code>max_drawdown</code></td>
+<td><code>fechamento_ajustado</code></td>
+<td>DOUBLE</td>
+<td>% (0–100, ≤ 0)</td>
+<td>Derivado</td>
+</tr>
+</tbody>
+</table>
+<p>O mart 10 também expõe colunas de rastreabilidade: <code>data_inicial</code>, <code>data_final</code>, <code>anos</code>,
+<code>qtd_precos_validos</code>, <code>qtd_retornos</code>, <code>preco_inicial</code>, <code>preco_final</code>.</p>
+<h2 id="5-formulas">5. Fórmulas<a class="headerlink" href="#5-formulas" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Earnings Yield</strong> = <code>100.0 / preco_lucro</code>; P/L zero ou NULL → NULL.</li>
+<li><strong>Payout</strong> = <code>dividend_yield * preco_lucro</code> (ex.: DY 6 × P/L 10 = 60%); componente NULL → NULL;
+  P/L zero → 0 (sem divisão).</li>
+<li><strong>P/VP ÷ ROE</strong> = <code>preco_valor_patrimonial / roe</code>; ROE zero ou NULL → NULL.</li>
+<li><strong>Retorno total e risco</strong> (metodologia aprovada em 2026-11-02):</li>
+<li>Janela: 5 anos até a última cotação de cada ticker (<code>data &gt;= MAX(data) - INTERVAL 5 YEAR</code>).</li>
+<li>Preço válido: <code>fechamento_ajustado &gt; 0</code>; NULL ou ≤ 0 é inválido e não gera retorno.</li>
+<li><code>cagr = ((preco_final / preco_inicial) ^ (1 / anos) - 1) * 100</code>, com primeiro/último preço
+    válido da janela e <code>anos = dias entre eles / 365.25</code>; NULL quando <code>anos = 0</code>.</li>
+<li><code>volatilidade_anualizada = stddev_samp(ln(P_t / P_t-1)) * sqrt(252) * 100</code>; o retorno é NULL
+    se qualquer dos dois preços for inválido; NULL com menos de 2 retornos.</li>
+<li><code>max_drawdown = min(P_t / max(P_0..P_t) - 1) * 100</code>.</li>
+</ul>
+<h2 id="6-tratamento-de-nulos-e-divisoes">6. Tratamento de nulos e divisões<a class="headerlink" href="#6-tratamento-de-nulos-e-divisoes" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Valores do Fundamentus são devolvidos sem arredondamento, troca de escala ou filtro.</li>
+<li>Nulos são preservados e nunca substituídos por zero; negativos são preservados.</li>
+<li>Toda divisão é protegida por <code>CASE WHEN denominador = 0 THEN NULL</code>; o registro da empresa é
+  mantido, apenas o indicador derivado fica NULL.</li>
+<li>Datas ausentes nas cotações não são preenchidas.</li>
+</ul>
+<h2 id="7-indicadores-desconsiderados">7. Indicadores desconsiderados<a class="headerlink" href="#7-indicadores-desconsiderados" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Indicador</th>
+<th>Justificativa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dívida líquida/EBITDA</td>
+<td>Silver não possui dívida líquida nem EBITDA em valores monetários</td>
+</tr>
+<tr>
+<td>Sharpe</td>
+<td>Sem taxa livre de risco nem metodologia aprovada</td>
+</tr>
+<tr>
+<td>Comparação setorial de margens</td>
+<td><code>b3_empresas.segmento</code> é segmento de listagem, não setor econômico</td>
+</tr>
+<tr>
+<td>Valor justo por Gordon</td>
+<td>Ke e crescimento perpétuo sem parà¢metros aprovados</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-dependencias">8. Dependências<a class="headerlink" href="#8-dependencias" title="Permanent link">&para;</a></h2>
+<p>Nenhum arquivo SQL depende de outro. Cada um depende apenas de uma tabela Silver:
+marts 1–9 → <code>refined.fundamentus_acoes</code>; mart 10 → <code>refined.yfinance_cotacoes</code>.</p>
+<h2 id="9-execucao">9. Execução<a class="headerlink" href="#9-execucao" title="Permanent link">&para;</a></h2>
+<p>Com o projeto (<code>pipeline/db.py</code> fornece <code>conectar()</code>; para consulta use somente leitura):</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">duckdb</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+<span class="n">con</span> <span class="o">=</span> <span class="n">duckdb</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"fundamentalistas.duckdb"</span><span class="p">,</span> <span class="n">read_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">con</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"sql/marts/marts_roic.sql"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span><span class="o">.</span><span class="n">df</span><span class="p">()</span>
+</code></pre></div>
+<p>Ou pela CLI do DuckDB: <code>duckdb -readonly fundamentalistas.duckdb &lt; sql/marts/marts_roic.sql</code>.</p>
+<h2 id="10-validacao-realizada-2026-11-02-conexao-read_only">10. Validação realizada (2026-11-02, conexão <code>read_only</code>)<a class="headerlink" href="#10-validacao-realizada-2026-11-02-conexao-read_only" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Todos os 10 SQLs executam no DuckDB; todas as tabelas/colunas referenciadas existem.</li>
+<li>Marts 1–9: 995 linhas = 995 tickers distintos (sem multiplicação nem perda de registros).</li>
+<li>Mart 10: 609 linhas = 609 tickers distintos da Silver.</li>
+<li>Fórmulas derivadas recalculadas linha a linha: 0 divergências; 0 valores infinitos/NaN;
+  <code>earnings_yield</code> NULL em exatamente os 90 casos de P/L = 0; <code>p_vp_por_roe</code> NULL nos 31 casos
+  de ROE = 0; exemplo de payout DY 6 × P/L 10 = 60.</li>
+<li>Mart 10 conferido contra implementação independente em pandas (VALE3, PETR4, ITUB4 e PPAR3,
+  este com preços inválidos): CAGR, volatilidade e drawdown idênticos até 6 casas decimais.</li>
+<li>Integridade da Silver: contagem e hash determinístico de <code>refined.yfinance_cotacoes</code>
+  idênticos antes e depois; <code>git status</code> só mostra <code>sql/</code> como novo.</li>
+</ul>
+<h2 id="11-observacoes-e-pendencias">11. Observações e pendências<a class="headerlink" href="#11-observacoes-e-pendencias" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Zeros no Fundamentus</strong>: as colunas do Fundamentus quase não têm NULL (apenas 9 em
+  <code>divida_liquida_patrimonio</code>), mas têm muitos zeros (ex.: 90 P/L, 31 ROE, 698 DY), e alguns
+  tickers têm <code>cotacao = 0</code>. O zero pode representar ausência de dado na origem. Por regra
+  (§5.2/§5.3) os zeros foram preservados; tratá-los como NULL exige regra aprovada.</li>
+<li><strong>Qualidade das cotações</strong>: 18.350 linhas de 8 tickers têm <code>fechamento_ajustado &lt; 0</code> e 1 linha é
+  NULL; são tratadas como inválidas. Há volatilidades extremas (máx. ≤ˆ 2.110% a.a.) que indicam
+  séries ajustadas anômalas na origem — preservadas, sem filtro não especificado.</li>
+<li>160 tickers têm <code>cagr</code> e <code>volatilidade_anualizada</code> NULL: todos possuem no máximo uma cotação
+  válida na Silver, portanto não há intervalo nem retornos para calcular.</li>
+</ul>
+<h2 id="12-materializacao-no-schema-marts">12. Materialização no schema <code>marts</code><a class="headerlink" href="#12-materializacao-no-schema-marts" title="Permanent link">&para;</a></h2>
+<p>Spec: <code>docs/specs/marts.agregacao.md</code> (ajuste "Materialização dos resultados na camada Gold").</p>
+<div class="highlight"><pre><span></span><code>uv run python -m pipeline.materializacao
+</code></pre></div>
+<p>Executar depois de <code>pipeline.transformacao</code>. Feche a DuckDB UI (<code>ui.py</code>) antes, porque o arquivo do
+banco fica bloqueado enquanto ela está aberta. O painel (<code>app.py</code>) pode continuar de pé: ele abre
+e fecha a conexão a cada leitura.</p>
+<p>O painel lê diretamente estas tabelas (<code>SELECT * FROM marts."&lt;nome&gt;"</code>) e não executa os <code>.sql</code>
+(spec <code>dashboard_apresentacao.md</code> v1.5). Depois de materializar, clique em "Recarregar dados".</p>
+<p><strong>Inventário e nomes.</strong> Cada <code>sql/marts/&lt;nome&gt;.sql</code> vira a tabela <code>marts.&lt;nome&gt;</code> (ex.:
+<code>marts_roic.sql</code> → <code>marts.marts_roic</code>). A chave lógica de cada arquivo está declarada em
+<code>pipeline/materializacao.py</code> (<code>MARTS</code>), conforme o comentário "Grão:" do próprio SQL. Um <code>.sql</code>
+novo sem chave declarada, ou uma chave declarada sem <code>.sql</code>, interrompe a execução.</p>
+<table>
+<thead>
+<tr>
+<th>Tabelas</th>
+<th>Natureza</th>
+<th>Chave lógica</th>
+<th>Estratégia</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>marts_01</code> … <code>marts_10_rank_*</code>, <code>marts_50_rank_recomendacoes</code></td>
+<td>fotografia por ticker</td>
+<td><code>ticker</code></td>
+<td>substituição integral</td>
+</tr>
+<tr>
+<td><code>marts_alavancagem</code>, <code>marts_crescimento_receita_5_anos</code>, <code>marts_dividend_yield_payout</code>, <code>marts_ev_ebit</code>, <code>marts_margens</code>, <code>marts_p_vp</code>, <code>marts_preco_lucro</code>, <code>marts_roe</code>, <code>marts_roic</code></td>
+<td>fotografia por ticker</td>
+<td><code>ticker</code></td>
+<td>substituição integral</td>
+</tr>
+<tr>
+<td><code>marts_retorno_total_risco</code>, <code>marts_painel_indicadores</code></td>
+<td>fotografia por ticker</td>
+<td><code>ticker</code></td>
+<td>substituição integral</td>
+</tr>
+<tr>
+<td><code>marts_card_01</code> … <code>marts_card_05</code>, <code>marts_card_02_acoes_semindicacao</code>, <code>marts_painel_data_referencia</code></td>
+<td>agregado de linha única</td>
+<td>— (exatamente 1 linha)</td>
+<td>substituição integral</td>
+</tr>
+<tr>
+<td><code>marts_cotacao</code></td>
+<td>série histórica</td>
+<td><code>(ticker, data)</code></td>
+<td>substituição integral</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Por que a cotação também é substituída por inteiro.</strong> A consulta devolve o histórico completo de
+<code>refined.yfinance_cotacoes</code>, sem filtro incremental, e a própria Silver é recriada por inteiro a
+cada transformação. O <code>fechamento_ajustado</code> é recalculado retroativamente pelo YFinance a cada
+provento ou desdobramento. Acrescentar só as datas novas deixaria preços antigos desatualizados e
+manteria linhas que já saíram da Silver.</p>
+<p><strong>Fluxo e atomicidade.</strong>
+1. Cada consulta é executada uma vez para uma tabela temporária da conexão. As colunas e os tipos
+   precisam bater com o <code>DESCRIBE</code> da consulta, e a chave não pode ter nulos nem duplicatas.
+2. Todas as tabelas <code>marts.*</code> são substituídas (<code>CREATE OR REPLACE TABLE … AS SELECT * FROM
+   &lt;temporária&gt;</code>) em uma única transação.
+3. Antes do <code>COMMIT</code>, cada tabela é comparada com a temporária: quantidade de registros, colunas,
+   tipos, chave e <code>EXCEPT ALL</code> nos dois sentidos (multiconjunto, com NULL igual a NULL). Isso
+   cobre valores, nulos e duplicações.
+4. Qualquer falha (erro de SQL, chave, divergência) dispara um <code>ROLLBACK</code>. Nesse caso nenhuma
+   tabela Gold muda, o erro informa a etapa, o arquivo e a tabela, e o processo sai com código 1.</p>
+<p>Só o schema <code>marts</code> é criado ou alterado. Tabelas em <code>marts</code> sem <code>.sql</code> correspondente não são
+apagadas: aparecem no relatório como órfãs, para decisão manual.</p>
+<p><strong>Validação realizada (2026-11-03, banco real).</strong> 30/30 consultas inventariadas, executadas e
+materializadas, num total de 1.934.482 registros (1.920.774 em <code>marts_cotacao</code>). Duas execuções
+seguidas resultaram no mesmo conteúdo, sem duplicações. A contagem e o hash de todas as tabelas
+<code>raw</code> e <code>refined</code> ficaram idênticos antes e depois. Em uma conexão nova, 29 de 30 tabelas são
+idênticas à consulta reexecutada. A exceção é <code>marts_retorno_total_risco</code>: o
+<code>stddev_samp</code> da volatilidade, executado em paralelo, varia no último bit entre execuções da
+<em>própria consulta</em> (|Δ| ≤ 3e-14 em 3 tickers). Por isso a validação compara a tabela com o resultado
+capturado na mesma execução, e não com uma nova execução.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "content.code.copy"], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copiado para \u00e1rea de transfer\u00eancia", "clipboard.copy": "Copiar para \u00e1rea de transfer\u00eancia", "search.result.more.one": "mais 1 nesta p\u00e1gina", "search.result.more.other": "# mais nesta p\u00e1gina", "search.result.none": "Nenhum documento encontrado", "search.result.one": "1 documento encontrado", "search.result.other": "# documentos encontrados", "search.result.placeholder": "Digite para iniciar a busca", "search.result.term.missing": "Ausente", "select.version": "Selecione a vers\u00e3o"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>
