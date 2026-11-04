@@ -27,6 +27,10 @@ origem na docstring, junto das decisões de implementação.
   com critérios `> 0` em vez de reescrevê-los.
 - **Cards copiam a consulta de `marts_50`.** Cada mart do painel é autocontido; a consistência
   com a recomendação consolidada é garantida por teste (`test/test_sql_marts.py`).
+- **Toda mudança entra por PR com o CI verde, inclusive `data:` e `docs:`.** A `main` é
+  protegida: sem push direto nem force push; os checks `ruff`, `pytest (ubuntu-latest)` e
+  `pytest (windows-latest)` são obrigatórios e a branch precisa estar atualizada com a `main`
+  antes do merge. Sem exigência de revisor (projeto de um autor só); a branch é apagada no merge.
 
 ## Limitações aceitas
 

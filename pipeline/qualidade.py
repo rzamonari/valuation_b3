@@ -33,6 +33,10 @@ Execução: uv run python -m pipeline.qualidade   (depois da materialização; s
      anterior): AVISO na Silver, que preserva o dado como veio; ERRO no mart de retorno e
      risco se algum indicador for calculado com preço ≤ 0 na janela de 5 anos (o mart deixa
      o ticker sem cálculo, com motivo_sem_calculo).
+   - Salto sem evento (razão diária do fechamento > LIMITE_SALTO ou < 1/LIMITE_SALTO num dia
+     sem desdobramento nem provento: grupamento não registrado ou cotação errada, D2 da spec
+     de indicadores): AVISO na Silver com uma linha por salto; ERRO se um ticker com algum
+     indicador de retorno e risco tiver um salto assim na janela de 5 anos.
    NULL não viola regra de domínio: NOT (NULL) não seleciona a linha (nulos preservados).
 4. Tabela ausente ou consulta inválida é ERRO, qualquer que seja a severidade declarada.
 """
@@ -94,6 +98,15 @@ EXCLUSOES = "marts.marts_exclusoes_universo"
 EXCLUSOES_MOTIVO = "marts.marts_painel_exclusoes_motivo"
 RISCO = "marts.marts_retorno_total_risco"
 INDICADORES_RISCO = ("cagr", "volatilidade_anualizada", "max_drawdown")
+LIMITE_SALTO = 5  # D2: 278 saltos em 1,9 mi de razões; p99,99 sem evento = 2,82
+# Saltos sem evento em toda a Silver, com a razão calculada sobre o pregão anterior.
+SALTOS_SEM_EVENTO = (
+    "SELECT ticker, data, razao FROM (SELECT ticker, data, "
+    "fechamento / LAG(fechamento) OVER (PARTITION BY ticker ORDER BY data) AS razao, "
+    "desdobramentos > 0 OR dividendos > 0 AS evento "
+    "FROM refined.yfinance_cotacoes WHERE fechamento > 0) "
+    f"WHERE NOT evento AND (razao > {LIMITE_SALTO} OR razao < 1.0 / {LIMITE_SALTO})"
+)
 MOTIVOS_EXCLUSAO = (
     "Fracionário",
     "BDR",
@@ -429,6 +442,12 @@ def _dominio_refined():
             "fechamento_ajustado > 0",
             ["ticker", "data", "fechamento_ajustado"],
         ),
+        Verificacao(
+            f"YFinance: fechamento sem salto > {LIMITE_SALTO}x sem evento",
+            DOMINIO_REFINED,
+            AVISO,
+            f"SELECT * FROM ({SALTOS_SEM_EVENTO}) ORDER BY data DESC, ticker",
+        ),
     ]
     return regras
 
@@ -518,6 +537,20 @@ def _dominio_marts():
             "WHERE c.fechamento_ajustado <= 0 AND ("
             + " OR ".join(f"r.{c} IS NOT NULL" for c in INDICADORES_RISCO)
             + ") GROUP BY r.ticker",
+        ),
+        Verificacao(
+            "marts_retorno_total_risco: nenhum indicador calculado com salto sem evento "
+            "na janela",
+            DOMINIO_MARTS,
+            ERRO,
+            "SELECT r.ticker, COUNT(*) AS saltos "
+            f"FROM {RISCO} r "
+            "JOIN (SELECT ticker, MAX(data) AS fim FROM refined.yfinance_cotacoes "
+            "GROUP BY ticker) l ON l.ticker = r.ticker "
+            f"JOIN ({SALTOS_SEM_EVENTO}) s ON s.ticker = r.ticker "
+            "AND s.data >= l.fim - INTERVAL 5 YEAR WHERE "
+            + " OR ".join(f"r.{c} IS NOT NULL" for c in INDICADORES_RISCO)
+            + " GROUP BY r.ticker",
         ),
         _regra(
             "marts_retorno_total_risco: ticker sem cálculo não tem indicador",

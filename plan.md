@@ -318,6 +318,11 @@ uv run mkdocs build --strict
 O CI (`.github/workflows/ci.yml`) repete as três primeiras e confere `requirements.txt` e a
 fotografia versionada.
 
+**Toda mudança entra por PR com o CI verde, inclusive `data:` e `docs:`.** A `main` é protegida
+(sem push direto nem force push; checks `ruff`, `pytest (ubuntu-latest)` e
+`pytest (windows-latest)` obrigatórios; branch atualizada antes do merge). O PR segue
+`.github/pull_request_template.md`.
+
 - [ ] Mudança na camada correta (seção 2); sem cálculo fora da Gold.
 - [ ] Testes de sucesso, erro e bordas (nulos, duplicatas, tabela vazia, divisão por zero, zeros do Fundamentus); sem rede e sem banco real.
 - [ ] Cobertura ≥ 85% sem mexer em `fail_under`/`omit`.
@@ -337,6 +342,7 @@ fotografia versionada.
 | Zeros do Fundamentus significando ausência | Rankings distorcidos | Preservados e excluídos pelos critérios `> 0` |
 | Payout estimado (`DY × P/L`) acima de 100% | Proventos favorece pagadora insustentável | Desempate por menor payout; documentado (56 de 256 elegíveis) |
 | `fechamento_ajustado` negativo (8 tickers) | Métricas de risco erradas | Provento ≥ fechamento anterior inverte o ajuste do Yahoo: ticker sem cálculo no mart, com `motivo_sem_calculo` (D1 da spec de indicadores); ERRO na qualidade se o mart calcular com preço ≤ 0; preço ≤ 0 fora do gráfico |
+| Salto sem evento no fechamento (grupamento não registrado) | Métricas de risco erradas | Razão diária > 5 ou < 0,2 sem desdobramento nem provento na janela: ticker sem cálculo (D2); AVISO na Silver e ERRO se o mart calcular |
 | 454 tickers sem emissora na B3 | Ficam fora dos rankings | Explicado por motivo em `marts_exclusoes_universo` e no painel; join alternativo avaliado e descartado (cadastro só de ativas; `otherCodes` não recupera nenhum) |
 | Classes ON/PN da mesma emissora | Aparecem empatadas | Documentado como limitação |
 | Arquivo DuckDB bloqueado | Etapa não grava | Fechar a UI; painel usa `read_only` |

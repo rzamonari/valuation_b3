@@ -107,7 +107,8 @@ vêm do `uv.lock` / [requirements.txt](requirements.txt), exportado dele
 (`uv export --no-dev --no-hashes --no-emit-project --locked -o requirements.txt`); o CI falha se
 os dois divergirem.
 
-**Atualizar os dados publicados:** gerar → verificar → commit → o Cloud faz o redeploy.
+**Atualizar os dados publicados:** gerar → verificar → PR → merge com o CI verde → o Cloud faz
+o redeploy.
 
 ```powershell
 uv run python -m pipeline.ingestao        # dados novos das 4 fontes
@@ -115,9 +116,11 @@ uv run python -m pipeline.transformacao
 uv run python -m pipeline.materializacao
 uv run python -m pipeline.fotografia      # gerar: exige a qualidade sem erros
 uv run python -m pipeline.fotografia --verificar   # verificar: hashes do manifesto
+git switch -c data/fotografia-<data de referência>
 git add fotografia/
 git commit -m "data: fotografia de <data de referência>"
-git push origin main                      # o Cloud detecta o push e refaz o deploy
+git push -u origin HEAD
+gh pr create --fill                       # merge com o CI verde; o Cloud refaz o deploy
 ```
 
 Depois do redeploy, o cabeçalho do painel mostra a nova data de referência e o início do novo
@@ -199,16 +202,17 @@ As 10 primeiras posições do ranking consolidado:
 | 5 | LREN3 | Lojas Renner | Tecidos, Vestuário e Calçados | +7 |
 | 5 | POMO3 | Marcopolo | Material Rodoviário | +7 |
 
-**Qualidade dos dados** (`uv run python -m pipeline.qualidade`): 77 verificações, **0 erros** e
-10 avisos. Todas as reconciliações raw → refined → marts batem, inclusive universo + exclusões =
+**Qualidade dos dados** (`uv run python -m pipeline.qualidade`): 79 verificações, **0 erros** e
+11 avisos. Todas as reconciliações raw → refined → marts batem, inclusive universo + exclusões =
 995 tickers do Fundamentus, sem sobreposição. Os avisos são extremos reais da
 fonte, preservados na Silver como vieram: ROE e margens fora de ±100%, 33 cotações zeradas no
-Fundamentus (zero significa ausência) e 18.350 fechamentos ajustados negativos no Yahoo Finance
-(8 tickers). Nenhum retorno ou risco é calculado a partir desses preços: os 3 tickers com o
-defeito na janela de 5 anos (PPAR3, MMAQ3, MMAQ4) ficam sem cálculo, e a qualidade dá ERRO se
+Fundamentus (zero significa ausência), 18.350 fechamentos ajustados negativos no Yahoo Finance
+(8 tickers) e 278 saltos no fechamento sem desdobramento nem provento (90 tickers). Nenhum
+retorno ou risco é calculado a partir desses preços: os 6 tickers com um dos defeitos na janela
+de 5 anos (PPAR3, AZUL3, FIGE3, MMAQ3, MMAQ4, PINE3) ficam sem cálculo, e a qualidade dá ERRO se
 isso mudar.
 
-**Testes:** 231 casos, cobertura de 93%, sem rede e sem tocar o banco real.
+**Testes:** 243 casos, cobertura de 93%, sem rede e sem tocar o banco real.
 
 ## Limitações
 
@@ -225,9 +229,12 @@ isso mudar.
   fechamento anterior: o fator de ajuste `1 − provento / fechamento` fica negativo e inverte o
   sinal do passado. Os tickers com esse defeito na janela de 5 anos aparecem na ficha sem
   retorno e risco, com o motivo (`motivo_sem_calculo`, decisão D1 em
-  [docs/specs/marts_sql_indicadores.md](docs/specs/marts_sql_indicadores.md)). MMAQ3 e MMAQ4
-  também têm um salto no fechamento bruto (3,00 e 163,86 → 2.550,01 em 2024-12-27) sem
-  desdobramento registrado, que ainda precisa de regra própria.
+  [docs/specs/marts_sql_indicadores.md](docs/specs/marts_sql_indicadores.md)).
+- O fechamento do Yahoo já vem ajustado por desdobramento. Por isso, uma razão diária acima de 5
+  ou abaixo de 0,2 num pregão sem desdobramento nem provento indica grupamento não registrado ou
+  cotação errada (decisão D2). Com um salto assim na janela de 5 anos, o ticker também fica sem
+  retorno e risco (AZUL3, FIGE3, MMAQ3, MMAQ4 e PINE3 nesta fotografia). Um salto espalhado por
+  vários pregões, cada um abaixo do limite, não é detectado.
 - A fotografia ocupa cerca de 27 MB por versão no histórico do git. Se as atualizações ficarem
   frequentes, vale migrar `fotografia/` para Git LFS.
 

@@ -227,7 +227,9 @@ Metodologia: janela de 5 anos até a última cotação; preço válido = `fecham
 `volatilidade = stddev_samp(ln(Pt/Pt−1)) × √252 × 100`; `max_drawdown = min(Pt / max(P0..Pt) − 1) × 100`.
 Janela com `fechamento_ajustado ≤ 0`, ou com provento ≥ fechamento anterior (ajuste retroativo
 inválido do Yahoo), deixa o ticker sem cálculo: indicadores e preços ficam NULL e
-`motivo_sem_calculo` é preenchido (PPAR3, MMAQ3 e MMAQ4 na base atual).
+`motivo_sem_calculo` é preenchido (PPAR3, MMAQ3 e MMAQ4 na base atual). O mesmo vale para um salto
+sem evento na janela: razão diária do fechamento > 5 ou < 0,2 sem desdobramento nem provento (D2;
+AZUL3, FIGE3, MMAQ3, MMAQ4 e PINE3). O motivo diz se é a D1, a D2 ou as duas.
 
 ### 6.3 Rankings temáticos (`marts_01` … `marts_10`, chave `ticker`)
 
@@ -341,7 +343,7 @@ verificação de **erro** falhar.
 |---|---|
 | `Verificacao(nome, camada, severidade, sql)` | Regra declarada; `severidade` = `ERRO` ou `AVISO` |
 | `Resultado` | `violacoes`, `exemplos`, `falha` (consulta não executou) e `status` (`OK`, `AVISO`, `ERRO`) |
-| `verificacoes()` | Catálogo completo (77 verificações) |
+| `verificacoes()` | Catálogo completo (79 verificações) |
 | `executar(con, catalogo=None)` / `erros(resultados)` | Executa e filtra os erros |
 | `exigir(con)` | Executa e levanta `ErroQualidade` se houver erro (portão da fotografia) |
 
@@ -350,13 +352,13 @@ verificação de **erro** falhar.
 | raw → refined | chaves distintas da Bronze = registros da Silver; mesma `_timestamp_ingestao` (4 fontes) | erro |
 | refined → marts | marts do Fundamentus com os mesmos tickers; `marts_cotacao` com as mesmas chaves; rankings dentro do universo; `marts_50` = universo negociado; painel e cards = `marts_50`; universo + exclusões = Fundamentus, sem sobreposição; contagem por motivo = exclusões | erro |
 | domínio refined | DY ≥ 0, liquidez ≥ 0, crescimento ≥ −100%, fechamento > 0, volume/dividendos/desdobramentos ≥ 0 | erro |
-| domínio refined | cotação > 0 (zero = ausência), percentuais em faixas plausíveis (`FAIXAS_PLAUSIVEIS`), máxima ≥ mínima, fechamento ajustado > 0 | aviso |
-| domínio marts | `marts_50`: cotação > 0, saldo em [−10, 10], faixas somam 10, recomendação coerente com o saldo, faixas válidas; rank ≥ 1; termômetro em [0, 100]; data de referência informada; motivo de exclusão na categoria fechada; `marts_retorno_total_risco` sem indicador calculado com fechamento ajustado ≤ 0 na janela e sem indicador quando há `motivo_sem_calculo` | erro |
+| domínio refined | cotação > 0 (zero = ausência), percentuais em faixas plausíveis (`FAIXAS_PLAUSIVEIS`), máxima ≥ mínima, fechamento ajustado > 0, fechamento sem salto > 5× sem evento | aviso |
+| domínio marts | `marts_50`: cotação > 0, saldo em [−10, 10], faixas somam 10, recomendação coerente com o saldo, faixas válidas; rank ≥ 1; termômetro em [0, 100]; data de referência informada; motivo de exclusão na categoria fechada; `marts_retorno_total_risco` sem indicador calculado com fechamento ajustado ≤ 0 ou salto sem evento na janela e sem indicador quando há `motivo_sem_calculo` | erro |
 | domínio marts | mais de `LIMITE_NAO_IDENTIFICADO` (10) exclusões com motivo "Não identificado" | aviso |
 
 As faixas plausíveis são aviso porque o Fundamentus publica extremos reais (ROE acima de
 1.000.000%, margem líquida de 144.637%) e a Silver preserva o dado como veio. Nulo não viola
-regra de domínio. Na base de 02/11/2026: 67 ok, 10 avisos, 0 erros.
+regra de domínio. Na base de 02/11/2026: 68 ok, 11 avisos, 0 erros.
 
 ---
 
@@ -474,8 +476,9 @@ para uma pasta vazia: nenhum teste toca o banco real, a fotografia versionada ne
 - 8 tickers têm `fechamento_ajustado < 0` em parte do histórico, por um provento ≥ fechamento
   anterior no ajuste retroativo do Yahoo. A Silver preserva o dado; os 3 com o defeito na janela
   de 5 anos (PPAR3, MMAQ3, MMAQ4) ficam sem retorno e risco, com `motivo_sem_calculo`.
-- MMAQ3/MMAQ4 têm um salto de 3,00 e 163,86 para 2.550,01 no fechamento bruto (2024-12-27), sem
-  desdobramento registrado; pendente de regra própria quando 2024 sair da janela.
+- Saltos sem evento no fechamento (razão diária > 5 ou < 0,2 sem desdobramento nem provento) na
+  janela de 5 anos deixam o ticker sem retorno e risco (D2: AZUL3, FIGE3, MMAQ3, MMAQ4, PINE3).
+  Um salto espalhado por vários pregões, cada um abaixo do limite, não é detectado.
 - `marts_retorno_total_risco` pode variar no último bit da volatilidade entre execuções
   (`stddev_samp` paralelo); por isso a materialização compara com a temporária, não com uma reexecução.
 
