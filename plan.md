@@ -41,7 +41,7 @@ indicadores e rankings fundamentalistas e exibi-los num painel somente leitura.
 | Camada | Schema | Artefato | Regra |
 |---|---|---|---|
 | Bronze | `raw` | `pipeline/ingestao.py` | Dado como veio, tudo `VARCHAR`, com `_timestamp_ingestao` e `_source_origin` |
-| Silver | `refined` | `pipeline/transformacao.py` | Tipagem estrita, deduplicação, validação de chave; **sem cálculo, sem preencher ausentes** |
+| Silver | `refined` | `pipeline/transformacao/` | Tipagem estrita, deduplicação, validação de chave; **sem cálculo, sem preencher ausentes** |
 | Gold | `marts` | `sql/marts/*.sql` + `pipeline/materializacao.py` | Um `SELECT` puro por mart, lendo só `refined`; o `.sql` é a fonte da verdade |
 | Apresentação | — | `painel.py` + `app.py` | Só lê, filtra, ordena e formata; **número novo exige mart novo** |
 
@@ -50,7 +50,8 @@ Garantias transversais, válidas para todas as etapas:
 - **Atomicidade:** cada etapa publica numa única transação; falha → `ROLLBACK` e versão anterior preservada.
 - **Idempotência:** reexecutar produz o mesmo estado (`CREATE OR REPLACE`, `IF NOT EXISTS`).
 - **Isolamento entre camadas:** cada etapa lê apenas a camada anterior e grava só no seu schema.
-- **Banco único:** `fundamentalistas.duckdb` na raiz, caminho derivado de `Path(__file__)`.
+- **Banco único:** `fundamentalistas.duckdb` na raiz, caminho derivado de `Path(__file__)`;
+  `VALUATIONB3_DB` aponta outro arquivo (ex.: homologação) para pipeline e painel.
 - **Nulos preservados:** nunca viram zero; divisão por zero resulta em `NULL`.
 - **Código de saída:** `0` em sucesso, `1` em falha (mensagem em `stderr`, sem traceback).
 
@@ -129,26 +130,27 @@ Dependências entre módulos: `db` não importa nada de `pipeline`; `ingestao`, 
 
 **Pronto:** `uv run streamlit run app.py` abre o painel; `test/test_painel.py` verde.
 
-**Testes hoje:** 84 casos em 5 arquivos (`test_db` 5, `test_transformacao` 27, `test_sql_marts` 9,
-`test_marts` 18, `test_painel` 25). A ingestão não tem testes.
+**Testes hoje:** 163 casos em 8 arquivos (`test_db` 10, `test_ingestao` 38,
+`test_transformacao` 49, `test_sql_marts` 12, `test_marts` 18, `test_painel` 25, `test_log` 4,
+`test_docs_hooks` 6); cobertura 91,8% com `uv run pytest`.
 
 ---
 
-## 4. Pendências no que já existe 🔧
+## 4. Pendências no que já existe ✅
 
-Corrigir antes das propostas da seção 5. Cada linha é um commit pequeno, sem mudança de
-comportamento do pipeline.
+Todas resolvidas em 04/11/2026, cada uma num commit pequeno, sem mudança de comportamento do
+pipeline. A P6 foi resolvida pela própria Etapa E (a pasta virou o subpacote).
 
 | # | Pendência (observada no repositório) | Ação | Verificação |
 |---|---|---|---|
-| P1 | `pipeline/ingestao.py` importa `requests` e `lxml`, não declarados no `pyproject.toml` | `uv add requests lxml`; `pyproject.toml` + `uv.lock` no mesmo commit | `uv sync` limpo + `uv run python -m pipeline.ingestao` |
-| P2 | `.vscode/tasks.json` só tem tarefas pontuais de renomear specs em `.venv/.specs/`, chamando `python` direto | Remover as tarefas obsoletas; se quiser tarefas, criar as do pipeline com `uv run ...` | Executar as tarefas no VS Code |
-| P3 | `_ident` duplicado em `db.py`, `materializacao.py` e `transformacao.py` | Reaproveitar `db._ident` | `uv run pytest --cov` |
-| P4 | Specs em `.venv/.specs/` (pasta descartável, fora do git), citadas em `painel.py`, `app.py`, `materializacao.py`, `sql/marts/README.md` e `RANKINGS.md` — e os nomes citados (`marts_agregacao_*.md`) não batem com os arquivos reais (`marts_sql_*.md`) | Mover para `docs/specs/`, versionar e corrigir as referências | Busca por `.venv/.specs` sem resultados |
-| P5 | `doc_api.md` e `.claude/` não versionados | Revisar e commitar | `git status` |
-| P6 | `pipeline/transformacao/` existe vazia (só `__pycache__`) ao lado de `transformacao.py` | Apagar até a Etapa E começar de fato | `uv run python -m pipeline.transformacao` |
-| P7 | Comentários de 5 `.sql` com mojibake (`âˆ’`, `mecà¢nico`); correção está no working tree, não commitada | Commitar a correção (junto com o texto novo de Proventos em `painel.py`) | `rg "Ã|â€|âˆ" sql/` sem resultados |
-| P8 | Cards e `marts_painel_indicadores` contêm **cópia literal** da consulta de `marts_50`; a mudança da P7 já teve de ser feita em 5 arquivos | Teste de consistência: contagens dos cards = `COUNT(*)` por `recomendacao` em `marts_50`; recomendação de `marts_painel_indicadores` = a de `marts_50` | Novo teste em `test/test_sql_marts.py` |
+| ✅ P1 | `pipeline/ingestao.py` importa `requests` e `lxml`, não declarados no `pyproject.toml` | `uv add requests lxml`; `pyproject.toml` + `uv.lock` no mesmo commit | `uv sync` limpo + `uv run python -m pipeline.ingestao` |
+| ✅ P2 | `.vscode/tasks.json` só tem tarefas pontuais de renomear specs em `.venv/.specs/`, chamando `python` direto | Remover as tarefas obsoletas; se quiser tarefas, criar as do pipeline com `uv run ...` | Executar as tarefas no VS Code |
+| ✅ P3 | `_ident` duplicado em `db.py`, `materializacao.py` e `transformacao.py` | Reaproveitar `db._ident` | `uv run pytest --cov` |
+| ✅ P4 | Specs em `.venv/.specs/` (pasta descartável, fora do git), citadas em `painel.py`, `app.py`, `materializacao.py`, `sql/marts/README.md` e `RANKINGS.md` — e os nomes citados (`marts_agregacao_*.md`) não batem com os arquivos reais (`marts_sql_*.md`) | Mover para `docs/specs/`, versionar e corrigir as referências | Busca por `.venv/.specs` sem resultados |
+| ✅ P5 | `doc_api.md` e `.claude/` não versionados | Revisar e commitar | `git status` |
+| ✅ P6 | `pipeline/transformacao/` existia vazia (só `__pycache__`) ao lado de `transformacao.py` | Apagar até a Etapa E começar de fato | `uv run python -m pipeline.transformacao` |
+| ✅ P7 | Comentários de 5 `.sql` com mojibake (`âˆ’`, `mecà¢nico`); correção está no working tree, não commitada | Commitar a correção (junto com o texto novo de Proventos em `painel.py`) | `rg "Ã|â€|âˆ" sql/` sem resultados |
+| ✅ P8 | Cards e `marts_painel_indicadores` contêm **cópia literal** da consulta de `marts_50`; a mudança da P7 já teve de ser feita em 5 arquivos | Teste de consistência: contagens dos cards = `COUNT(*)` por `recomendacao` em `marts_50`; recomendação de `marts_painel_indicadores` = a de `marts_50` | Novo teste em `test/test_sql_marts.py` |
 
 ---
 
@@ -158,7 +160,15 @@ Cada etapa é um PR dedicado, com testes verdes antes e depois. Refatoração e 
 nunca se misturam com mudança de comportamento. Ordem sugerida: A → B → C → D → E; F só após
 decisão; G conforme demanda.
 
-### Etapa A — Qualidade de código (Ruff)
+**Estado em 04/11/2026:** A–E ✅ entregues (branch `evolucao/pendencias-e-roadmap`);
+F 📋 aguarda decisão; G 📋 backlog.
+
+### Etapa A — Qualidade de código (Ruff) ✅
+
+> Entregue. Além do `select`, `[tool.ruff.lint.pycodestyle] max-line-length = 100`: o formatter
+> mantém o código em 88 colunas e o E501 vale a 100 para docstrings, comentários e SQL em
+> strings (margem já usada no projeto). A cópia da spec Silver na docstring de
+> `transformacao.py` deu lugar a uma referência a `docs/specs/refined_transformacao.md`.
 
 1. Acrescentar ao `pyproject.toml` (sem reescrevê-lo):
    ```toml
@@ -173,7 +183,10 @@ decisão; G conforme demanda.
 
 **Pronto quando:** `uv run ruff check .` e `uv run ruff format . --check` passam.
 
-### Etapa B — Testes obrigatórios
+### Etapa B — Testes obrigatórios ✅
+
+> Entregue: `addopts = "--cov"`, `htmlcov/` ignorado, `test/test_ingestao.py` (38 casos,
+> ingestão de 0% para 89%). Cobertura total 91,8%.
 
 1. `addopts = "--cov"` em `[tool.pytest.ini_options]`, tornando os 60% obrigatórios.
 2. `htmlcov/` no `.gitignore`.
@@ -183,7 +196,11 @@ decisão; G conforme demanda.
 
 **Pronto quando:** `uv run pytest` aplica a cobertura e fica ≥ 60% sem ampliar `omit` nem reduzir `fail_under`.
 
-### Etapa C — Documentação com MkDocs Material
+### Etapa C — Documentação com MkDocs Material ✅
+
+> Entregue. A Referência não copia `doc_api.md`, `README.md` e `RANKINGS.md`: o hook
+> `docs/hooks.py` inclui o arquivo de origem e reescreve os links (código vira texto), para
+> o `--strict` validar sem afrouxar a checagem de links.
 
 1. `uv add --dev mkdocs-material` (hoje está no `.venv`, mas não declarado).
 2. `mkdocs.yml` (`language: pt-BR`) e `docs/`: Início, Instalação e uso, Arquitetura,
@@ -194,7 +211,12 @@ decisão; G conforme demanda.
 
 **Pronto quando:** `uv run mkdocs build --strict` passa e `site/` não está mais versionado.
 
-### Etapa D — Robustez e observabilidade
+### Etapa D — Robustez e observabilidade ✅
+
+> Entregue: `pipeline/log.py`, type hints nas funções públicas, `VALUATIONB3_DB`
+> (`db.caminho_banco()`, reutilizado pelo painel). Silver e Gold rodaram com a variável
+> presente sobre uma cópia do banco. Com a variável ausente, a resolução para
+> `fundamentalistas.duckdb` foi verificada, mas o pipeline completo não rodou no banco real.
 
 1. Type hints nas funções públicas, começando por `pipeline/db.py`.
 2. Migrar `print` para `logging` (`ingestao.py` já importa `logging`, mas imprime): etapa, fonte,
@@ -203,16 +225,20 @@ decisão; G conforme demanda.
 
 **Pronto quando:** testes verdes e o pipeline completo roda com a variável ausente e presente.
 
-### Etapa E — Modularização da Silver
+### Etapa E — Modularização da Silver ✅
 
-1. Dividir `pipeline/transformacao.py` (1.797 linhas) em
+> Entregue, com um módulo a mais: `comum.py` (erros, conversões, deduplicação e preparo SQL
+> compartilhados) e `__main__.py` (mantém `python -m`). `refined.*` idêntico antes e depois:
+> EXCEPT ALL nos dois sentidos nas 7 tabelas e as 130 colunas com os mesmos tipos.
+
+1. Dividir `pipeline/transformacao.py` (1.033 linhas após a Etapa A) em
    `pipeline/transformacao/{__init__,b3,fundamentus,minhareceita,yfinance}.py`, mantendo a
    interface pública (`executar`, `main`, `ErroTransformacao`, …) e `python -m pipeline.transformacao`.
 2. Sem mudança de comportamento: mesmas tabelas `refined.*`, mesmos testes.
 
 **Pronto quando:** `refined.*` idêntico antes e depois (`EXCEPT ALL` nos dois sentidos).
 
-### Etapa F — Layout `src/` (decisão pendente)
+### Etapa F — Layout `src/` (decisão pendente) 📋
 
 Diverge do padrão `pipeline/` adotado na skill; **decidir antes de executar**. Se aprovada:
 
@@ -223,7 +249,7 @@ Diverge do padrão `pipeline/` adotado na skill; **decidir antes de executar**. 
 
 **Pronto quando:** pipeline completo, painel e `uv run pytest` funcionam com os novos caminhos.
 
-### Etapa G — Novos indicadores (backlog de produto)
+### Etapa G — Novos indicadores (backlog de produto) 📋
 
 Candidatos: Dívida Líquida/EBITDA, Sharpe, valor justo por Gordon, comparação setorial (exige
 fonte de setor econômico). Para cada um:
@@ -258,8 +284,8 @@ O painel pode ficar aberto; depois de materializar, clique em **Recarregar dados
 ```powershell
 uv run ruff check .
 uv run ruff format . --check
-uv run pytest --cov
-uv run mkdocs build --strict   # a partir da Etapa C
+uv run pytest                  # cobertura obrigatória (addopts = --cov)
+uv run mkdocs build --strict
 ```
 
 - [ ] Mudança na camada correta (seção 2); sem cálculo fora da Gold.
@@ -277,7 +303,7 @@ uv run mkdocs build --strict   # a partir da Etapa C
 |---|---|---|
 | Fonte muda formato ou sai do ar | Ingestão aborta | `validar_fontes`, `FalhaExtracao`, conversões estritas na Silver |
 | Rate limit do Yahoo Finance | Extração lenta ou falha | Paralelismo 4, retry com backoff |
-| Consulta de `marts_50` copiada em cards e painel | Números divergentes entre seções | Teste de consistência (P8) |
+| Consulta de `marts_50` copiada em cards e painel | Números divergentes entre seções | Teste de consistência em `test_sql_marts.py` (P8 ✅) |
 | Zeros do Fundamentus significando ausência | Rankings distorcidos | Preservados e excluídos pelos critérios `> 0` |
 | Payout estimado (`DY × P/L`) acima de 100% | Proventos favorece pagadora insustentável | Desempate por menor payout; documentado (56 de 256 elegíveis) |
 | `fechamento_ajustado` negativo (8 tickers) | Métricas de risco erradas | Tratado como inválido no mart e no gráfico |
@@ -285,4 +311,4 @@ uv run mkdocs build --strict   # a partir da Etapa C
 | Classes ON/PN da mesma emissora | Aparecem empatadas | Documentado como limitação |
 | Arquivo DuckDB bloqueado | Etapa não grava | Fechar a UI; painel usa `read_only` |
 | Volume de `marts_cotacao` (~1,9 mi linhas) | Memória no painel | Filtro no banco por ticker com parâmetro vinculado |
-| Specs fora do git (`.venv/.specs/`) | Perda de decisões ao recriar o `.venv` | Mover para `docs/specs/` (P4) — prioridade alta |
+| Specs fora do git | Perda de decisões ao recriar o `.venv` | Resolvido: versionadas em `docs/specs/` (P4 ✅) |

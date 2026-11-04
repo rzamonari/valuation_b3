@@ -6,7 +6,7 @@ description: Regras e boas práticas de desenvolvimento Python do projeto b3_val
 # Python para Engenharia de Dados — b3_valuation
 
 Guia de consulta rápida para quem altera este repositório. Fontes complementares:
-[plan.md](../../../plan.md) (fases, pendências P1–P5 e roadmap A–G) e
+[plan.md](../../../plan.md) (fases, pendências P1–P8 e roadmap A–G) e
 [doc_api.md](../../../doc_api.md) (o que cada módulo faz).
 
 **Legenda:** ✅ já configurado no repositório · 📋 recomendação/proposta (ainda não ativa).
@@ -22,8 +22,9 @@ Nunca trate um item 📋 como se já estivesse em vigor.
 b3_valuation/
 ├── pyproject.toml          ✅ projeto "valuationb3", Python >= 3.13
 ├── uv.lock                 ✅
-├── pipeline/               ✅ pacote Python (módulos planos)
-│   ├── db.py               conexão e persistência genérica no DuckDB
+├── pipeline/               ✅ pacote Python
+│   ├── db.py               conexão, caminho do banco e persistência genérica no DuckDB
+│   ├── log.py              logging dos comandos (stdout até INFO, stderr avisos/erros)
 │   ├── ingestao.py         Bronze  → schema raw      (python -m pipeline.ingestao)
 │   ├── transformacao/      Silver  → schema refined  (subpacote: comum, b3, fundamentus,
 │   │                       yfinance, minhareceita; orquestração no __init__)
@@ -33,7 +34,8 @@ b3_valuation/
 ├── app.py                  ✅ interface Streamlit (apenas layout/interação)
 ├── ui.py                   ✅ abre a DuckDB UI
 ├── test/                   ✅ testes pytest (nome atual: test/, não tests/)
-└── site/                   ⚠ HTML gerado pelo MkDocs, versionado, sem mkdocs.yml/docs/
+├── mkdocs.yml + docs/      ✅ documentação MkDocs Material (specs em docs/specs/)
+└── site/                   gerado por `uv run mkdocs build` (fora do git)
 ```
 
 ### Responsabilidade por camada
@@ -51,11 +53,12 @@ b3_valuation/
 
 - Código novo vai em `pipeline/`. Quando um módulo crescer demais, divida-o em subpacote
   `pipeline/<nome_do_pacote>/` mantendo a interface pública (ex.: Etapa E do plano:
-  `pipeline/transformacao/{b3,fundamentus,minhareceita,yfinance}.py`).
+  `pipeline/transformacao/{comum,b3,fundamentus,minhareceita,yfinance}.py`, com
+  `__main__.py` para manter `python -m`).
 - Cada etapa lê apenas a camada anterior. Nada de `painel.py` lendo `raw.*`.
 - Sem dependência circular: `db` não importa nada de `pipeline`; os demais importam `db`.
-- Não duplique utilitários. Ex. conhecido (P3): `_ident` repetido em `db.py`,
-  `materializacao.py` e `transformacao.py` — reaproveite o de `db` ao tocar nesses trechos.
+- Não duplique utilitários: `_ident` e `caminho_banco()` vivem em `db` e são reaproveitados
+  (inclusive pelo painel).
 - Notebooks (se usados) são só para exploração; funções reutilizáveis vão para `pipeline/`
   com teste. Nenhum passo do pipeline pode depender de notebook.
 - Mantenha nomes em português e o padrão existente (`extrair_*`, `preparar`, `publicar`,
@@ -87,11 +90,9 @@ uv run python -m pipeline.ingestao   # qualquer comando roda via uv run
 ```
 
 - `pyproject.toml` e `uv.lock` sempre no **mesmo commit**.
-- Dependência importada precisa estar declarada, mesmo que já venha transitiva.
-  Pendência conhecida (P1): `requests` e `lxml` usados em `ingestao.py` → `uv add requests lxml`.
-- MkDocs e mkdocs-material estão no `.venv` mas **não** no `pyproject.toml`: declare-os com
-  `uv add --dev mkdocs-material` antes de depender deles.
-- Tarefas do VS Code (`.vscode/tasks.json`) chamam `python` direto (P2): ao editar, troque por `uv run`.
+- Dependência importada precisa estar declarada, mesmo que já venha transitiva
+  (`requests` e `lxml` da ingestão e `mkdocs-material` do grupo dev já estão).
+- Tarefas do VS Code (`.vscode/tasks.json`) chamam sempre `uv run`, nunca `python` direto.
 - Mudanças de configuração são incrementais: acrescente seções ao `pyproject.toml`, não reescreva o arquivo.
 
 ### Comandos do dia a dia
@@ -107,15 +108,15 @@ uv run streamlit run app.py               # painel
 uv run ruff check .
 uv run ruff check . --fix
 uv run ruff format .
-uv run pytest --cov
-uv run mkdocs serve                       # 📋 depois de existir mkdocs.yml
+uv run pytest                             # sempre com cobertura (addopts = --cov)
+uv run mkdocs serve                       # documentação em http://127.0.0.1:8000
 ```
 
 ---
 
 ## 3. Estilo, lint e imports — Ruff
 
-Estado: `ruff` ✅ no grupo `dev`; **sem `[tool.ruff]`** no `pyproject.toml` (roda com padrões).
+Estado ✅: `ruff` no grupo `dev` e configurado no `pyproject.toml` (Etapa A):
 
 ```powershell
 uv run ruff check .            # lint
@@ -124,14 +125,15 @@ uv run ruff format .           # formatação
 uv run ruff format . --check   # verificação sem alterar (CI / definição de pronto)
 ```
 
-📋 Configuração recomendada (Etapa A do plano), a acrescentar no `pyproject.toml`:
-
 ```toml
 [tool.ruff]
 target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 100   # E501 em prosa/SQL; o formatter mantém o código em 88
 ```
 
 - Configuração só no `pyproject.toml`; não crie `ruff.toml`/`.ruff.toml`.
@@ -143,35 +145,23 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 
 ## 4. Testes — pytest e cobertura
 
-Estado ✅: `pytest`, `pytest-cov`; `testpaths = ["test"]`, `pythonpath = ["."]`;
-`[tool.coverage.report] fail_under = 60`, `show_missing = true`.
-⚠ O limite só é aplicado quando `--cov` é passado (não há `addopts`).
+Estado ✅: `pytest`, `pytest-cov`; `testpaths = ["test"]`, `pythonpath = ["."]`,
+`addopts = "--cov"`; `[tool.coverage.report] fail_under = 60`, `show_missing = true`.
+Todo `uv run pytest` aplica o limite. `htmlcov/` está no `.gitignore`.
 
 ```powershell
-uv run pytest                                          # todos os testes, sem cobertura
-uv run pytest test/test_db.py -k gravar                # recorte
-uv run pytest --cov                                    # cobertura no terminal + fail_under 60
-uv run pytest --cov --cov-report=term-missing          # linhas não cobertas
-uv run pytest --cov --cov-report=html                  # relatório em htmlcov/index.html
+uv run pytest                                  # todos os testes + cobertura (fail_under 60)
+uv run pytest test/test_db.py -k gravar --no-cov   # recorte rápido, sem cobertura
+uv run pytest --cov-report=html                # relatório em htmlcov/index.html
 ```
-
-📋 Tornar a cobertura obrigatória e reprodutível (Etapa B):
-
-```toml
-[tool.pytest.ini_options]
-testpaths = ["test"]
-pythonpath = ["."]
-addopts = "--cov"
-```
-
-e incluir `htmlcov/` no `.gitignore`.
 
 ### Regras
 
 - **Nunca** reduza `fail_under`, amplie `omit` ou marque `skip` para fazer a execução passar.
 - Sem rede e sem banco real: use `tmp_path` + `monkeypatch` como em `test/test_db.py`
-  (`monkeypatch.setattr(db, "_ARQUIVO_DB", tmp_path / "teste.duckdb")`).
-  Para ingestão, substitua `_get`, `_sessao` e chamadas do `yfinance`.
+  (`monkeypatch.setattr(db, "_ARQUIVO_DB", tmp_path / "teste.duckdb")`);
+  `test/conftest.py` remove `VALUATIONB3_DB` do ambiente de cada teste.
+  Para ingestão, substitua `_sessao` e `yf.Ticker` (ver `test/test_ingestao.py`).
 - Dados de teste pequenos, fictícios e conferíveis à mão (DataFrames ou `INSERT` inline).
 - Cubra sucesso, erro (`FalhaExtracao`, `ErroMaterializacao`, `ROLLBACK`) e bordas do domínio:
   nulos, duplicatas, tabela vazia, divisão por zero → `NULL`, zeros do Fundamentus.
@@ -194,36 +184,14 @@ def test_mart_retorna_null_quando_divisor_e_zero(tmp_path, monkeypatch):
 
 ## 5. Documentação — MkDocs Material
 
-Estado observado: `site/` contém HTML gerado por mkdocs 1.6.1 + mkdocs-material 9.8.0
-(páginas Início, Uso, Arquitetura, Decisões, Referência, Specs), mas **não existem
-`mkdocs.yml` nem `docs/` no repositório**, e o MkDocs não está declarado no `pyproject.toml`.
-Logo, a documentação não é reconstruível hoje. Specs vivem em `.venv/.specs/` (P4 — pasta
-descartável e ignorada pelo git).
-
-📋 Proposta (Etapa C):
+Estado ✅ (Etapa C): `mkdocs-material` no grupo dev, `mkdocs.yml` (`strict: true`) e `docs/`;
+specs versionadas em `docs/specs/`; `site/` fora do git. As páginas da Referência publicam
+`doc_api.md`, `sql/marts/README.md` e `RANKINGS.md` sem cópia: o hook `docs/hooks.py`
+inclui o arquivo de origem e reescreve os links (código vira texto).
 
 ```powershell
-uv add --dev mkdocs-material
 uv run mkdocs serve            # pré-visualização em http://127.0.0.1:8000
 uv run mkdocs build --strict   # falha em link quebrado ou página fora da nav
-```
-
-```yaml
-# mkdocs.yml
-site_name: B3 Valuation
-theme:
-  name: material
-  language: pt-BR
-nav:
-  - Início: index.md
-  - Instalação e uso: uso.md
-  - Arquitetura: arquitetura.md
-  - Referência:
-      - API: referencia/api.md          # a partir de doc_api.md
-      - Marts: referencia/marts.md      # a partir de sql/marts/README.md
-      - Rankings: referencia/rankings.md
-  - Decisões: decisoes.md
-  - Specs: specs/...                    # movidas de .venv/.specs/
 ```
 
 ```text
@@ -232,12 +200,12 @@ docs/
 ├── uso.md            instalação (uv sync), execução do pipeline, painel
 ├── arquitetura.md    camadas raw/refined/marts, garantias (atomicidade, idempotência)
 ├── decisoes.md       decisões e limitações aceitas
-├── referencia/
-└── specs/
+├── referencia/       marcadores preenchidos pelo hook (api, marts, rankings)
+├── specs/            specs de cada camada
+└── hooks.py          hook do MkDocs (fora do site via exclude_docs)
 ```
 
 - Toda página entra na `nav`; `--strict` deve passar.
-- Avaliar remover `site/` do git (adicionar ao `.gitignore`) depois que o build for reproduzível.
 - Exemplos de código e comandos na doc devem ser os reais (`uv run python -m pipeline.<modulo>`)
   e atualizados no mesmo PR que muda a interface — inclusive `doc_api.md`, docstrings e
   `sql/marts/README.md`.
@@ -248,7 +216,8 @@ docs/
 
 ### Código
 
-- Tipagem explícita em funções públicas (hoje quase ausente — 📋 Etapa D, começando por `db.py`):
+- Tipagem explícita em funções públicas (✅ em `db`, `ingestao`, `transformacao` e
+  `materializacao`; mantenha em código novo):
   ```python
   def gravar(con: duckdb.DuckDBPyConnection, df: pd.DataFrame, schema: str, tabela: str) -> int:
   ```
@@ -257,8 +226,8 @@ docs/
 - Exceções específicas do domínio (`FalhaExtracao`, `ErroMaterializacao`); nada de
   `except Exception: pass`. Capture o mínimo e repasse contexto.
 - Caminhos derivados de `Path(__file__)` (padrão atual), nunca do diretório de trabalho
-  nem absolutos fixos. 📋 Etapa D: caminho do banco configurável por variável de ambiente,
-  mantendo `fundamentalistas.duckdb` como padrão.
+  nem absolutos fixos. O banco vem de `db.caminho_banco()`: `VALUATIONB3_DB` (relativo =
+  a partir da raiz) ou `fundamentalistas.duckdb`.
 - Sem efeitos colaterais no import: conexão, leitura e escrita só dentro de funções.
 - SQL dinâmico: identificadores via `_ident`; valores via parâmetro vinculado (`?`), nunca f-string.
 - Sem abstração ou dependência nova sem necessidade concreta.
@@ -267,8 +236,10 @@ docs/
 
 - As fontes atuais são públicas e o projeto não usa segredos. Se surgir algum: variável de
   ambiente, nunca no código, no `.mcp.json`, em fixtures ou na doc.
-- Hoje a saída é via `print`. 📋 Etapa D: migrar para `logging` registrando etapa, fonte,
-  contagens e falhas por item — **nunca** headers, tokens ou payloads completos.
+- Saída via `logging` (✅ Etapa D): logger `pipeline.<modulo>` com nome explícito (sob
+  `python -m`, `__name__` é `__main__`) e `pipeline.log.configurar()` só no `main()`.
+  Registre etapa, fonte, contagens e falhas por item — **nunca** headers, tokens ou
+  payloads completos.
 
 ### Dados
 
@@ -306,8 +277,8 @@ docs/
    ```powershell
    uv run ruff check .
    uv run ruff format . --check
-   uv run pytest --cov
-   uv run mkdocs build --strict   # só depois de existir mkdocs.yml
+   uv run pytest
+   uv run mkdocs build --strict
    ```
 6. **Relatar** os comandos executados e o resultado real (incluindo % de cobertura e falhas).
    Não afirme que algo passou sem ter executado; se uma verificação não pôde rodar, diga qual e por quê.
@@ -316,6 +287,6 @@ docs/
 
 - [ ] Mudança na camada correta; sem lógica de cálculo fora da Gold.
 - [ ] Testes de sucesso, erro e bordas; sem rede e sem banco real.
-- [ ] `uv run pytest --cov` ≥ 60% sem mexer em `fail_under`/`omit`.
+- [ ] `uv run pytest` ≥ 60% sem mexer em `fail_under`/`omit`.
 - [ ] `pyproject.toml` + `uv.lock` juntos quando houver dependência nova.
 - [ ] `doc_api.md`, docstrings e `sql/marts/README.md` atualizados se a interface mudou.
