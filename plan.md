@@ -131,9 +131,11 @@ com `DENSE_RANK`.
 
 ---
 
-## 4. Pendências no que já existe 🔧
+## 4. Pendências no que já existe ✅
 
 Itens observados no repositório que devem ser corrigidos antes das propostas da seção 5.
+Todos resolvidos (P2: as tarefas antigas eram renomeações pontuais de specs e foram
+substituídas pelas etapas do pipeline, testes e Ruff via `uv run`).
 
 | # | Pendência | Ação | Verificação |
 |---|---|---|---|
@@ -150,7 +152,10 @@ Itens observados no repositório que devem ser corrigidos antes das propostas da
 Cada etapa é um PR dedicado, com testes verdes antes e depois. Refatoração e formatação em massa
 nunca se misturam com mudança de comportamento.
 
-### Etapa A — Qualidade de código (Ruff)
+### Etapa A — Qualidade de código (Ruff) ✅
+
+> `E501` ignorado: o comprimento de linha fica a cargo do `ruff format`; o que ele não quebra
+> (strings, SQL, URLs) não justifica reescrita manual.
 
 1. Adicionar `[tool.ruff]` no `pyproject.toml` (`target-version = "py313"`; regras `E`, `F`, `W`, `I`, `B`, `UP`, `SIM`).
 2. Commit só de formatação: `uv run ruff check . --fix` e `uv run ruff format .`.
@@ -158,7 +163,7 @@ nunca se misturam com mudança de comportamento.
 
 **Pronto quando:** `uv run ruff check .` e `uv run ruff format . --check` passam sem erros.
 
-### Etapa B — Testes obrigatórios
+### Etapa B — Testes obrigatórios ✅
 
 1. `addopts = "--cov"` em `[tool.pytest.ini_options]`, tornando o limite de 60% obrigatório.
 2. `htmlcov/` no `.gitignore`.
@@ -166,7 +171,9 @@ nunca se misturam com mudança de comportamento.
 
 **Pronto quando:** `uv run pytest` aplica a cobertura e fica ≥ 60% sem ampliar `omit`.
 
-### Etapa C — Documentação com MkDocs Material
+### Etapa C — Documentação com MkDocs Material ✅
+
+> `doc_api.md` e `sql/marts/*.md` são incluídos no site via `pymdownx.snippets` (fonte única).
 
 1. `uv add --dev mkdocs-material`; criar `mkdocs.yml` (`language: pt-BR`).
 2. Páginas: Início, Instalação e uso, Arquitetura, Referência da API (de `doc_api.md`), Marts (de `sql/marts/README.md` e `RANKINGS.md`), Decisões (specs da P4).
@@ -174,7 +181,9 @@ nunca se misturam com mudança de comportamento.
 
 **Pronto quando:** `uv run mkdocs build --strict` passa.
 
-### Etapa D — Robustez e observabilidade
+### Etapa D — Robustez e observabilidade ✅
+
+> Logging em `pipeline/log.py`; variável `VALUATIONB3_DB` em `db.caminho_banco()`.
 
 1. Type hints nas funções públicas, começando por `pipeline/db.py`.
 2. Migrar `print` para `logging` (etapa, fonte, contagens, falhas por item; nunca headers, tokens ou payloads).
@@ -182,7 +191,7 @@ nunca se misturam com mudança de comportamento.
 
 **Pronto quando:** testes verdes e o pipeline completo roda com a variável ausente e presente.
 
-### Etapa E — Modularização da Silver
+### Etapa E — Modularização da Silver ✅
 
 1. Extrair `pipeline/transformacao.py` (~1.800 linhas) por fonte: `pipeline/transformacao/{b3,fundamentus,minhareceita,yfinance}.py`.
 2. Sem mudança de comportamento: mesmas tabelas `refined.*`, mesmos testes.

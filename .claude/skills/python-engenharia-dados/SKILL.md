@@ -19,21 +19,26 @@ b3_valuation/
 ├── painel.py                 # leitura dos marts, formatação e gráficos (apresentação)
 ├── ui.py                     # abre o banco na DuckDB UI
 ├── pipeline/
-│   ├── db.py                 # conexão e persistência genérica no DuckDB
+│   ├── db.py                 # conexão, caminho do banco (VALUATIONB3_DB) e persistência genérica
+│   ├── log.py                # configuração do logging das etapas
 │   ├── ingestao.py           # Bronze  (schema raw)
-│   ├── transformacao.py      # Silver  (schema refined) — ~1.800 linhas
+│   ├── transformacao/        # Silver  (schema refined): comum, b3, fundamentus, yfinance, minhareceita
 │   └── materializacao.py     # Gold    (schema marts)
 ├── sql/marts/*.sql           # uma consulta por mart + README.md / RANKINGS.md
-├── test/                     # test_db, test_transformacao, test_marts, test_sql_marts, test_painel
-├── doc_api.md                # referência da API (ainda não versionado)
+├── test/                     # test_db, test_ingestao, test_log, test_transformacao, test_marts, test_sql_marts, test_painel
+├── doc_api.md                # referência da API (incluída no site MkDocs)
+├── docs/ + mkdocs.yml        # documentação MkDocs Material; specs em docs/specs/
 └── fundamentalistas.duckdb   # banco local, fora do git
 ```
 
 Já configurado: `uv` + `uv.lock`; grupo `dev` com `pytest`, `pytest-cov`, `ruff`;
-`[tool.pytest.ini_options]` (`testpaths = ["test"]`, `pythonpath = ["."]`);
-`[tool.coverage]` com `fail_under = 60`, `show_missing = true`, omitindo `test/*`, `app.py`, `ui.py`.
+`[tool.pytest.ini_options]` (`testpaths = ["test"]`, `pythonpath = ["."]`, `addopts = "--cov"`);
+`[tool.coverage]` com `fail_under = 60`, `show_missing = true`, omitindo `test/*`, `app.py`, `ui.py`;
+`[tool.ruff]` (`py313`; regras `E`, `F`, `W`, `I`, `B`, `UP`, `SIM`; `E501` a cargo do formatador);
+MkDocs Material (`mkdocs.yml`, `docs/`); `logging` via `pipeline/log.py`; type hints nas funções
+públicas de `pipeline/*`; caminho do banco sobrescrevível por `VALUATIONB3_DB`.
 
-Não configurado: `[tool.ruff]`, MkDocs, layout `src/`, type hints, `logging` estruturado.
+Não configurado: layout `src/`.
 
 ## 1. Estrutura e modularidade
 
@@ -42,7 +47,7 @@ Não configurado: `[tool.ruff]`, MkDocs, layout `src/`, type hints, `logging` es
 | Mudança | Lugar |
 |---|---|
 | Nova fonte ou extração | `pipeline/ingestao.py` → `raw`, tudo como `VARCHAR` via `db.gravar` |
-| Tipagem, padronização, deduplicação | `pipeline/transformacao.py` → `refined` |
+| Tipagem, padronização, deduplicação | `pipeline/transformacao/` → `refined` (mapeamento no módulo da fonte; motor em `comum.py`) |
 | Novo indicador/ranking/agregado | novo `sql/marts/marts_*.sql` + declaração em `MARTS` (`materializacao.py`) |
 | Conexão/persistência genérica | `pipeline/db.py` |
 | Exibição | `painel.py` (leitura/formatação) e `app.py` (layout) — **sem cálculo**: número novo na tela exige um mart |
@@ -50,8 +55,8 @@ Não configurado: `[tool.ruff]`, MkDocs, layout `src/`, type hints, `logging` es
 Regras:
 - Um módulo, uma responsabilidade. Regra de negócio não entra em `db.py`; acesso a banco não entra em `app.py`.
 - Sem dependências circulares: `pipeline.*` importa `pipeline.db`, nunca `painel`/`app`.
-- Não duplique lógica: reutilize `db.conectar`, `db.gravar`, `db.criar_schema` e os helpers existentes antes de criar outros (ex.: há `_ident` duplicado em `db.py` e `materializacao.py` — ao tocar nesses trechos, prefira reaproveitar o de `db`).
-- Módulos grandes (`transformacao.py`): ao adicionar algo significativo, considere extrair por fonte (ex.: `pipeline/transformacao/b3.py`, `.../yfinance.py`) **em PR separado**, sem mudar comportamento.
+- Não duplique lógica: reutilize `db.conectar`, `db.gravar`, `db.criar_schema`, `db._ident` e os helpers existentes antes de criar outros.
+- Módulos grandes: ao adicionar algo significativo, considere extrair (como foi feito em `pipeline/transformacao/`, por fonte) **em PR separado**, sem mudar comportamento.
 - Notebooks só para exploração. Código reutilizável vai para o pacote e ganha teste; nenhum notebook é etapa do pipeline.
 - Siga o idioma e a nomenclatura do repositório: identificadores em português, `snake_case`, funções privadas com `_`, docstring de módulo com linha `Execução: uv run ...` e decisões de implementação.
 
@@ -88,10 +93,10 @@ uv run streamlit run app.py               # painel
 uv run python ui.py                       # DuckDB UI
 ```
 
-- Sempre execute ferramentas com `uv run` (inclusive em tarefas do VS Code: hoje `.vscode/tasks.json` chama `python` diretamente).
-- Declare todo import direto. **Pendência observada:** `pipeline/ingestao.py` importa `requests` e `lxml`, que só chegam como dependências transitivas — corrigir com `uv add requests lxml`.
+- Sempre execute ferramentas com `uv run` (inclusive nas tarefas do VS Code, `.vscode/tasks.json`).
+- Declare todo import direto (`uv add <pacote>`), mesmo que ele já chegue como dependência transitiva.
 - Versione `pyproject.toml` e `uv.lock` juntos, no mesmo commit.
-- **Atenção:** as specs referenciadas no código ficam em `.venv/.specs/`. `.venv` é descartável e ignorado pelo git; recriar o ambiente apaga as specs. [PROPOSTA] movê-las para `docs/specs/` e atualizar as referências.
+- As specs referenciadas no código ficam em `docs/specs/` (versionadas e publicadas no MkDocs, em Decisões).
 
 ## 3. Estilo, lint e imports com Ruff
 
@@ -104,10 +109,7 @@ uv run ruff format .         # formata
 uv run ruff format . --check # verifica sem alterar (CI)
 ```
 
-Hoje não há `[tool.ruff]`: valem os padrões (regras `E4`, `E7`, `E9`, `F`; linha 88). Os
-imports já seguem a ordem stdlib → terceiros → locais, mas isso **não** é verificado.
-
-**[PROPOSTA]** configuração centralizada no `pyproject.toml`:
+Configuração centralizada no `pyproject.toml` (não crie `ruff.toml` paralelo):
 
 ```toml
 [tool.ruff]
@@ -115,10 +117,11 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = ["E501"]  # comprimento de linha a cargo do ruff format (88)
 ```
 
-Ao ativar: rode `uv run ruff check . --fix` e `uv run ruff format .` em um commit só de
-formatação, separado de mudanças de comportamento. Não crie `ruff.toml` paralelo.
+Formatação em massa vai num commit só de formatação, separado de mudanças de comportamento.
+`ruff format` também formata blocos de código Python dentro de arquivos `.md`.
 
 ## 4. Testes com pytest e cobertura (mínimo 60%)
 
@@ -130,7 +133,7 @@ uv run pytest --cov --cov-report=term-missing      # linhas não cobertas
 uv run pytest --cov --cov-report=html              # relatório em htmlcov/index.html
 ```
 
-- O limite de 60% está em `[tool.coverage.report]` e só é aplicado quando `--cov` é passado. [PROPOSTA] `addopts = "--cov"` em `[tool.pytest.ini_options]` para torná-lo obrigatório em toda execução, e `htmlcov/` no `.gitignore`.
+- O limite de 60% está em `[tool.coverage.report]` e é aplicado em toda execução (`addopts = "--cov"`); `htmlcov/` está no `.gitignore`.
 - Nunca reduza `fail_under`, amplie `omit` ou adicione `# pragma: no cover` para passar. Se a cobertura cair, escreva testes.
 - Arquivo de teste por módulo: `test/test_<modulo>.py`. Nome do teste descreve o comportamento: `test_gravar_de_novo_substitui_a_tabela_sem_acumular`.
 - **Nunca toque o banco real.** Padrão do projeto: banco em `tmp_path` e `monkeypatch.setattr(db, "_ARQUIVO_DB", arquivo)` (ver `test/test_db.py`); `painel` usa `ARQUIVO_DB`.
@@ -142,30 +145,14 @@ uv run pytest --cov --cov-report=html              # relatório em htmlcov/index
 
 ## 5. Documentação com MkDocs Material
 
-Hoje **não há** `mkdocs.yml` nem `docs/`; a documentação está em `doc_api.md`, nas docstrings
-de módulo e em `sql/marts/README.md` / `RANKINGS.md`.
-
-**[PROPOSTA]** adoção:
+Site em `mkdocs.yml` + `docs/` (Início, Instalação e uso, Arquitetura, Referência da API, Marts,
+Decisões com as specs de `docs/specs/`). `doc_api.md`, `sql/marts/README.md` e `RANKINGS.md`
+continuam sendo a fonte: as páginas os incluem com `pymdownx.snippets` (`--8<-- "doc_api.md"`).
+Por isso, links relativos nesses arquivos quebram o build; cite o caminho em código.
 
 ```powershell
-uv add --dev mkdocs-material
 uv run mkdocs serve           # pré-visualização em http://127.0.0.1:8000
 uv run mkdocs build --strict  # build falha com link quebrado ou página fora da nav
-```
-
-```yaml
-# mkdocs.yml
-site_name: B3 Valuation
-theme:
-  name: material
-  language: pt-BR
-nav:
-  - Início: index.md
-  - Instalação e uso: uso.md
-  - Arquitetura: arquitetura.md        # Medallion raw → refined → marts, banco único
-  - Referência da API: referencia/api.md   # conteúdo atual de doc_api.md
-  - Marts: referencia/marts.md         # a partir de sql/marts/README.md e RANKINGS.md
-  - Decisões: decisoes/index.md        # specs e decisões de implementação
 ```
 
 - Toda página nova entra na `nav`. Instalação, configuração, execução do pipeline, arquitetura e decisões relevantes devem estar cobertas.
@@ -175,18 +162,18 @@ nav:
 ## 6. Boas práticas de Python e Engenharia de Dados
 
 **Código**
-- Type hints em funções públicas novas ou alteradas (hoje praticamente inexistentes; adote de forma incremental): `def gravar(con: duckdb.DuckDBPyConnection, df: pd.DataFrame, schema: str, tabela: str) -> int:`.
+- Type hints em funções públicas novas ou alteradas (já presentes em `pipeline/*`; `painel.py` ainda sem): `def gravar(con: duckdb.DuckDBPyConnection, df: pd.DataFrame, schema: str, tabela: str) -> int:`.
 - Funções curtas e coesas; nomes que dizem o que fazem.
 - Exceções específicas (`YFRateLimitError`, `duckdb.IOException`, exceções do domínio como `FalhaExtracao`). Nada de `except Exception: pass`.
 - Sem efeitos colaterais no import; execução só sob `if __name__ == "__main__":` / `main()`.
 
 **Configuração, caminhos e segredos**
 - Caminhos derivados de `Path(__file__)` (padrão de `db._RAIZ`), nunca do diretório corrente nem absolutos.
-- [PROPOSTA] permitir sobrescrever o caminho do banco por variável de ambiente, com o valor atual como padrão, para não fixar `fundamentalistas.duckdb` no código.
+- O caminho do banco vem de `db.caminho_banco()`: `VALUATIONB3_DB` (relativo à raiz) ou `fundamentalistas.duckdb`. Não leia a variável em outro lugar.
 - Segredos (tokens de API, se surgirem) via variável de ambiente ou `.env` ignorado pelo git — nunca no código, em fixtures, logs ou docs.
 
 **Observabilidade**
-- Registre contexto útil: etapa, fonte, contagens lidas/gravadas, falhas por item. Hoje o pipeline usa `print`; [PROPOSTA] migrar para `logging` ao tocar os módulos. Nunca registre headers, tokens ou payloads completos.
+- Registre contexto útil: etapa, fonte, contagens lidas/gravadas, falhas por item, com `logging.getLogger("pipeline.<módulo>")` (nome fixo: com `-m`, `__name__` vira `"__main__"`) e `log.configurar()` no `main()`. Não use `print` no pipeline. Nunca registre headers, tokens ou payloads completos.
 
 **Dados**
 - Bronze grava o dado como veio (`VARCHAR`); tipagem e regras na Silver; cálculo na Gold.
