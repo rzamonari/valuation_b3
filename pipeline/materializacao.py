@@ -35,10 +35,17 @@ Spec: docs/specs/marts_materializacao.md (ajuste "Materialização dos resultado
    em DOUBLE executadas em paralelo (desvio-padrão, somas) podem variar no último bit.
 7. Somente o schema marts é criado ou alterado; raw e refined são apenas lidos. Tabelas em marts
    sem .sql correspondente não são apagadas: aparecem no relatório como órfãs para decisão manual.
+8. Dependências entre marts: um .sql pode ler outro mart como marts.<nome> (ex.: marts_50 lê os
+   rankings 01 a 10 em vez de repetir as regras). As referências são extraídas do texto sem
+   comentários; os marts são preparados em ordem topológica (empate = ordem alfabética) e cada
+   referência é trocada pela temporária já preparada da dependência. Motivo: o resultado
+   publicado é coerente com a mesma execução, e não com a versão anterior de marts.<nome>.
+   Dependência não declarada em MARTS ou ciclo interrompem no inventário.
 """
 
 import contextlib
 import logging
+import re
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -56,6 +63,9 @@ log = logging.getLogger("pipeline.materializacao")
 SCHEMA_DESTINO = "marts"
 PASTA_MARTS = Path(__file__).resolve().parent.parent / "sql" / "marts"
 AMOSTRA = 5  # chaves exibidas em mensagens de erro
+# marts.<nome> (com ou sem aspas) dentro de um .sql: dependência de outro mart
+_REFERENCIA = re.compile(r'\bmarts\s*\.\s*"?(marts_\w+)"?', re.IGNORECASE)
+_COMENTARIO = re.compile(r"--[^\n]*")
 
 FOTOGRAFIA = "fotografia por ticker"
 LINHA_UNICA = "agregado de linha única"
@@ -209,6 +219,56 @@ def inventariar(pasta: Path = PASTA_MARTS, marts: list[Mart] = MARTS) -> list[Ma
     return sorted(marts, key=lambda m: m.nome)
 
 
+def dependencias(sql: str) -> set[str]:
+    """Marts lidos por uma consulta (referências marts.<nome> fora de comentários)."""
+    return {nome.lower() for nome in _REFERENCIA.findall(_COMENTARIO.sub("", sql))}
+
+
+def ordenar(marts: list[Mart], pasta: Path = PASTA_MARTS) -> list[Mart]:
+    """Ordem topológica pelas dependências entre marts; empate em ordem alfabética."""
+    por_nome = {m.nome: m for m in marts}
+    pendentes = {
+        m.nome: dependencias(_texto_sql(Path(pasta) / f"{m.nome}.sql")) for m in marts
+    }
+    for nome, deps in sorted(pendentes.items()):
+        desconhecidas = sorted(deps - por_nome.keys())
+        if desconhecidas:
+            raise ErroMaterializacao(
+                "inventário",
+                "o .sql lê mart não declarado em pipeline.materializacao.MARTS",
+                arquivo=f"sql/marts/{nome}.sql",
+                exemplo=", ".join(f"marts.{d}" for d in desconhecidas),
+            )
+    ordem = []
+    while pendentes:
+        prontos = sorted(n for n, deps in pendentes.items() if not deps - set(ordem))
+        if not prontos:
+            raise ErroMaterializacao(
+                "inventário",
+                "dependência circular entre marts",
+                exemplo=", ".join(sorted(pendentes)),
+            )
+        for nome in prontos:
+            ordem.append(nome)
+            del pendentes[nome]
+    return [por_nome[n] for n in ordem]
+
+
+def _resolver(sql, temporarias):
+    """Troca marts.<dependência> pela temporária preparada nesta mesma execução."""
+
+    def trocar(ref):
+        nome = ref.group(1).lower()
+        if nome not in temporarias:
+            raise ErroMaterializacao(
+                "execução da consulta",
+                f"dependência marts.{nome} ainda não preparada nesta execução",
+            )
+        return temporarias[nome]
+
+    return _REFERENCIA.sub(trocar, _COMENTARIO.sub("", sql))
+
+
 # --------------------------------------------------------------------------- validações
 
 
@@ -279,15 +339,23 @@ def _validar_publicada(con, p):
 
 
 def preparar(
-    con: duckdb.DuckDBPyConnection, mart: Mart, pasta: Path = PASTA_MARTS
+    con: duckdb.DuckDBPyConnection,
+    mart: Mart,
+    pasta: Path = PASTA_MARTS,
+    temporarias: dict[str, str] | None = None,
 ) -> Preparada:
-    """Executa o .sql uma vez para uma tabela temporária e valida colunas e chave."""
+    """Executa o .sql uma vez para uma tabela temporária e valida colunas e chave.
+
+    temporarias: {mart: temporária} das dependências já preparadas (ver decisão 8).
+    """
     arquivo = Path(pasta) / f"{mart.nome}.sql"
     rotulo_arquivo = f"sql/marts/{arquivo.name}"
     rotulo = _rotulo_gold(mart.nome)
     temporaria = _temporaria(mart.nome)
     with _contexto("execução da consulta", arquivo=rotulo_arquivo, destino=rotulo):
         sql = _texto_sql(arquivo)
+        if dependencias(sql):
+            sql = _resolver(sql, temporarias or {})
         esperadas = _colunas(con, f"({sql})")
         con.execute(f"CREATE OR REPLACE TEMP TABLE {temporaria} AS {sql}")
         colunas = _colunas(con, temporaria)
@@ -380,7 +448,7 @@ def _coletar_relatorio(con, preparadas, marts):
             "natureza": p.mart.natureza,
             "estrategia": ESTRATEGIA,
         }
-        for p in preparadas
+        for p in sorted(preparadas, key=lambda p: p.mart.nome)
     ]
     return {"tabelas": tabelas, "orfas": _orfas(con, marts)}
 
@@ -423,8 +491,9 @@ def executar(
     marts = inventariar(pasta, marts)
     preparadas = []
     try:
-        for mart in marts:
-            preparadas.append(preparar(con, mart, pasta))
+        for mart in ordenar(marts, pasta):
+            temporarias = {p.mart.nome: p.temporaria for p in preparadas}
+            preparadas.append(preparar(con, mart, pasta, temporarias))
         publicar(con, preparadas)
         return _coletar_relatorio(con, preparadas, marts)
     finally:

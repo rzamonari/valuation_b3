@@ -8,6 +8,8 @@ from pathlib import Path
 
 import duckdb
 
+from pipeline.materializacao import dependencias
+
 PASTA_MARTS = Path(__file__).resolve().parent.parent / "sql" / "marts"
 
 INDICADORES = [
@@ -64,9 +66,22 @@ def novo_banco(tmp_path, acoes, emissoras, receita=()):
     return con
 
 
-def executar_mart(con, nome):
+def _texto(nome):
     texto = (PASTA_MARTS / f"{nome}.sql").read_text(encoding="utf-8-sig").strip()
-    cursor = con.execute(texto.removesuffix(";"))
+    return texto.removesuffix(";")
+
+
+def _materializar_dependencias(con, nome):
+    """Grava em marts.<dep> os marts que a consulta lê (ex.: marts_50 lê os rankings)."""
+    con.execute("CREATE SCHEMA IF NOT EXISTS marts")
+    for dep in sorted(dependencias(_texto(nome))):
+        _materializar_dependencias(con, dep)
+        con.execute(f"CREATE OR REPLACE TABLE marts.{dep} AS {_texto(dep)}")
+
+
+def executar_mart(con, nome):
+    _materializar_dependencias(con, nome)
+    cursor = con.execute(_texto(nome))
     colunas = [d[0] for d in cursor.description]
     return [dict(zip(colunas, linha, strict=False)) for linha in cursor.fetchall()]
 
@@ -289,9 +304,32 @@ def test_ticker_sem_liquidez_fica_fora_das_recomendacoes(tmp_path):
     assert tickers == ["BOAS3"]
 
 
+def test_recomendacao_usa_o_ranking_materializado(tmp_path):
+    # marts_50 lê marts.marts_01_rank_valor em vez de repetir a regra: ticker ausente do
+    # mart do ranking é não elegível naquele tema.
+    acoes = [{"ticker": "BOAS3", **COMPLETA}, {"ticker": "OTIM3", **COMPLETA}]
+    con = novo_banco(tmp_path, acoes, emissoras_de(acoes))
+    antes = executar_mart(con, "marts_50_rank_recomendacoes")
+    assert por_ticker(antes, "faixa_valor") == {
+        "BOAS3": "Superior",
+        "OTIM3": "Superior",
+    }
+
+    texto = _texto("marts_50_rank_recomendacoes")
+    con.execute("DELETE FROM marts.marts_01_rank_valor WHERE ticker = 'OTIM3'")
+    cursor = con.execute(texto)
+    colunas = [d[0] for d in cursor.description]
+    depois = [dict(zip(colunas, linha, strict=False)) for linha in cursor.fetchall()]
+    assert por_ticker(depois, "faixa_valor") == {
+        "BOAS3": "Superior",
+        "OTIM3": "Não elegível",
+    }
+    assert por_ticker(depois, "qtd_nao_elegivel") == {"BOAS3": 0, "OTIM3": 1}
+
+
 # --------------------------------------------------------------------------- cards × marts_50
-# Cards e marts_painel_indicadores trazem cópia literal da consulta de marts_50: os números
-# exibidos no painel precisam bater com a recomendação consolidada.
+# Cards e marts_painel_indicadores leem marts.marts_50_rank_recomendacoes: os números exibidos
+# no painel precisam bater com a recomendação consolidada.
 
 CARDS = {
     "marts_card_02_acoes_compra": "Compra",

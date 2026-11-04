@@ -42,7 +42,7 @@ indicadores e rankings fundamentalistas e exibi-los num painel somente leitura.
 |---|---|---|---|
 | Bronze | `raw` | `pipeline/ingestao.py` | Dado como veio, tudo `VARCHAR`, com `_timestamp_ingestao` e `_source_origin` |
 | Silver | `refined` | `pipeline/transformacao/` | Tipagem estrita, deduplicação, validação de chave; **sem cálculo, sem preencher ausentes** |
-| Gold | `marts` | `sql/marts/*.sql` + `pipeline/materializacao.py` | Um `SELECT` puro por mart, lendo só `refined`; o `.sql` é a fonte da verdade |
+| Gold | `marts` | `sql/marts/*.sql` + `pipeline/materializacao.py` | Um `SELECT` puro por mart, lendo `refined` e, quando agrega outro mart, `marts.<nome>`; o `.sql` é a fonte da verdade |
 | Apresentação | — | `painel.py` + `app.py` | Só lê, filtra, ordena e formata; **número novo exige mart novo** |
 
 Garantias transversais, válidas para todas as etapas:
@@ -50,6 +50,8 @@ Garantias transversais, válidas para todas as etapas:
 - **Atomicidade:** cada etapa publica numa única transação; falha → `ROLLBACK` e versão anterior preservada.
 - **Idempotência:** reexecutar produz o mesmo estado (`CREATE OR REPLACE`, `IF NOT EXISTS`).
 - **Isolamento entre camadas:** cada etapa lê apenas a camada anterior e grava só no seu schema.
+  Na Gold, um mart pode ler outro mart da mesma execução (`marts.<nome>`, resolvido em ordem
+  topológica pela materialização), nunca a versão publicada anterior.
 - **Banco único:** `fundamentalistas.duckdb` na raiz, caminho derivado de `Path(__file__)`;
   `VALUATIONB3_DB` aponta outro arquivo (ex.: homologação) para pipeline e painel.
 - **Nulos preservados:** nunca viram zero; divisão por zero resulta em `NULL`.
@@ -260,7 +262,8 @@ fonte de setor econômico). Para cada um:
 4. Se exibido: `MARTS_CARREGAR` / `MARTS_OBRIGATORIOS` em `painel.py` e `doc_api.md`.
 
 Se o indicador depender de dado ausente na Silver, a mudança começa na Bronze (nova fonte) e segue
-camada a camada. Se alterar rankings ou a regra de recomendação, replicar nos cards (ver P8).
+camada a camada. Rankings e regra de recomendação têm uma única fonte (`marts_01`…`10` e
+`marts_50`); cards e painel os leem como dependência.
 
 ---
 
@@ -303,7 +306,7 @@ uv run mkdocs build --strict
 |---|---|---|
 | Fonte muda formato ou sai do ar | Ingestão aborta | `validar_fontes`, `FalhaExtracao`, conversões estritas na Silver |
 | Rate limit do Yahoo Finance | Extração lenta ou falha | Paralelismo 4, retry com backoff |
-| Consulta de `marts_50` copiada em cards e painel | Números divergentes entre seções | Teste de consistência em `test_sql_marts.py` (P8 ✅) |
+| Regra de recomendação repetida em vários `.sql` | Números divergentes entre seções | Resolvido: `marts_50` lê os rankings e cards/painel leem `marts_50`; teste de consistência mantido (P8 ✅) |
 | Zeros do Fundamentus significando ausência | Rankings distorcidos | Preservados e excluídos pelos critérios `> 0` |
 | Payout estimado (`DY × P/L`) acima de 100% | Proventos favorece pagadora insustentável | Desempate por menor payout; documentado (56 de 256 elegíveis) |
 | `fechamento_ajustado` negativo (8 tickers) | Métricas de risco erradas | Tratado como inválido no mart e no gráfico |

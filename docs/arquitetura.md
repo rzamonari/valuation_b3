@@ -37,6 +37,8 @@ Painel Streamlit
   anterior é preservada. Na Bronze, se qualquer fonte falhar, nada é gravado.
 - **Idempotência:** reexecutar produz o mesmo estado (`CREATE OR REPLACE`, `IF NOT EXISTS`).
 - **Isolamento entre camadas:** cada etapa lê apenas a camada anterior e grava só no seu schema.
+  Na Gold, um mart pode ler outro mart da mesma execução (`marts.<nome>`, resolvido em ordem
+  topológica pela materialização), nunca a versão publicada anterior.
 - **Nulos preservados:** nunca viram zero; divisão por zero resulta em `NULL`.
 - **Conversões estritas:** valor fora do formato esperado gera erro com etapa, coluna e exemplo,
   em vez de virar `NULL` sem aviso.

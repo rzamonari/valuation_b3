@@ -285,8 +285,12 @@ Fotografia atual: 391 tickers — 95 Compra, 20 Manter, 276 Venda.
 | `marts_painel_data_referencia` | 1 linha | `data_referencia` (`MAX(_timestamp_ingestao)` em `America/Sao_Paulo`) |
 | `marts_painel_indicadores` | `ticker` | recomendação + indicadores do Fundamentus, `payout`, `earnings_yield` |
 
-Os cards e marts do painel contêm **cópia literal** da consulta de `marts_50`: qualquer mudança
-nos rankings ou na regra precisa ser replicada neles.
+Dependências entre marts: `marts_50` lê `marts.marts_01` … `marts_10` (ticker e rank), e os cards
+01–05 e `marts_painel_indicadores` leem `marts.marts_50_rank_recomendacoes`. A elegibilidade e o
+`DENSE_RANK` de cada tema vivem só no arquivo do ranking, e a regra de recomendação só no
+`marts_50`. A materialização extrai as referências `marts.<nome>` do `.sql`, prepara os marts em
+ordem topológica e troca cada referência pela temporária da mesma execução (`dependencias`,
+`ordenar`).
 
 ### 6.6 Tratamento de dados
 

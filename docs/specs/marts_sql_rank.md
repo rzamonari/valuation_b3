@@ -531,6 +531,14 @@ A consulta deverá ser autocontida (sem depender da execução de outro arquivo)
 
 O rank de cada ticker em cada ranking deverá ser idêntico ao retornado pelo arquivo individual correspondente. Qualquer alteração futura em um ranking individual deverá ser replicada em `marts_50_rank_recomendacoes.sql`.
 
+> **Revisão (04/11/2026):** a consulta deixou de ser autocontida. `marts_50_rank_recomendacoes.sql`
+> lê `ticker` e `rank` de `marts.marts_01_rank_valor` … `marts.marts_10_rank_rentabilidade`, e
+> `pipeline/materializacao.py` prepara os dez rankings antes dele, na mesma execução. A
+> igualdade dos ranks passa a valer por construção, e a alteração de um ranking não precisa mais
+> ser replicada. Resultado conferido sobre o banco real: as 30 tabelas `marts.*` iguais antes e
+> depois (`EXCEPT ALL` nos dois sentidos), salvo o último bit de desvios-padrão em DOUBLE de
+> `marts_retorno_total_risco`, cujo `.sql` não mudou.
+
 ### 7.2. Faixa de cada ticker em cada ranking
 
 Para cada um dos 10 rankings, cada ticker da consulta-base recebe uma faixa, calculada pela posição relativa do seu rank em relação ao maior rank daquele ranking (`max_rank`):

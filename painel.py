@@ -24,8 +24,8 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
      Motivo: número novo na tela exige um .sql novo em sql/marts/, declarado em
      pipeline/materializacao.py e materializado em marts.
 
-3. MARTS DO PAINEL (marts.marts_card_05_* e marts.marts_painel_*), todos com a regra de
-   recomendação de marts_50 copiada literalmente. Termômetro: empate -> Manter (P1).
+3. MARTS DO PAINEL (marts.marts_card_* e marts.marts_painel_*): leem a recomendação de
+   marts.marts_50_rank_recomendacoes, sem repetir a regra. Termômetro: empate -> Manter (P1).
 
 4. LAYOUT (app.py) e LINGUAGEM VISUAL
    - Cinco faixas: pulso do mercado, ranking de oportunidades, valor × qualidade, rankings
