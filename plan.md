@@ -198,10 +198,10 @@ nunca se misturam com mudança de comportamento.
 
 **Pronto quando:** `refined.*` idêntico antes e depois (comparação por `EXCEPT ALL`).
 
-### Etapa F — Layout `src/` (opcional, último)
+### Etapa F — Layout `pipeline/` (opcional, último)
 
 1. `[build-system]` com `uv_build`.
-2. `git mv pipeline src/valuationb3`, `git mv test tests`; imports `from valuationb3 import db`.
+2. `git mv painel.py pipeline/painel.py`, `git mv test tests`; imports continuam `from pipeline import db`.
 3. Ajustar `testpaths`, remover `pythonpath = ["."]`, ajustar `[tool.coverage.run] source`.
 4. Atualizar comandos em docstrings, `doc_api.md`, `painel.py` e MkDocs.
 

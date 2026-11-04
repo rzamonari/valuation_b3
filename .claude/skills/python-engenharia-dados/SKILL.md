@@ -28,7 +28,8 @@ b3_valuation/
 ├── test/                     # test_db, test_ingestao, test_log, test_transformacao, test_marts, test_sql_marts, test_painel
 ├── doc_api.md                # referência da API (incluída no site MkDocs)
 ├── docs/ + mkdocs.yml        # documentação MkDocs Material; specs em docs/specs/
-└── fundamentalistas.duckdb   # banco local, fora do git
+├── .vscode/tasks.json        # tarefas do pipeline, painel, pytest e ruff check (todas via uv run)
+└── fundamentalistas.duckdb   # banco local — ATENÇÃO: ainda rastreado pelo git (ver abaixo)
 ```
 
 Já configurado: `uv` + `uv.lock`; grupo `dev` com `pytest`, `pytest-cov`, `ruff`;
@@ -38,7 +39,14 @@ Já configurado: `uv` + `uv.lock`; grupo `dev` com `pytest`, `pytest-cov`, `ruff
 MkDocs Material (`mkdocs.yml`, `docs/`); `logging` via `pipeline/log.py`; type hints nas funções
 públicas de `pipeline/*`; caminho do banco sobrescrevível por `VALUATIONB3_DB`.
 
-Não configurado: layout `src/`.
+Não configurado: layout `pipeline/` + `tests/` como pacote instalável; regra `BLE` do Ruff (os
+`# noqa: BLE001` do código são só documentais); tarefas do VS Code para `ruff format` e `mkdocs`.
+Atalhos `taskipy` em `[tool.taskipy.tasks]`: `uv run task docs` e `uv run task docs-build`.
+
+**[PROPOSTA] Banco fora do git:** `*.duckdb` está no `.gitignore`, mas `fundamentalistas.duckdb`
+foi versionado antes disso e continua rastreado. Correção sugerida, em commit próprio e só com
+aprovação: `git rm --cached fundamentalistas.duckdb` (o arquivo local permanece). Até lá, não
+inclua o banco em commits de código.
 
 ## 1. Estrutura e modularidade
 
@@ -60,17 +68,17 @@ Regras:
 - Notebooks só para exploração. Código reutilizável vai para o pacote e ganha teste; nenhum notebook é etapa do pipeline.
 - Siga o idioma e a nomenclatura do repositório: identificadores em português, `snake_case`, funções privadas com `_`, docstring de módulo com linha `Execução: uv run ...` e decisões de implementação.
 
-**[PROPOSTA] Padrão `src/` e `tests/`** — orientação para a evolução, não renomeie automaticamente:
+**[PROPOSTA] Padrão `pipeline/` e `tests/`** — orientação para a evolução, não renomeie automaticamente:
 
 ```text
-src/valuationb3/{__init__.py, db.py, ingestao.py, transformacao.py, materializacao.py, painel.py}
-tests/{test_db.py, test_ingestao.py, test_transformacao.py, ...}   # espelha src/valuationb3/
+pipeline/{__init__.py, db.py, ingestao.py, transformacao/, materializacao.py, painel.py}
+tests/{test_db.py, test_ingestao.py, test_transformacao.py, ...}   # espelha pipeline/
 app.py                                                              # entrypoint fino
 ```
 
 Migração incremental (um PR dedicado, testes verdes antes e depois):
 1. Adicionar `[build-system]` (ex.: `uv_build`) ao `pyproject.toml` para o projeto ser instalável.
-2. `git mv pipeline src/valuationb3` e `git mv test tests`; atualizar imports (`from valuationb3 import db`).
+2. `git mv painel.py pipeline/painel.py` e `git mv test tests`; imports continuam `from pipeline import db`.
 3. Ajustar `testpaths`, remover `pythonpath = ["."]`, ajustar `[tool.coverage.run] source`.
 4. Atualizar comandos `uv run python -m ...` em docstrings, `doc_api.md` e `painel.py`.
 
@@ -133,7 +141,8 @@ uv run pytest --cov --cov-report=term-missing      # linhas não cobertas
 uv run pytest --cov --cov-report=html              # relatório em htmlcov/index.html
 ```
 
-- O limite de 60% está em `[tool.coverage.report]` e é aplicado em toda execução (`addopts = "--cov"`); `htmlcov/` está no `.gitignore`.
+- O limite de 60% está em `[tool.coverage.report]` e é aplicado em toda execução (`addopts = "--cov"`, então `uv run pytest` já mede); `htmlcov/` está no `.gitignore`.
+- Mapeamento atual: `pipeline/db.py` → `test_db.py`, `ingestao.py` → `test_ingestao.py`, `log.py` → `test_log.py`, `transformacao/` → `test_transformacao.py`, `materializacao.py` → `test_marts.py`, `sql/marts/*.sql` → `test_sql_marts.py`, `painel.py` → `test_painel.py`. Não há `conftest.py`; crie um só quando uma fixture for compartilhada por mais de um arquivo.
 - Nunca reduza `fail_under`, amplie `omit` ou adicione `# pragma: no cover` para passar. Se a cobertura cair, escreva testes.
 - Arquivo de teste por módulo: `test/test_<modulo>.py`. Nome do teste descreve o comportamento: `test_gravar_de_novo_substitui_a_tabela_sem_acumular`.
 - **Nunca toque o banco real.** Padrão do projeto: banco em `tmp_path` e `monkeypatch.setattr(db, "_ARQUIVO_DB", arquivo)` (ver `test/test_db.py`); `painel` usa `ARQUIVO_DB`.
@@ -151,8 +160,8 @@ continuam sendo a fonte: as páginas os incluem com `pymdownx.snippets` (`--8<--
 Por isso, links relativos nesses arquivos quebram o build; cite o caminho em código.
 
 ```powershell
-uv run mkdocs serve           # pré-visualização em http://127.0.0.1:8000
-uv run mkdocs build --strict  # build falha com link quebrado ou página fora da nav
+uv run task docs        # mkdocs serve — pré-visualização em http://127.0.0.1:8000
+uv run task docs-build  # mkdocs build --strict — falha com link quebrado ou página fora da nav
 ```
 
 - Toda página nova entra na `nav`. Instalação, configuração, execução do pipeline, arquitetura e decisões relevantes devem estar cobertas.
@@ -164,7 +173,8 @@ uv run mkdocs build --strict  # build falha com link quebrado ou página fora da
 **Código**
 - Type hints em funções públicas novas ou alteradas (já presentes em `pipeline/*`; `painel.py` ainda sem): `def gravar(con: duckdb.DuckDBPyConnection, df: pd.DataFrame, schema: str, tabela: str) -> int:`.
 - Funções curtas e coesas; nomes que dizem o que fazem.
-- Exceções específicas (`YFRateLimitError`, `duckdb.IOException`, exceções do domínio como `FalhaExtracao`). Nada de `except Exception: pass`.
+- Exceções específicas (`YFRateLimitError`, `duckdb.IOException`, exceções do domínio como `FalhaExtracao`, `ErroTransformacao`, `ErroMaterializacao`). Nada de `except Exception: pass`.
+- `except Exception` amplo só na fronteira de uma etapa (falha por item tolerada, rollback, abortar a fonte), com comentário justificando — padrão `# noqa: BLE001 — <motivo>` de `ingestao.py` —, registro em log e re-raise ou exceção de domínio.
 - Sem efeitos colaterais no import; execução só sob `if __name__ == "__main__":` / `main()`.
 
 **Configuração, caminhos e segredos**
@@ -183,7 +193,8 @@ uv run mkdocs build --strict  # build falha com link quebrado ou página fora da
 - Atomicidade: publique em transação; qualquer falha faz `ROLLBACK` e mantém a versão anterior. Extração falhou → nada é gravado.
 - Conexões: abra, use e feche (`try/finally`). Leitura com `read_only=True`. O arquivo DuckDB fica bloqueado enquanto há conexão de escrita (ou a DuckDB UI) aberta.
 - SQL: valores por parâmetro vinculado (`WHERE ticker = ?`); identificadores via `_ident`. Nunca interpole entrada externa.
-- Volume e memória: filtre e agregue no DuckDB, não no pandas. `marts.marts_cotacao` tem ~1,9 milhão de linhas — leia só o recorte necessário; para varreduras grandes use `fetch_record_batch`/`fetch_df_chunk` ou `COPY ... TO` em vez de `fetchdf()` completo.
+- Volume e memória: filtre e agregue no DuckDB, não no pandas. `marts.marts_cotacao` tem ~1,9 milhão de linhas — leia só o recorte necessário (como `painel.ler_cotacao(ticker)`). Para varreduras grandes, **recomendação** (ainda não usada no código): `fetch_record_batch`/`fetch_df_chunk` ou `COPY ... TO` em vez de `fetchdf()` completo.
+- Inspeção do banco: o servidor MCP DuckDB do ambiente usa versão anterior à do projeto (DuckDB 2.0.0) e não abre o arquivo; consulte com `uv run python -c "import duckdb; ..."` usando `read_only=True`.
 - Chamadas externas: retry com backoff para erros transitórios, sem retry para erros definitivos (padrão `_com_retry` / `_ErroDefinitivo`), paralelismo limitado.
 
 **Evite** abstrações prematuras (camadas genéricas para uma única fonte) e dependências novas para o que a stdlib, o DuckDB ou o pandas já resolvem.
@@ -198,8 +209,8 @@ uv run mkdocs build --strict  # build falha com link quebrado ou página fora da
    ```powershell
    uv run ruff check .
    uv run ruff format . --check
-   uv run pytest --cov
-   uv run mkdocs build --strict   # somente depois que MkDocs estiver configurado
+   uv run pytest                  # com cobertura e fail_under=60 (addopts)
+   uv run task docs-build         # quando docs, docstrings citadas ou doc_api.md mudarem
    ```
 
 5. **Relate** os comandos executados e o resultado real (incluindo a cobertura obtida). Se algo falhou ou não foi executado, diga isso explicitamente — nunca afirme que uma verificação passou sem rodá-la.

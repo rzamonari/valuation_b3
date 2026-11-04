@@ -60,8 +60,8 @@ banco, para consultas por assistentes de IA.
 uv run ruff check .            # lint
 uv run ruff format . --check   # formatação
 uv run pytest                  # testes, sempre com cobertura (mínimo 60%)
-uv run mkdocs serve            # esta documentação em http://127.0.0.1:8000
-uv run mkdocs build --strict   # build falha com link quebrado ou página fora da nav
+uv run task docs               # esta documentação em http://127.0.0.1:8000 (mkdocs serve)
+uv run task docs-build         # mkdocs build --strict: falha com link quebrado ou página fora da nav
 ```
 
 Os testes nunca tocam o banco real nem a rede: usam DuckDB em pasta temporária e substituem as

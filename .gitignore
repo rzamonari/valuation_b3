@@ -1,9 +1,36 @@
+# Ambiente e cache Python
 .venv/
 __pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Ferramentas (pytest, Ruff, cobertura)
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Documentacao gerada (mkdocs build)
+site/
+
+# Dados locais (DuckDB e Parquet)
 *.db
 *.duckdb
 *.duckdb.wal
 *.parquet
-.coverage
-htmlcov/
-site/
+
+# Segredos e configuracoes locais
+.env
+.env.*
+.streamlit/secrets.toml
+.claude/settings.local.json
+
+# Sistema operacional e editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/

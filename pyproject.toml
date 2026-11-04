@@ -19,6 +19,7 @@ dev = [
     "pytest>=9.2.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.3",
+    "taskipy>=1.14.1",
 ]
 
 [tool.pytest.ini_options]
@@ -42,3 +43,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 # O comprimento de linha é responsabilidade do `ruff format` (88). O que ele não quebra
 # (strings longas, SQL, URLs e comentários separadores) não vale reescrita manual.
 ignore = ["E501"]
+
+[tool.taskipy.tasks]
+docs = { cmd = "mkdocs serve", help = "pré-visualiza a documentação em http://127.0.0.1:8000" }
+docs-build = { cmd = "mkdocs build --strict", help = "gera o site em site/ e falha com link quebrado" }
