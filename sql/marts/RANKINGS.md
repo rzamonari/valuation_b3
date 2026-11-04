@@ -136,5 +136,7 @@ import duckdb
 from pathlib import Path
 
 con = duckdb.connect("fundamentalistas.duckdb", read_only=True)
-df = con.execute(Path("sql/marts/marts_01_rank_valor.sql").read_text(encoding="utf-8")).df()
+df = con.execute(
+    Path("sql/marts/marts_01_rank_valor.sql").read_text(encoding="utf-8")
+).df()
 ```
