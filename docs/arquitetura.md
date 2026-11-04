@@ -18,6 +18,7 @@ marts (Gold)        indicadores, rankings, recomendação e marts do painel
         ▼
 fotografia/         versionada no git
         │  painel.py + app.py (somente leitura: banco local ou fotografia)
+        │  aba "Saúde do pipeline": marts_painel_saude_pipeline ← meta.execucoes
         ▼
 Painel Streamlit    local ou Streamlit Community Cloud
 ```
@@ -32,6 +33,7 @@ Painel Streamlit    local ou Streamlit Community Cloud
 | Qualidade | — | `pipeline/qualidade.py` | Só lê; erro = código de saída 1 e nenhuma fotografia nova |
 | Fotografia | `fotografia/` | `pipeline/fotografia.py` | Cópia fiel de `marts.*` (tipos conferidos), hash por arquivo e total |
 | Apresentação | — | `painel.py` + `app.py` | Só lê, filtra, ordena e formata; **número novo exige mart novo** |
+| Registro de execução | `meta` | `pipeline/execucao.py` | Uma linha em `meta.execucoes` por execução de etapa; republica `marts_painel_saude_pipeline` |
 
 `pipeline/db.py` concentra a conexão e a persistência genérica (`conectar`, `criar_schema`,
 `gravar`, `_ident`) e não importa nada de `pipeline`. Os módulos do pipeline nunca importam
@@ -50,13 +52,18 @@ Painel Streamlit    local ou Streamlit Community Cloud
   em vez de virar `NULL` sem aviso.
 - **Validação antes de publicar:** colunas, tipos e chave lógica (sem nulos nem duplicatas).
 - **Código de saída:** `0` em sucesso, `1` em falha (mensagem em `stderr`, sem traceback).
+- **Rastreabilidade das execuções:** cada etapa registra início, fim, duração, linhas por tabela,
+  status, avisos e erro em `meta.execucoes`, também quando falha. O registro nunca altera o
+  resultado da etapa ([Operação](operacao.md#registro-de-execucao)).
 
 ## Chamadas externas
 
 Retry com backoff exponencial para erros transitórios (`TENTATIVAS = 3`, `BACKOFF_BASE = 2`,
 `TIMEOUT = 30`), sem retry para erros definitivos (HTTP 4xx exceto 429). Paralelismo limitado:
 8 workers HTTP e 4 para o Yahoo Finance. `validar_fontes()` confirma a disponibilidade da B3
-antes de qualquer extração.
+antes de qualquer extração. Os testes de contrato (`test/contrato/`, toda segunda no GitHub
+Actions) conferem o formato de cada fonte contra o contrato da Silver e abrem uma issue quando
+ele muda ([Operação](operacao.md#contrato-das-fontes)).
 
 ## Fora do escopo
 

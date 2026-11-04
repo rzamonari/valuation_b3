@@ -21,6 +21,7 @@ Números de linhas citados abaixo vêm do banco `fundamentalistas.duckdb` com da
 | Qualidade | — | [pipeline/qualidade.py](pipeline/qualidade.py) | `uv run python -m pipeline.qualidade` | Reconciliação raw → refined → marts e regras de domínio (só leitura) |
 | Fotografia | — | [pipeline/fotografia.py](pipeline/fotografia.py) | `uv run python -m pipeline.fotografia` | `marts.*` em Parquet + manifesto com data de referência e hash |
 | Apresentação | — | [painel.py](painel.py) + [app.py](app.py) | `uv run streamlit run app.py` | Só lê, filtra, ordena e formata |
+| Registro de execução | `meta` | [pipeline/execucao.py](pipeline/execucao.py) | (cada etapa, ao terminar) | `meta.execucoes` + `marts_painel_saude_pipeline` |
 
 Utilitários: [ui.py](ui.py) abre o banco na DuckDB UI (`http://localhost:4213`);
 [.mcp.json](.mcp.json) expõe o banco a um servidor MCP de leitura (`mcp-server-motherduck`).
@@ -32,6 +33,7 @@ Utilitários: [ui.py](ui.py) abre o banco na DuckDB UI (`http://localhost:4213`)
 - **Isolamento:** cada etapa lê só a camada anterior e grava só no seu schema.
 - **Nulos preservados:** nunca viram zero; divisão por zero resulta em `NULL`.
 - **Código de saída:** `0` em sucesso, `1` em falha (mensagem em `stderr`, sem traceback).
+- **Registro de execução:** toda etapa grava uma linha em `meta.execucoes`, também quando falha; o registro nunca muda o resultado da etapa.
 - **Banco único:** `fundamentalistas.duckdb` na raiz, caminho derivado de `Path(__file__)` (independe do cwd);
   `VALUATIONB3_DB` aponta outro arquivo para pipeline e painel.
 
@@ -295,6 +297,7 @@ Fotografia atual: 391 tickers — 95 Compra, 20 Manter, 276 Venda.
 | `marts_painel_indicadores` | `ticker` | recomendação + indicadores do Fundamentus, `payout`, `earnings_yield` |
 | `marts_exclusoes_universo` | `ticker` | tickers do Fundamentus fora do universo: `emissora`, `motivo` (categoria fechada), `detalhe`, indicadores básicos |
 | `marts_painel_exclusoes_motivo` | `motivo` | `ordem`, `motivo`, `descricao`, `quantidade`, `quantidade_negociada` (lê `marts_exclusoes_universo`) |
+| `marts_painel_saude_pipeline` | `etapa` (sempre 4 linhas) | última execução de ingestão, transformação, materialização e qualidade em `meta.execucoes`: `ordem`, `camada`, `status`, `inicio_utc`, `fim_utc`, `duracao_s`, `tabelas`, `linhas`, `linhas_por_tabela`, `avisos`, `lista_avisos`, `erro`, `ultimo_sucesso_utc` |
 
 Dependências entre marts: `marts_50` lê `marts.marts_01` … `marts_10` (ticker e rank), e os cards
 01–05 e `marts_painel_indicadores` leem `marts.marts_50_rank_recomendacoes`. A elegibilidade e o
@@ -318,14 +321,15 @@ ordem topológica e troca cada referência pela temporária da mesma execução 
 | Símbolo | Descrição |
 |---|---|
 | `Mart(nome, chave, natureza)` | Declaração de um mart; `chave=()` = resultado de linha única |
-| `MARTS` | Registro dos 30 marts com a chave do comentário `Grão:` de cada `.sql` |
+| `MARTS` | Registro dos 33 marts com a chave do comentário `Grão:` de cada `.sql` |
 | `ErroMaterializacao(etapa, motivo, *, arquivo, destino, exemplo)` | Erro com contexto; nenhuma tabela Gold muda |
 | `inventariar(pasta, marts)` | Exige correspondência 1:1 entre `.sql` e `MARTS` |
 | `dependencias(sql)` | Marts lidos pela consulta (`marts.<nome>` fora de comentários) |
 | `ordenar(marts, pasta)` | Ordem topológica pelas dependências (empate alfabético); dependência não declarada ou ciclo interrompem |
 | `preparar(con, mart, pasta, temporarias)` | Executa o `.sql` uma vez para tabela temporária; valida colunas/tipos contra `DESCRIBE` e a chave (sem nulos/duplicatas; linha única = exatamente 1) |
 | `publicar(con, preparadas)` | `CREATE OR REPLACE TABLE marts.<nome>` de todos numa transação; antes do `COMMIT` confere contagem, colunas, tipos, chave e `EXCEPT ALL` nos dois sentidos |
-| `executar(con, pasta, marts)` | Orquestra e devolve relatório (tabelas + órfãs) |
+| `executar(con, pasta, marts)` | Orquestra e devolve relatório (tabelas + órfãs); cria `meta.execucoes` vazia se ainda não existir (o mart de saúde a lê) |
+| `atualizar(con, nomes, pasta, marts)` | Mesmo preparo e publicação para um subconjunto sem dependência fora dele; usado pelo registro para republicar só `marts_painel_saude_pipeline` |
 
 Naturezas: **fotografia por ticker**, **agregado de linha única** e **série histórica**
 (`marts_cotacao`); todas com **substituição integral**. Tabelas em `marts` sem `.sql`
@@ -346,6 +350,7 @@ verificação de **erro** falhar.
 | `verificacoes()` | Catálogo completo (79 verificações) |
 | `executar(con, catalogo=None)` / `erros(resultados)` | Executa e filtra os erros |
 | `exigir(con)` | Executa e levanta `ErroQualidade` se houver erro (portão da fotografia) |
+| `avisos(resultados)` | Verificações com AVISO no formato do registro de execução (`"<nome>: <n> violação(ões)"`) |
 
 | Camada | O que confere | Severidade |
 |---|---|---|
@@ -366,22 +371,49 @@ regra de domínio. Na base de 02/11/2026: 68 ok, 11 avisos, 0 erros.
 
 | Símbolo | Descrição |
 |---|---|
-| `exportar(con, pasta)` | Exige qualidade sem erros; grava cada mart de `MARTS` em `<mart>.parquet` (zstd, ordenado pela chave) e `manifesto.json`; troca a pasta por renomeação (falha preserva a anterior) |
+| `exportar(con, pasta, marts, registro=None)` | Exige qualidade sem erros; grava cada mart de `MARTS` em `<mart>.parquet` (zstd, ordenado pela chave) e `manifesto.json`; troca a pasta por renomeação (falha preserva a anterior) |
 | `verificar(pasta)` | Confere arquivos e SHA-256 contra o manifesto; `ErroFotografia` se divergir |
 | `conectar(pasta, nomes=None)` | DuckDB em memória com views `marts."<mart>"` sobre os Parquet (só as de `nomes`, se informado); Parquet ilegível vira `ErroFotografia` |
 | `ler_manifesto(pasta)` | Lê e valida o formato do manifesto |
 | `COLUNAS` / `selecao(nome)` | Marts exportados só com parte das colunas: `marts_cotacao` vai com `ticker`, `data`, `fechamento_ajustado`, `dividendos` e `volume` (o que o painel usa; 26 MB → 10 MB). O banco local segue com a série completa |
 
-Manifesto: `data_referencia`, `gerada_em`, versão do `duckdb`, resumo da qualidade e, por tabela,
-`arquivo`, `registros`, `bytes`, `sha256` e, nos marts recortados, `colunas`. `hash` = SHA-256 das linhas `"<mart> <sha256>"` em
-ordem alfabética: identifica a fotografia inteira e só muda quando os dados mudam (a escrita é
+Manifesto: `data_referencia`, `gerada_em`, versão do `duckdb`, resumo da qualidade, por tabela
+`arquivo`, `registros`, `bytes`, `sha256` e, nos marts recortados, `colunas`, e `execucoes`: a
+execução mais recente de cada etapa em `meta.execucoes` e, por último, a da própria fotografia
+(concluída antes de o manifesto ser escrito). `hash` = SHA-256 das linhas `"<mart> <sha256>"` em
+ordem alfabética, sem os marts de `FORA_DO_HASH` (`marts_painel_saude_pipeline`, que muda a cada
+ciclo; o arquivo dele continua conferido por `verificar`): identifica os dados e só muda quando eles mudam (a escrita é
 determinística para a mesma versão do DuckDB). Tipos sem equivalente em Parquet (ex.: `HUGEINT`)
 interrompem a exportação. `uv run python -m pipeline.fotografia --verificar` confere a fotografia
 versionada (também no CI).
 
 ---
 
-## 10. `painel` — leitura, formatação e gráficos
+## 10. `pipeline.execucao` — registro de execução e saúde do pipeline
+
+Cada `main()` das cinco etapas roda dentro de `registrada("<etapa>")`. Ao sair, com sucesso,
+`sys.exit(1)` ou exceção, a execução é gravada em `meta.execucoes` e
+`marts_painel_saude_pipeline` é republicado (`materializacao.atualizar`). O registro nunca levanta:
+banco bloqueado ou erro na gravação vira aviso no log, e sem o arquivo do banco nada é gravado.
+
+| Símbolo | Descrição |
+|---|---|
+| `Execucao(etapa)` | `inicio_utc`, `fim_utc`, `duracao_s` (relógio monotônico), `status`, `tabelas` (`{tabela: linhas}`), `avisos`, `erro`; `concluir(status, avisos, erro)` (idempotente para o mesmo status) e `como_dict()` |
+| `registrada(etapa)` | Context manager: mede o bloco, captura avisos e erros do log (`pipeline.log.capturar`) e registra ao sair; a exceção ou o `SystemExit` seguem adiante |
+| `registrar(execucao)` / `gravar(con, execucao)` | Abre o banco e grava, sem levantar / grava numa conexão aberta e republica o mart de saúde |
+| `garantir_tabela(con)` | `CREATE TABLE IF NOT EXISTS meta.execucoes` |
+| `ultimas(con)` | Execução mais recente de cada etapa, na ordem do pipeline (vazio sem a tabela) |
+| `idade(data_referencia, hoje=None, limite=LIMITE_DIAS_UTEIS)` | `Idade(dias_corridos, dias_uteis, limite_dias_uteis)` e `alerta` (dias úteis > limite); dias úteis = segunda a sexta, sem feriados; `hoje` em Brasília (UTC−3) |
+| `LIMITE_DIAS_UTEIS` | 5 |
+
+`meta.execucoes`: `id`, `etapa`, `inicio_utc`, `fim_utc`, `duracao_s`, `status` (`sucesso` ou
+`falha`), `linhas_por_tabela` (`STRUCT(tabela, linhas)[]`), `avisos` (`VARCHAR[]`, até 20) e `erro`.
+Horários em `TIMESTAMP` UTC, sem fuso. A idade dos dados não está em mart porque depende do dia
+em que o painel é aberto.
+
+---
+
+## 11. `painel` — leitura, formatação e gráficos
 
 Módulo sem dependência de Streamlit (testável e reaproveitável).
 
@@ -397,6 +429,9 @@ Módulo sem dependência de Streamlit (testável e reaproveitável).
 | `filtrar(df, recomendacoes, segmentos, liquidez_minima)` | Recorte por recomendação, segmento e liquidez mínima |
 | `BancoBloqueado` | Arquivo em uso por outro processo (UI, ingestão, materialização) |
 | `ErroMart(tabela, mensagem)` | Falha ao ler uma tabela |
+| `ler_saude()` | `marts_painel_saude_pipeline`, ou `None` se o mart não existe (banco ou fotografia anteriores ao registro); fora de `MARTS_OBRIGATORIOS` |
+| `execucao_fotografia()` | Linha `fotografia` de `execucoes` no manifesto (só na fonte fotografia) |
+| `idade_dados(data_referencia, hoje=None)` | `pipeline.execucao.idade` sobre a data de referência |
 
 Cada leitura abre e fecha uma conexão `read_only`; na fotografia, a conexão só cria as views dos
 marts lidos, então a carga da página nunca abre o Parquet de `marts_cotacao`. Não há cálculo no painel: **número novo exige
@@ -412,6 +447,8 @@ mart novo**.
 | `pct(v, casas=1)` | `12,3%` (não multiplica por 100) | `—` |
 | `multiplo(v, casas=1)` | `8,5x` | `—` |
 | `data_br(v)` | `02/11/2026` | `—` |
+| `data_hora(v)` | `02/11/2026 09:05 UTC` | `—` |
+| `duracao(segundos)` | `8,4 s` / `3 min 05 s` / `1 h 02 min` | `—` |
 
 ### Gráficos e tabelas (Plotly, template `b3` em modo escuro)
 
@@ -420,14 +457,23 @@ mart novo**.
 `fig_cotacao` (fechamento ajustado + volume + 💰 proventos; preços ≤ 0 ficam fora),
 `html_cartao`, `html_termometro`, `html_metrica` (mini cartão da ficha) e `html_grade` +
 `css_grade` (grade responsiva por largura da área de conteúdo: `GRADE_PULSO` 2/3/6 colunas,
-`GRADE_FICHA` 2/5).
+`GRADE_FICHA` 2/5, `GRADE_SAUDE` 2/4).
+
+Saúde do pipeline: `tabela_saude` (última execução por etapa), `tabela_linhas_por_tabela`,
+`falhas_saude`, `avisos_saude`, `metricas_saude` (idade, última ingestão, avisos da qualidade,
+fotografia) e `fig_duracao_etapas` (barras pela duração, cor pelo status: `STATUS_EXECUCAO`).
 
 Constantes visuais: `REC` (ícone + rótulo + cor por recomendação, para acessibilidade),
 `FAIXAS`, `INDICADORES`, `RANKINGS`, `LIQUIDEZ_MINIMA` (Todas, R$ 100 mil, R$ 1 mi, R$ 10 mi).
 
 ---
 
-## 11. `app.py` — painel Streamlit
+## 12. `app.py` — painel Streamlit
+
+Duas abas: **📈 Visões de investimento** (as cinco seções abaixo) e **🩺 Saúde do pipeline**
+(idade dos dados com alerta acima de 5 dias úteis, última execução de cada etapa, falhas com o
+erro, duração por etapa, linhas por tabela e avisos; sem o mart de saúde, a aba explica o motivo).
+O alerta de idade também aparece no cabeçalho.
 
 Cinco seções:
 
@@ -446,32 +492,37 @@ leitura mostram mensagem clara e param a página. Tema escuro em
 
 ---
 
-## 12. Testes
+## 13. Testes
 
 ```powershell
-uv run pytest   # testpaths = test, pythonpath = .; addopts = --cov, fail_under = 85
+uv run pytest   # testpaths = test, pythonpath = .; addopts = --cov -m "not contrato", fail_under = 85
+uv run pytest test/contrato -m contrato --no-cov -rf   # contrato das fontes (rede real)
 ```
 
 Cobertura medida sem `test/*`, `app.py`, `ui.py` e `.venv/*`. `test/conftest.py` remove
-`VALUATIONB3_DB` e `VALUATIONB3_FONTE` do ambiente de cada teste e aponta a fotografia do painel
-para uma pasta vazia: nenhum teste toca o banco real, a fotografia versionada nem a rede.
+`VALUATIONB3_DB` e `VALUATIONB3_FONTE` do ambiente de cada teste e aponta o banco padrão e a
+fotografia do painel para `tmp_path`: nenhum teste toca o banco real (nem pelo registro de
+execução de um `main()`), a fotografia versionada nem a rede. A exceção são os testes de contrato
+(`test/contrato/`, marcador `contrato`), fora do `pytest` padrão.
 
 | Arquivo | Testes | Cobre |
 |---|---|---|
 | [test/test_db.py](test/test_db.py) | 10 | conexão, `caminho_banco` (`VALUATIONB3_DB`), schema, `gravar` |
 | [test/test_ingestao.py](test/test_ingestao.py) | 38 | retry/backoff, 4xx definitivo, cada fonte, `FalhaExtracao`, rollback da gravação |
 | [test/test_transformacao.py](test/test_transformacao.py) | 50 | conversões, deduplicação, chaves, JSON, publicação |
-| [test/test_sql_marts.py](test/test_sql_marts.py) | 19 | SQLs dos marts com dados fictícios; `marts_50` sobre os rankings; cards × `marts_50`; empate do termômetro; exclusões por motivo |
+| [test/test_sql_marts.py](test/test_sql_marts.py) | 31 | SQLs dos marts com dados fictícios; `marts_50` sobre os rankings; cards × `marts_50`; empate do termômetro; exclusões por motivo |
 | [test/test_marts.py](test/test_marts.py) | 24 | inventário, dependências entre marts, preparação, publicação e rollback |
-| [test/test_qualidade.py](test/test_qualidade.py) | 23 | pipeline de ponta a ponta + cada tipo de violação (inclusive partição universo/exclusões); código de saída |
-| [test/test_fotografia.py](test/test_fotografia.py) | 22 | exportação, determinismo do hash, portão de qualidade, adulteração, painel sobre a fotografia |
-| [test/test_painel.py](test/test_painel.py) | 36 | leitura (inclusive cotação fora da carga da página e hashes da fotografia só com arquivo mudado), filtros, formatação, gráficos e grade responsiva |
-| [test/test_log.py](test/test_log.py) | 4 | destino das mensagens (`stdout`/`stderr`) e configuração idempotente |
+| [test/test_qualidade.py](test/test_qualidade.py) | 31 | pipeline de ponta a ponta + cada tipo de violação (inclusive partição universo/exclusões); código de saída |
+| [test/test_fotografia.py](test/test_fotografia.py) | 29 | exportação, determinismo do hash, portão de qualidade, adulteração, painel sobre a fotografia |
+| [test/test_painel.py](test/test_painel.py) | 47 | leitura (inclusive cotação fora da carga da página e hashes da fotografia só com arquivo mudado), filtros, formatação, gráficos e grade responsiva |
+| [test/test_log.py](test/test_log.py) | 5 | destino das mensagens (`stdout`/`stderr`), configuração idempotente e captura de avisos e erros |
 | [test/test_docs_hooks.py](test/test_docs_hooks.py) | 6 | hook do MkDocs: inclusão de documentos e reescrita de links |
+| [test/test_execucao.py](test/test_execucao.py) | 25 | registro em `meta.execucoes` (sucesso, `sys.exit(1)`, exceção, banco ausente ou bloqueado), mart de saúde, `ultimas`, idade em dias úteis |
+| [test/contrato/test_contrato_fontes.py](test/contrato/test_contrato_fontes.py) | 5 | contrato real de B3 (listagem paginada e detalhe), Fundamentus, Minha Receita e Yahoo; fora do `pytest` padrão |
 
 ---
 
-## 13. Limitações conhecidas
+## 14. Limitações conhecidas
 
 - Fora do escopo: Dívida Líquida/EBITDA, Sharpe, valor justo por Gordon e comparação setorial.
 - Rank Valor é uma versão simplificada da Magic Formula; payout é estimado (`DY × P/L`).

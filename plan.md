@@ -25,7 +25,7 @@ indicadores e rankings fundamentalistas e exibi-los num painel somente leitura.
 - Extração de B3 (empresas listadas), Fundamentus, Minha Receita (CNPJ) e Yahoo Finance.
 - Tipagem, padronização e validação de chaves (Silver), sem cálculo financeiro.
 - 11 marts de indicadores (9 do Fundamentus + retorno/risco + cotação), 10 rankings temáticos,
-  1 recomendação consolidada e 8 marts do painel — 30 marts no total.
+  1 recomendação consolidada, os marts do painel e o da saúde do pipeline — 33 marts no total.
 - Painel Streamlit com cinco seções e filtros.
 
 **Fora do escopo (limitações aceitas)**

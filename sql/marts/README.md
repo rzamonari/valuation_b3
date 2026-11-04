@@ -185,6 +185,7 @@ novo sem chave declarada, ou uma chave declarada sem `.sql`, interrompe a execu�
 | `marts_exclusoes_universo` | fotografia por ticker | `ticker` | substituição integral |
 | `marts_card_01` … `marts_card_05`, `marts_card_02_acoes_semindicacao`, `marts_painel_data_referencia` | agregado de linha única | — (exatamente 1 linha) | substituição integral |
 | `marts_painel_exclusoes_motivo` | agregado por categoria | `motivo` | substituição integral |
+| `marts_painel_saude_pipeline` | agregado por categoria | `etapa` | substituição integral, também ao fim de cada etapa (registro de execução) |
 | `marts_cotacao` | série histórica | `(ticker, data)` | substituição integral |
 
 **Por que a cotação também é substituída por inteiro.** A consulta devolve o histórico completo de
@@ -204,8 +205,16 @@ manteria linhas que já saíram da Silver.
 4. Qualquer falha (erro de SQL, chave, divergência) dispara um `ROLLBACK`. Nesse caso nenhuma
    tabela Gold muda, o erro informa a etapa, o arquivo e a tabela, e o processo sai com código 1.
 
-Só o schema `marts` é criado ou alterado. Tabelas em `marts` sem `.sql` correspondente não são
-apagadas: aparecem no relatório como órfãs, para decisão manual.
+Só o schema `marts` é criado ou alterado. A exceção é `meta.execucoes`, criada vazia se ainda não
+existir, porque `marts_painel_saude_pipeline` a lê. Tabelas em `marts` sem `.sql` correspondente
+não são apagadas: aparecem no relatório como órfãs, para decisão manual.
+
+**Saúde do pipeline.** `marts_painel_saude_pipeline` lê `meta.execucoes`, e não a Silver: uma
+linha por etapa (ingestão, transformação, materialização e qualidade), com a execução mais
+recente, a soma das linhas publicadas (linhas da camada), os avisos e o último sucesso. O
+registro de execução (`pipeline/execucao.py`) o republica ao fim de cada etapa com
+`materializacao.atualizar`, que aplica o mesmo preparo, validação e transação dos demais. A
+fotografia o exporta, mas o deixa fora do hash total, porque os horários mudam a cada ciclo.
 
 **Validação realizada (2026-11-03, banco real).** 30/30 consultas inventariadas, executadas e
 materializadas, num total de 1.934.482 registros (1.920.774 em `marts_cotacao`). Duas execuções

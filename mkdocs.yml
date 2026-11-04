@@ -47,6 +47,7 @@ validation:
 nav:
   - Início: index.md
   - Instalação e uso: uso.md
+  - Operação: operacao.md
   - Arquitetura: arquitetura.md
   - Referência:
       - API: referencia/api.md
