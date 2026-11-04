@@ -253,7 +253,9 @@ def extrair_minhareceita(cnpjs):
 
     rejeitados = [cnpj for cnpj, (_, payload) in resultados if payload is None]
     if rejeitados:
-        print(f"  {len(rejeitados)} CNPJs rejeitados pela API (HTTP 400/404): {rejeitados}")
+        print(
+            f"  {len(rejeitados)} CNPJs rejeitados pela API (HTTP 400/404): {rejeitados}"
+        )
     registros = [
         {
             "cnpj": cnpj,
