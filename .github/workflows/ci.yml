@@ -31,6 +31,12 @@ jobs:
         run: uv run ruff check .
       - name: ruff format --check
         run: uv run ruff format --check .
+      - name: requirements.txt em dia com o uv.lock (Streamlit Cloud)
+        run: |
+          uv export --no-dev --no-hashes --no-emit-project --locked -q -o requirements.txt
+          git diff --exit-code requirements.txt
+      - name: fotografia versionada íntegra (hashes do manifesto)
+        run: uv run python -m pipeline.fotografia --verificar
 
   test:
     name: pytest (${{ matrix.os }})
