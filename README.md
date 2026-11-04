@@ -107,7 +107,8 @@ vêm do `uv.lock` / [requirements.txt](requirements.txt), exportado dele
 (`uv export --no-dev --no-hashes --no-emit-project --locked -o requirements.txt`); o CI falha se
 os dois divergirem.
 
-**Atualizar os dados publicados:** gerar → verificar → commit → o Cloud faz o redeploy.
+**Atualizar os dados publicados:** gerar → verificar → PR → merge com o CI verde → o Cloud faz
+o redeploy.
 
 ```powershell
 uv run python -m pipeline.ingestao        # dados novos das 4 fontes
@@ -115,9 +116,11 @@ uv run python -m pipeline.transformacao
 uv run python -m pipeline.materializacao
 uv run python -m pipeline.fotografia      # gerar: exige a qualidade sem erros
 uv run python -m pipeline.fotografia --verificar   # verificar: hashes do manifesto
+git switch -c data/fotografia-<data de referência>
 git add fotografia/
 git commit -m "data: fotografia de <data de referência>"
-git push origin main                      # o Cloud detecta o push e refaz o deploy
+git push -u origin HEAD
+gh pr create --fill                       # merge com o CI verde; o Cloud refaz o deploy
 ```
 
 Depois do redeploy, o cabeçalho do painel mostra a nova data de referência e o início do novo

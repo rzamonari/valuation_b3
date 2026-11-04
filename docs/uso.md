@@ -86,14 +86,17 @@ uv export --no-dev --no-hashes --no-emit-project --locked -o requirements.txt
 
 ### Atualizar a fotografia publicada
 
-Gerar → verificar → commit → o Cloud faz o redeploy sozinho a cada push na `main`:
+Gerar → verificar → PR → merge com o CI verde → o Cloud faz o redeploy sozinho a cada
+atualização da `main`:
 
 ```powershell
 uv run python -m pipeline.fotografia              # gerar (exige a qualidade sem erros)
 uv run python -m pipeline.fotografia --verificar  # verificar os hashes do manifesto
+git switch -c data/fotografia-<data de referência>
 git add fotografia/
 git commit -m "data: fotografia de <data de referência>"
-git push origin main
+git push -u origin HEAD
+gh pr create --fill                       # merge com o CI verde; o Cloud refaz o deploy
 ```
 
 Confira no cabeçalho do painel publicado a nova data de referência e o início do hash.

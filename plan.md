@@ -318,6 +318,11 @@ uv run mkdocs build --strict
 O CI (`.github/workflows/ci.yml`) repete as três primeiras e confere `requirements.txt` e a
 fotografia versionada.
 
+**Toda mudança entra por PR com o CI verde, inclusive `data:` e `docs:`.** A `main` é protegida
+(sem push direto nem force push; checks `ruff`, `pytest (ubuntu-latest)` e
+`pytest (windows-latest)` obrigatórios; branch atualizada antes do merge). O PR segue
+`.github/pull_request_template.md`.
+
 - [ ] Mudança na camada correta (seção 2); sem cálculo fora da Gold.
 - [ ] Testes de sucesso, erro e bordas (nulos, duplicatas, tabela vazia, divisão por zero, zeros do Fundamentus); sem rede e sem banco real.
 - [ ] Cobertura ≥ 85% sem mexer em `fail_under`/`omit`.
