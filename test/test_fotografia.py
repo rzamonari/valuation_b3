@@ -71,14 +71,37 @@ def test_leitura_da_fotografia_e_identica_as_tabelas(con, foto):
     leitura = f.conectar(pasta)
     try:
         for nome in manifesto["tabelas"]:
-            consulta = f'SELECT * FROM marts."{nome}" ORDER BY ALL'
+            consulta = f'SELECT {f.selecao(nome)} FROM marts."{nome}" ORDER BY ALL'
             tabela = con.execute(consulta).fetchall()
             assert leitura.execute(consulta).fetchall() == tabela, nome
-            assert colunas(leitura, f'marts."{nome}"') == colunas(
-                con, f'marts."{nome}"'
-            )
+            assert colunas(leitura, f'marts."{nome}"') == colunas(con, f"({consulta})")
     finally:
         leitura.close()
+
+
+def test_cotacao_vai_so_com_as_colunas_do_painel(con, foto):
+    pasta, manifesto = foto
+    esperadas = list(f.COLUNAS["marts_cotacao"])
+    assert manifesto["tabelas"]["marts_cotacao"]["colunas"] == esperadas
+    assert "colunas" not in manifesto["tabelas"]["marts_roic"]
+    leitura = f.conectar(pasta)
+    try:
+        lidas = [c[0] for c in colunas(leitura, "marts.marts_cotacao")]
+    finally:
+        leitura.close()
+    assert lidas == esperadas
+    assert len(colunas(con, "marts.marts_cotacao")) > len(
+        esperadas
+    )  # banco segue completo
+
+
+def test_coluna_do_recorte_ausente_no_mart_interrompe_sem_alterar(con, foto):
+    pasta, manifesto = foto
+    con.execute("ALTER TABLE marts.marts_cotacao DROP COLUMN dividendos")
+    with pytest.raises(duckdb.BinderException, match="dividendos"):
+        f.exportar(con, pasta)
+    assert f.verificar(pasta)["hash"] == manifesto["hash"]
+    assert not list(pasta.parent.glob(".fotografia.*"))
 
 
 def test_mesmos_dados_geram_o_mesmo_hash(con, foto, tmp_path):
@@ -215,7 +238,10 @@ def test_sem_banco_o_painel_le_a_fotografia(painel_na_fotografia):
     assert p.tabelas_faltando() == []
     d = p.ler(p.MARTS_CARREGAR)
     assert d["marts_card_01_acoes_analisadas"]["quantidade"].tolist() == [2]
-    assert sorted(p.ler_cotacao("BOAS3")["fechamento"].tolist()) == [1.5, 1.6]
+    cotacao = p.ler_cotacao("BOAS3")
+    assert cotacao.columns.tolist() == list(f.COLUNAS["marts_cotacao"])
+    assert len(cotacao) == 2
+    assert p.fig_cotacao(cotacao).data  # o gráfico da ficha monta só com o recorte
     assert p.ler_cotacao("ZZZZ3").empty
     assert manifesto["hash"][:12] in p.origem()
     assert "01/11/2026" in p.origem()

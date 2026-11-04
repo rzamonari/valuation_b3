@@ -121,7 +121,8 @@ git push origin main                      # o Cloud detecta o push e refaz o dep
 ```
 
 Depois do redeploy, o cabeçalho do painel mostra a nova data de referência e o início do novo
-hash. Cada fotografia acrescenta cerca de 26 MB ao histórico do git (quase tudo `marts_cotacao`).
+hash. Cada fotografia acrescenta cerca de 10 MB ao histórico do git (quase tudo `marts_cotacao`,
+exportado só com as colunas que o painel usa).
 
 ## Painel
 

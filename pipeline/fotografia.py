@@ -20,6 +20,10 @@ Execução:
 5. Leitura (conectar): banco DuckDB em memória com views marts."<mart>" sobre os Parquet, para
    o painel usar as mesmas consultas do banco local. verificar() confere manifesto, arquivos
    e hashes antes do uso.
+6. Recorte de colunas (COLUNAS): marts_cotacao entra só com as colunas que o painel usa
+   (ticker, data, fechamento_ajustado, dividendos, volume), registradas em "colunas" no manifesto.
+   Motivo: é quase todo o volume da fotografia (26 MB → 10 MB), e cada fotografia nova fica
+   no histórico do git. O banco local continua com a série completa.
 """
 
 import argparse
@@ -44,6 +48,10 @@ PASTA_FOTOGRAFIA = db._RAIZ / "fotografia"
 MANIFESTO = "manifesto.json"
 FORMATO = 1
 MART_DATA_REFERENCIA = "marts_painel_data_referencia"
+# Marts exportados só com parte das colunas (decisão 6); os demais vão inteiros.
+COLUNAS = {
+    "marts_cotacao": ("ticker", "data", "fechamento_ajustado", "dividendos", "volume")
+}
 
 
 class ErroFotografia(Exception):
@@ -74,13 +82,18 @@ def _ordem(mart: Mart) -> str:
     return ", ".join(_ident(c) for c in mart.chave) if mart.chave else "ALL"
 
 
+def selecao(nome: str) -> str:
+    """Lista do SELECT de um mart na fotografia: as colunas de COLUNAS ou todas."""
+    return ", ".join(_ident(c) for c in COLUNAS[nome]) if nome in COLUNAS else "*"
+
+
 def _conferir_tipos(con, nome, arquivo):
     """O Parquet relido precisa ter as colunas e tipos da tabela (ex.: HUGEINT vira DOUBLE)."""
 
     def colunas(relacao):
         return [(c[0], c[1]) for c in con.execute(f"DESCRIBE {relacao}").fetchall()]
 
-    origem = colunas(f"marts.{_ident(nome)}")
+    origem = colunas(f"SELECT {selecao(nome)} FROM marts.{_ident(nome)}")
     relido = colunas(f"SELECT * FROM read_parquet({_literal(arquivo.as_posix())})")
     if origem != relido:
         diferentes = [
@@ -110,11 +123,17 @@ def exportar(
         for mart in sorted(marts, key=lambda m: m.nome):
             arquivo = temporaria / f"{mart.nome}.parquet"
             con.execute(
-                f"COPY (SELECT * FROM marts.{_ident(mart.nome)} ORDER BY {_ordem(mart)}) "
+                f"COPY (SELECT {selecao(mart.nome)} FROM marts.{_ident(mart.nome)} "
+                f"ORDER BY {_ordem(mart)}) "
                 f"TO {_literal(arquivo.as_posix())} (FORMAT parquet, COMPRESSION zstd)"
             )
             _conferir_tipos(con, mart.nome, arquivo)
             tabelas[mart.nome] = {
+                **(
+                    {"colunas": list(COLUNAS[mart.nome])}
+                    if mart.nome in COLUNAS
+                    else {}
+                ),
                 "arquivo": arquivo.name,
                 "registros": con.execute(
                     f"SELECT COUNT(*) FROM marts.{_ident(mart.nome)}"

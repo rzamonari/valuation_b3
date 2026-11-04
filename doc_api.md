@@ -368,9 +368,10 @@ regra de domínio. Na base de 02/11/2026: 67 ok, 10 avisos, 0 erros.
 | `verificar(pasta)` | Confere arquivos e SHA-256 contra o manifesto; `ErroFotografia` se divergir |
 | `conectar(pasta)` | DuckDB em memória com views `marts."<mart>"` sobre os Parquet |
 | `ler_manifesto(pasta)` | Lê e valida o formato do manifesto |
+| `COLUNAS` / `selecao(nome)` | Marts exportados só com parte das colunas: `marts_cotacao` vai com `ticker`, `data`, `fechamento_ajustado`, `dividendos` e `volume` (o que o painel usa; 26 MB → 10 MB). O banco local segue com a série completa |
 
 Manifesto: `data_referencia`, `gerada_em`, versão do `duckdb`, resumo da qualidade e, por tabela,
-`arquivo`, `registros`, `bytes` e `sha256`. `hash` = SHA-256 das linhas `"<mart> <sha256>"` em
+`arquivo`, `registros`, `bytes`, `sha256` e, nos marts recortados, `colunas`. `hash` = SHA-256 das linhas `"<mart> <sha256>"` em
 ordem alfabética: identifica a fotografia inteira e só muda quando os dados mudam (a escrita é
 determinística para a mesma versão do DuckDB). Tipos sem equivalente em Parquet (ex.: `HUGEINT`)
 interrompem a exportação. `uv run python -m pipeline.fotografia --verificar` confere a fotografia

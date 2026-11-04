@@ -53,8 +53,9 @@ inclusive **Pipeline: completo**, que roda materialização e qualidade em sequ�
 código `1` se alguma verificação de erro falhar (avisos só aparecem no relatório).
 
 `pipeline.fotografia` exige a qualidade sem erros e grava `marts.*` em `fotografia/` (um Parquet
-por mart + `manifesto.json` com data de referência, contagens e SHA-256). A pasta é versionada no
-git; para publicar dados novos, gere a fotografia e faça commit dela.
+por mart + `manifesto.json` com data de referência, contagens e SHA-256). `marts_cotacao` vai só
+com as colunas que o painel usa (cerca de 10 MB); o banco local segue com a série completa. A
+pasta é versionada no git; para publicar dados novos, gere a fotografia e faça commit dela.
 
 ```powershell
 uv run python -m pipeline.fotografia --verificar   # confere os hashes da fotografia versionada

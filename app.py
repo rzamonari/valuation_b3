@@ -23,7 +23,8 @@ def carregar():
     return p.ler(p.MARTS_CARREGAR)
 
 
-@st.cache_data(show_spinner=False)
+# Limite de entradas: o cache é compartilhado entre visitantes (~0,6 MB por ticker, 609 tickers).
+@st.cache_data(show_spinner=False, max_entries=64)
 def carregar_cotacao(ticker):
     return p.ler_cotacao(ticker)
 
