@@ -1,0 +1,156 @@
+# Diagnóstico das fontes a partir do runner do GitHub (IP de datacenter): só valida e amostra,
+# não grava banco nem fotografia. Cada fonte é um passo separado (continue-on-error) para o
+# resultado de uma não esconder o das outras; o resumo do job traz contagens e tempos.
+# workflow_dispatch só aparece quando o arquivo está na main; até lá, o push que altera este
+# arquivo também dispara a execução.
+name: Diagnóstico das fontes
+
+on:
+  workflow_dispatch:
+  push:
+    paths: [.github/workflows/diagnostico-fontes.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  fontes:
+    name: fontes (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked
+
+      - name: IP de saída do runner
+        run: |
+          echo "IP: $(curl -s https://api.ipify.org)"
+          echo "| Fonte | Resultado | Detalhe |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: validar_fontes (página B3 + app de listados)
+        id: validar
+        continue-on-error: true
+        run: |
+          uv run python - <<'EOF'
+          import os, time
+          from pipeline import ingestao
+          t = time.monotonic()
+          try:
+              ingestao.validar_fontes()
+              linha = f"| validar_fontes | ok | {time.monotonic() - t:.1f}s |"
+          except Exception as exc:
+              linha = f"| validar_fontes | FALHA | {exc} |"
+          print(linha)
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(linha + "\n")
+          print(f"::notice title=validar_fontes::{linha}")
+          raise SystemExit("FALHA" in linha)
+          EOF
+
+      - name: B3 (listagem completa + 10 detalhes)
+        id: b3
+        continue-on-error: true
+        run: |
+          uv run python - <<'EOF'
+          import os, time
+          from pipeline import ingestao
+          t = time.monotonic()
+          try:
+              df = ingestao.extrair_b3()
+              cvms = [c for c in df["codeCVM"] if c][:10]
+              tickers = ingestao.identificar_tickers(df[df["codeCVM"].isin(cvms)])
+              linha = (f"| B3 | ok | {len(df)} empresas, {len(tickers)} tickers de 10 "
+                       f"codeCVM, {time.monotonic() - t:.1f}s |")
+              falhou = not tickers
+          except Exception as exc:
+              linha, falhou = f"| B3 | FALHA | {exc} |", True
+          print(linha)
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(linha + "\n")
+          print(f"::notice title=B3::{linha}")
+          raise SystemExit(falhou)
+          EOF
+
+      - name: Fundamentus (resultado.php)
+        id: fundamentus
+        continue-on-error: true
+        run: |
+          uv run python - <<'EOF'
+          import os, time
+          from pipeline import ingestao
+          t = time.monotonic()
+          try:
+              df = ingestao.extrair_fundamentus()
+              linha = f"| Fundamentus | ok | {len(df)} linhas, {time.monotonic() - t:.1f}s |"
+          except Exception as exc:
+              linha = f"| Fundamentus | FALHA | {exc} |"
+          print(linha)
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(linha + "\n")
+          print(f"::notice title=Fundamentus::{linha}")
+          raise SystemExit("FALHA" in linha)
+          EOF
+
+      - name: Minha Receita (20 CNPJs)
+        id: minhareceita
+        continue-on-error: true
+        run: |
+          uv run python - <<'EOF'
+          import os, time
+          from pipeline import ingestao
+          t = time.monotonic()
+          try:
+              cnpjs = ingestao.identificar_cnpjs(ingestao.extrair_b3())[:20]
+              t = time.monotonic()
+              df = ingestao.extrair_minhareceita(cnpjs)
+              linha = (f"| Minha Receita | ok | {len(df)}/{len(cnpjs)} CNPJs, "
+                       f"{time.monotonic() - t:.1f}s |")
+          except Exception as exc:
+              linha = f"| Minha Receita | FALHA | {str(exc)[:300]} |"
+          print(linha)
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(linha + "\n")
+          print(f"::notice title=Minha Receita::{linha}")
+          raise SystemExit("FALHA" in linha)
+          EOF
+
+      - name: Yahoo Finance (20 tickers, histórico completo)
+        id: yahoo
+        continue-on-error: true
+        run: |
+          uv run python - <<'EOF'
+          import logging, os, time
+          import yfinance as yf
+          from pipeline import ingestao
+          logging.basicConfig(level=logging.INFO)
+          logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+          yf.config.debug.hide_exceptions = False
+          tickers = ["PETR4", "VALE3", "ITUB4", "BBDC4", "BBAS3", "ABEV3", "WEGE3",
+                     "B3SA3", "RENT3", "SUZB3", "GGBR4", "ELET3", "EQTL3", "RADL3",
+                     "PRIO3", "VIVT3", "TAEE11", "CMIG4", "SBSP3", "KLBN11"]
+          t = time.monotonic()
+          try:
+              df = ingestao.extrair_yfinance(tickers)
+              obtidos = df["ticker"].nunique()
+              linha = (f"| Yahoo | {'ok' if obtidos == len(tickers) else 'PARCIAL'} | "
+                       f"{obtidos}/{len(tickers)} tickers, {len(df)} linhas, "
+                       f"{time.monotonic() - t:.1f}s |")
+              falhou = obtidos < len(tickers)
+          except Exception as exc:
+              linha, falhou = f"| Yahoo | FALHA | {str(exc)[:300]} |", True
+          print(linha)
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a").write(linha + "\n")
+          print(f"::notice title=Yahoo::{linha}")
+          raise SystemExit(falhou)
+          EOF
+
+      - name: Resultado
+        run: |
+          echo "validar=${{ steps.validar.outcome }} b3=${{ steps.b3.outcome }}" \
+               "fundamentus=${{ steps.fundamentus.outcome }}" \
+               "minhareceita=${{ steps.minhareceita.outcome }} yahoo=${{ steps.yahoo.outcome }}"
+          test "${{ steps.validar.outcome }}${{ steps.b3.outcome }}${{ steps.fundamentus.outcome }}${{ steps.minhareceita.outcome }}${{ steps.yahoo.outcome }}" \
+            = "successsuccesssuccesssuccesssuccess"
