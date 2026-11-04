@@ -1,6 +1,9 @@
 """Testes da camada Refined (Silver). Usam bancos DuckDB temporários: a Bronze real não é tocada."""
 
 import json
+import os
+import subprocess
+import sys
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
@@ -749,3 +752,21 @@ def test_bronze_ausente_encerra_com_codigo_1(tmp_path, monkeypatch):
     assert consultar(
         con, "SELECT COUNT(*) FROM duckdb_tables() WHERE schema_name = 'refined'"
     ) == [(0,)]
+
+
+def test_comando_publica_e_imprime_o_relatorio(tmp_path):
+    # Executa como o usuário (python -m): sob -m o módulo se chama __main__, e o relatório
+    # precisa continuar saindo no stdout.
+    novo_banco(tmp_path).close()
+    ambiente = os.environ | {db.VARIAVEL_DB: str(tmp_path / "teste.duckdb")}
+    processo = subprocess.run(
+        [sys.executable, "-m", "pipeline.transformacao"],
+        cwd=db._RAIZ,
+        env=ambiente,
+        capture_output=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert processo.returncode == 0, processo.stderr
+    assert "TOTAL GRAVADO NAS SETE TABELAS" in processo.stdout
+    assert processo.stderr == ""

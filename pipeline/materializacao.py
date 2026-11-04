@@ -38,6 +38,7 @@ Spec: docs/specs/marts_materializacao.md (ajuste "Materialização dos resultado
 """
 
 import contextlib
+import logging
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -47,6 +48,10 @@ import duckdb
 
 from pipeline import db
 from pipeline.db import _ident
+from pipeline.log import configurar as configurar_logging
+
+# explícito: sob python -m, __name__ é "__main__" e sairia da hierarquia "pipeline"
+log = logging.getLogger("pipeline.materializacao")
 
 SCHEMA_DESTINO = "marts"
 PASTA_MARTS = Path(__file__).resolve().parent.parent / "sql" / "marts"
@@ -182,7 +187,7 @@ def _texto_sql(arquivo):
 # --------------------------------------------------------------------------- inventário
 
 
-def inventariar(pasta=PASTA_MARTS, marts=MARTS):
+def inventariar(pasta: Path = PASTA_MARTS, marts: list[Mart] = MARTS) -> list[Mart]:
     """Confere que cada .sql da pasta tem um Mart declarado e vice-versa."""
     arquivos = {f.stem for f in Path(pasta).glob("*.sql")}
     declarados = {m.nome for m in marts}
@@ -273,7 +278,9 @@ def _validar_publicada(con, p):
 # --------------------------------------------------------------------------- preparação
 
 
-def preparar(con, mart, pasta=PASTA_MARTS):
+def preparar(
+    con: duckdb.DuckDBPyConnection, mart: Mart, pasta: Path = PASTA_MARTS
+) -> Preparada:
     """Executa o .sql uma vez para uma tabela temporária e valida colunas e chave."""
     arquivo = Path(pasta) / f"{mart.nome}.sql"
     rotulo_arquivo = f"sql/marts/{arquivo.name}"
@@ -308,7 +315,7 @@ def preparar(con, mart, pasta=PASTA_MARTS):
 # --------------------------------------------------------------------------- publicação
 
 
-def publicar(con, preparadas):
+def publicar(con: duckdb.DuckDBPyConnection, preparadas: list[Preparada]) -> None:
     """Substitui as tabelas Gold e as valida em uma única transação; falha = rollback."""
     con.begin()
     try:
@@ -382,25 +389,25 @@ def _imprimir_relatorio(relatorio):
     tabelas = relatorio["tabelas"]
     largura = max(len(r["tabela"]) for r in tabelas) + 2
     numeros = max(len(_fmt(r["registros"])) for r in tabelas) + 2
-    print()
-    print(f"{'TABELA':<{largura}}{'REGISTROS':>{numeros + 2}}  COLS  CHAVE LÓGICA")
-    print("-" * (largura + numeros + 40))
+    log.info("")
+    log.info(f"{'TABELA':<{largura}}{'REGISTROS':>{numeros + 2}}  COLS  CHAVE LÓGICA")
+    log.info("-" * (largura + numeros + 40))
     for r in tabelas:
-        print(
+        log.info(
             f"{r['tabela']:<{largura}}{_fmt(r['registros']):>{numeros + 2}}"
             f"  {r['colunas']:>4}  {r['chave']}"
         )
-    print("-" * (largura + numeros + 40))
+    log.info("-" * (largura + numeros + 40))
     total = sum(r["registros"] for r in tabelas)
-    print(
+    log.info(
         f"{f'{len(tabelas)} tabelas materializadas':<{largura}}{_fmt(total):>{numeros + 2}}"
     )
-    print(
+    log.info(
         f"\nEstratégia: {ESTRATEGIA} em transação única; registros, colunas, tipos, "
         "valores (EXCEPT ALL) e chave lógica validados antes do COMMIT."
     )
     if relatorio["orfas"]:
-        print(
+        log.warning(
             "\nATENÇÃO: tabelas em marts sem .sql correspondente (não foram removidas): "
             + ", ".join(relatorio["orfas"])
         )
@@ -409,7 +416,9 @@ def _imprimir_relatorio(relatorio):
 # --------------------------------------------------------------------------- orquestração
 
 
-def executar(con, pasta=PASTA_MARTS, marts=MARTS):
+def executar(
+    con: duckdb.DuckDBPyConnection, pasta: Path = PASTA_MARTS, marts: list[Mart] = MARTS
+) -> dict:
     """Inventaria, prepara e valida todos os marts e só então os publica atomicamente."""
     marts = inventariar(pasta, marts)
     preparadas = []
@@ -422,23 +431,21 @@ def executar(con, pasta=PASTA_MARTS, marts=MARTS):
         _remover_temporarias(con, preparadas)
 
 
-def main():
+def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
+    configurar_logging()
 
     try:
         con = db.conectar()
     except duckdb.Error as exc:
-        print(
-            f"\nERRO DE MATERIALIZAÇÃO\n  Etapa:   conexão\n  Motivo:  {exc}",
-            file=sys.stderr,
-        )
+        log.error(f"\nERRO DE MATERIALIZAÇÃO\n  Etapa:   conexão\n  Motivo:  {exc}")
         sys.exit(1)
     try:
         relatorio = executar(con)
     except ErroMaterializacao as exc:
-        print(f"\nERRO DE MATERIALIZAÇÃO\n{exc}", file=sys.stderr)
-        print("Nenhuma tabela Gold foi alterada.", file=sys.stderr)
+        log.error(f"\nERRO DE MATERIALIZAÇÃO\n{exc}")
+        log.error("Nenhuma tabela Gold foi alterada.")
         sys.exit(1)
     finally:
         con.close()

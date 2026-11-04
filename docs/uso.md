@@ -25,7 +25,17 @@ uv run streamlit run app.py               # painel
 Todas terminam com código `0` em sucesso e `1` em falha. Em falha, nenhuma tabela da camada de
 destino é alterada.
 
-O banco fica em `fundamentalistas.duckdb`, na raiz do projeto.
+O banco fica em `fundamentalistas.duckdb`, na raiz do projeto. Para usar outro arquivo (ex.: uma
+cópia de homologação), defina `VALUATIONB3_DB`; um caminho relativo é resolvido a partir da raiz
+do projeto. Pipeline, painel e `ui.py` passam a usar o mesmo arquivo:
+
+```powershell
+$env:VALUATIONB3_DB = "D:\dados\homologacao.duckdb"
+uv run python -m pipeline.transformacao
+Remove-Item Env:VALUATIONB3_DB   # volta ao padrão
+```
+
+Progresso e relatórios saem em `stdout`; avisos e erros, em `stderr`.
 
 !!! note "Arquivo bloqueado"
     O DuckDB aceita um único processo gravando. Feche a DuckDB UI (`uv run python ui.py`) antes

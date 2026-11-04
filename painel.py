@@ -7,7 +7,7 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
      pipeline/materializacao.py gera a partir de sql/marts/<nome>.sql. Motivo: o número já foi
      calculado e validado na materialização; todas as faixas mostram a mesma fotografia e os
      rankings não são reexecutados a cada abertura. Os .sql não são lidos aqui.
-   - Conexão duckdb.connect("fundamentalistas.duckdb", read_only=True), aberta e fechada dentro
+   - Conexão duckdb.connect(ARQUIVO_DB, read_only=True), aberta e fechada dentro
      de cada leitura. Motivo: conexão aberta segura o arquivo e o pipeline não consegue gravar.
    - Banco bloqueado por outro processo (DuckDB UI do ui.py, ingestão, materialização) vira
      BancoBloqueado, com mensagem clara no app e sem traceback.
@@ -57,7 +57,6 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
 
 import math
 from datetime import date, datetime
-from pathlib import Path
 
 import duckdb
 import pandas as pd
@@ -66,8 +65,10 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.subplots import make_subplots
 
-RAIZ = Path(__file__).resolve().parent
-ARQUIVO_DB = RAIZ / "fundamentalistas.duckdb"
+from pipeline import db
+
+# Mesmo arquivo do pipeline (fundamentalistas.duckdb ou VALUATIONB3_DB), lido na importação.
+ARQUIVO_DB = db.caminho_banco()
 SCHEMA_MARTS = "marts"
 
 MARTS_CARDS = [

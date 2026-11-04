@@ -85,3 +85,35 @@ def test_gravar_aceita_nome_de_coluna_com_aspas_e_espacos(tmp_path, monkeypatch)
     colunas = [c[0] for c in con.execute("DESCRIBE raw.fundamentus").fetchall()]
     con.close()
     assert colunas == ['Div. "Yield"', "Patrim. Líq"]
+
+
+def test_caminho_banco_sem_variavel_usa_o_arquivo_padrao(tmp_path, monkeypatch):
+    arquivo = apontar_banco(tmp_path, monkeypatch)
+    assert db.caminho_banco() == arquivo
+
+
+def test_caminho_banco_com_variavel_vazia_usa_o_arquivo_padrao(tmp_path, monkeypatch):
+    arquivo = apontar_banco(tmp_path, monkeypatch)
+    monkeypatch.setenv(db.VARIAVEL_DB, "  ")
+    assert db.caminho_banco() == arquivo
+
+
+def test_caminho_banco_absoluto_da_variavel_e_usado_como_esta(tmp_path, monkeypatch):
+    apontar_banco(tmp_path, monkeypatch)
+    outro = tmp_path / "homologacao.duckdb"
+    monkeypatch.setenv(db.VARIAVEL_DB, str(outro))
+    assert db.caminho_banco() == outro
+
+
+def test_caminho_banco_relativo_e_resolvido_a_partir_da_raiz(monkeypatch):
+    monkeypatch.setenv(db.VARIAVEL_DB, "dados/homologacao.duckdb")
+    assert db.caminho_banco() == db._RAIZ / "dados" / "homologacao.duckdb"
+
+
+def test_conectar_usa_o_arquivo_da_variavel(tmp_path, monkeypatch):
+    padrao = apontar_banco(tmp_path, monkeypatch)
+    outro = tmp_path / "homologacao.duckdb"
+    monkeypatch.setenv(db.VARIAVEL_DB, str(outro))
+    db.conectar().close()
+    assert outro.exists()
+    assert not padrao.exists()

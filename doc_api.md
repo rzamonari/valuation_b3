@@ -30,7 +30,8 @@ Utilitários: [ui.py](ui.py) abre o banco na DuckDB UI (`http://localhost:4213`)
 - **Isolamento:** cada etapa lê só a camada anterior e grava só no seu schema.
 - **Nulos preservados:** nunca viram zero; divisão por zero resulta em `NULL`.
 - **Código de saída:** `0` em sucesso, `1` em falha (mensagem em `stderr`, sem traceback).
-- **Banco único:** `fundamentalistas.duckdb` na raiz, caminho derivado de `Path(__file__)` (independe do cwd).
+- **Banco único:** `fundamentalistas.duckdb` na raiz, caminho derivado de `Path(__file__)` (independe do cwd);
+  `VALUATIONB3_DB` aponta outro arquivo para pipeline e painel.
 
 ---
 
@@ -50,11 +51,22 @@ Feche a DuckDB UI (`ui.py`) antes das etapas 1 a 3: o DuckDB aceita um único pr
 O painel pode ficar aberto (abre e fecha conexão `read_only` a cada leitura); depois de
 materializar, clique em **Recarregar dados**.
 
-Dependências (`pyproject.toml`): `duckdb`, `pandas`, `plotly`, `pyarrow`, `streamlit`, `yfinance`.
-Grupo `dev`: `pytest`, `pytest-cov`, `ruff`.
+Dependências (`pyproject.toml`): `duckdb`, `lxml`, `pandas`, `plotly`, `pyarrow`, `requests`,
+`streamlit`, `yfinance`. Grupo `dev`: `mkdocs-material`, `pytest`, `pytest-cov`, `ruff`.
 
-> `pipeline/ingestao.py` também importa `requests` e `lxml`, que hoje chegam como dependências
-> transitivas e não estão declaradas no `pyproject.toml` (pendência P1 do [plan.md](plan.md)).
+**Outro arquivo de banco.** Defina `VALUATIONB3_DB` (ex.: uma cópia de homologação); um caminho
+relativo é resolvido a partir da raiz do projeto. Pipeline, painel e `ui.py` passam a usar o
+mesmo arquivo. Vazia ou ausente, vale `fundamentalistas.duckdb`.
+
+```powershell
+$env:VALUATIONB3_DB = "D:\dados\homologacao.duckdb"
+uv run python -m pipeline.transformacao
+Remove-Item Env:VALUATIONB3_DB   # volta ao padrão
+```
+
+**Saída.** Os módulos registram em `logging` (`pipeline.log.configurar()` no `main()`):
+progresso e relatórios vão para `stdout`; avisos (retry, falha por item, tabelas órfãs) e erros,
+para `stderr`.
 
 ---
 
@@ -63,7 +75,9 @@ Grupo `dev`: `pytest`, `pytest-cov`, `ruff`.
 | Símbolo | Descrição |
 |---|---|
 | `PASTA_RAW` | `<raiz>/raw` |
-| `conectar()` | Abre (criando se preciso) `fundamentalistas.duckdb`. Quem chama fecha. |
+| `VARIAVEL_DB` | `"VALUATIONB3_DB"`: nome da variável de ambiente com outro arquivo de banco. |
+| `caminho_banco()` | Arquivo do banco: o de `VALUATIONB3_DB` (relativo = a partir da raiz) ou `fundamentalistas.duckdb`. |
+| `conectar()` | Abre (criando se preciso) o banco de `caminho_banco()`. Quem chama fecha. |
 | `criar_schema(con, nome)` | `CREATE SCHEMA IF NOT EXISTS`. |
 | `gravar(con, df, schema, tabela)` | Recria `schema.tabela` a partir do DataFrame com **todas as colunas `VARCHAR`** e devolve o `COUNT(*)`. Não abre nem confirma transação. |
 | `_ident(nome)` | Cita identificador SQL com aspas duplas (escapando `"`). |
@@ -357,19 +371,22 @@ leitura mostram mensagem clara e param a página. Tema escuro em
 ## 10. Testes
 
 ```powershell
-uv run pytest            # testpaths = test, pythonpath = .
-uv run pytest --cov      # fail_under = 60 (omit: test/*, app.py, ui.py, .venv/*)
+uv run pytest   # testpaths = test, pythonpath = .; addopts = --cov, fail_under = 60
 ```
+
+Cobertura medida sem `test/*`, `app.py`, `ui.py` e `.venv/*`. `test/conftest.py` remove
+`VALUATIONB3_DB` do ambiente de cada teste: nenhum teste toca o banco real nem a rede.
 
 | Arquivo | Testes | Cobre |
 |---|---|---|
-| [test/test_db.py](test/test_db.py) | 5 | conexão, schema, `gravar` |
-| [test/test_transformacao.py](test/test_transformacao.py) | 27 | conversões, deduplicação, chaves, JSON, publicação |
-| [test/test_sql_marts.py](test/test_sql_marts.py) | 9 | SQLs dos marts com dados fictícios |
+| [test/test_db.py](test/test_db.py) | 10 | conexão, `caminho_banco` (`VALUATIONB3_DB`), schema, `gravar` |
+| [test/test_ingestao.py](test/test_ingestao.py) | 38 | retry/backoff, 4xx definitivo, cada fonte, `FalhaExtracao`, rollback da gravação |
+| [test/test_transformacao.py](test/test_transformacao.py) | 49 | conversões, deduplicação, chaves, JSON, publicação |
+| [test/test_sql_marts.py](test/test_sql_marts.py) | 12 | SQLs dos marts com dados fictícios; cards × `marts_50` |
 | [test/test_marts.py](test/test_marts.py) | 18 | inventário, preparação, publicação e rollback da materialização |
 | [test/test_painel.py](test/test_painel.py) | 25 | leitura, filtros, formatação e gráficos |
-
-A ingestão ainda não tem testes (Etapa B do [plan.md](plan.md)).
+| [test/test_log.py](test/test_log.py) | 4 | destino das mensagens (`stdout`/`stderr`) e configuração idempotente |
+| [test/test_docs_hooks.py](test/test_docs_hooks.py) | 6 | hook do MkDocs: inclusão de documentos e reescrita de links |
 
 ---
 

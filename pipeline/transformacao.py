@@ -34,6 +34,7 @@ seções citadas abaixo e nos comentários referem-se a ela).
 
 import contextlib
 import json
+import logging
 import re
 import sys
 import uuid
@@ -47,6 +48,10 @@ import pyarrow as pa
 
 from pipeline import db
 from pipeline.db import _ident
+from pipeline.log import configurar as configurar_logging
+
+# explícito: sob python -m, __name__ é "__main__" e sairia da hierarquia "pipeline"
+log = logging.getLogger("pipeline.transformacao")
 
 SCHEMA_ORIGEM = "raw"
 SCHEMA_DESTINO = "refined"
@@ -437,7 +442,7 @@ def _formatar_registros(registros):
 # --------------------------------------------------------------------------- verificação Bronze
 
 
-def verificar_bronze(con):
+def verificar_bronze(con: duckdb.DuckDBPyConnection) -> None:
     existentes = {
         nome
         for (nome,) in con.execute(
@@ -620,7 +625,7 @@ def _expressao_coluna(con, tabela, coluna):
     return expressao
 
 
-def preparar_tabela_sql(con, tabela):
+def preparar_tabela_sql(con: duckdb.DuckDBPyConnection, tabela: TabelaSql) -> Preparada:
     rotulo_origem = _rotulo_bronze(tabela.origem)
     with _contexto("leitura", rotulo_origem, _rotulo_silver(tabela.destino)):
         _validar_colunas_bronze(
@@ -805,7 +810,7 @@ def _carregar_staging(con, destino, tabela_arrow):
     return staging
 
 
-def preparar_minhareceita(con):
+def preparar_minhareceita(con: duckdb.DuckDBPyConnection) -> list[Preparada]:
     """Valida o contrato JSON em todos os registros e prepara as quatro tabelas da Minha Receita."""
     rotulo = _rotulo_bronze(ORIGEM_MINHARECEITA)
     with _contexto("leitura", rotulo, _rotulo_silver(ORIGEM_MINHARECEITA)):
@@ -909,7 +914,7 @@ def preparar_minhareceita(con):
 # --------------------------------------------------------------------------- publicação atômica
 
 
-def publicar(con, preparadas):
+def publicar(con: duckdb.DuckDBPyConnection, preparadas: list[Preparada]) -> None:
     """Substitui as tabelas Silver em uma única transação; falha faz rollback (seção 13)."""
     con.begin()
     try:
@@ -970,30 +975,30 @@ def _imprimir_relatorio(relatorio):
     numeros = max([len(_fmt(r["gravados"])) for r in relatorio] + [12])
 
     def linha(rotulo, n, recuo=2):
-        print(f"{' ' * recuo}{rotulo:<{largura - recuo}}{_fmt(n):>{numeros}}")
+        log.info(f"{' ' * recuo}{rotulo:<{largura - recuo}}{_fmt(n):>{numeros}}")
 
     for r in relatorio:
-        print()
-        print(r["tabela"])
-        print("-" * (largura + numeros))
+        log.info("")
+        log.info(r["tabela"])
+        log.info("-" * (largura + numeros))
         linha("Registros de origem", r["origem"])
         linha("Registros antes da deduplicação", r["antes_dedup"])
         linha("Duplicatas idênticas removidas", r["duplicatas"])
         linha("Registros gravados", r["gravados"])
         linha("Total de registros processados", r["processados"])
-        print("  Valores nulos por coluna:")
+        log.info("  Valores nulos por coluna:")
         for coluna, n in r["nulos"].items():
             linha(coluna, n, recuo=4)
     total = sum(r["gravados"] for r in relatorio)
-    print()
-    print("=" * (largura + numeros))
-    print(f"{'TOTAL GRAVADO NAS SETE TABELAS':<{largura}}{_fmt(total):>{numeros}}")
+    log.info("")
+    log.info("=" * (largura + numeros))
+    log.info(f"{'TOTAL GRAVADO NAS SETE TABELAS':<{largura}}{_fmt(total):>{numeros}}")
 
 
 # --------------------------------------------------------------------------- orquestração
 
 
-def executar(con):
+def executar(con: duckdb.DuckDBPyConnection) -> list[dict]:
     """Prepara e valida as sete tabelas e só então as publica atomicamente."""
     with _contexto("verificação da Bronze"):
         verificar_bronze(con)
@@ -1003,23 +1008,21 @@ def executar(con):
     return _coletar_relatorio(con, preparadas)
 
 
-def main():
+def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
+    configurar_logging()
 
     try:
         con = db.conectar()
     except duckdb.Error as exc:
-        print(
-            f"\nERRO DE TRANSFORMAÇÃO\n  Etapa:   conexão\n  Motivo:  {exc}",
-            file=sys.stderr,
-        )
+        log.error(f"\nERRO DE TRANSFORMAÇÃO\n  Etapa:   conexão\n  Motivo:  {exc}")
         sys.exit(1)
     try:
         relatorio = executar(con)
     except ErroTransformacao as exc:
-        print(f"\nERRO DE TRANSFORMAÇÃO\n{exc}", file=sys.stderr)
-        print("Nenhuma tabela Silver foi alterada.", file=sys.stderr)
+        log.error(f"\nERRO DE TRANSFORMAÇÃO\n{exc}")
+        log.error("Nenhuma tabela Silver foi alterada.")
         sys.exit(1)
     finally:
         con.close()

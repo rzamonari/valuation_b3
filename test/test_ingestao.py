@@ -5,6 +5,7 @@ O banco é um DuckDB temporário em tmp_path; o banco real não é tocado.
 
 import base64
 import json
+import logging
 
 import duckdb
 import pandas as pd
@@ -259,18 +260,19 @@ def test_extrair_fundamentus_sem_tabela_ou_vazia_e_falha(monkeypatch, pagina):
 # --------------------------------------------------------------------------- Minha Receita
 
 
-def test_minhareceita_grava_cnpj_original_e_lista_os_rejeitados(monkeypatch, capsys):
+def test_minhareceita_grava_cnpj_original_e_lista_os_rejeitados(monkeypatch, caplog):
     def rotas(url):
         if url.endswith("/00000000000191"):
             return Resposta(200, '{"cnpj": "00000000000191"}')
         return Resposta(404)
 
     usar_sessao(monkeypatch, rotas)
-    df = ing.extrair_minhareceita(["191", "999"])
+    with caplog.at_level(logging.INFO, logger="pipeline"):
+        df = ing.extrair_minhareceita(["191", "999"])
     assert df["cnpj"].tolist() == ["191"]  # valor gravado como veio da B3
     assert df["payload_json"].tolist() == ['{"cnpj": "00000000000191"}']
     assert df["_source_origin"].tolist() == [f"{ing.URL_MINHARECEITA}00000000000191"]
-    assert "1 CNPJs rejeitados" in capsys.readouterr().out
+    assert "1 CNPJs rejeitados" in caplog.text
 
 
 def test_minhareceita_com_consulta_falhando_e_falha_de_extracao(monkeypatch):
