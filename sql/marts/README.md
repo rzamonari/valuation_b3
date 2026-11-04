@@ -160,7 +160,9 @@ novo sem chave declarada, ou uma chave declarada sem `.sql`, interrompe a execu�
 | `marts_01` … `marts_10_rank_*`, `marts_50_rank_recomendacoes` | fotografia por ticker | `ticker` | substituição integral |
 | `marts_alavancagem`, `marts_crescimento_receita_5_anos`, `marts_dividend_yield_payout`, `marts_ev_ebit`, `marts_margens`, `marts_p_vp`, `marts_preco_lucro`, `marts_roe`, `marts_roic` | fotografia por ticker | `ticker` | substituição integral |
 | `marts_retorno_total_risco`, `marts_painel_indicadores` | fotografia por ticker | `ticker` | substituição integral |
+| `marts_exclusoes_universo` | fotografia por ticker | `ticker` | substituição integral |
 | `marts_card_01` … `marts_card_05`, `marts_card_02_acoes_semindicacao`, `marts_painel_data_referencia` | agregado de linha única | — (exatamente 1 linha) | substituição integral |
+| `marts_painel_exclusoes_motivo` | agregado por categoria | `motivo` | substituição integral |
 | `marts_cotacao` | série histórica | `(ticker, data)` | substituição integral |
 
 **Por que a cotação também é substituída por inteiro.** A consulta devolve o histórico completo de
@@ -191,3 +193,51 @@ idênticas à consulta reexecutada. A exceção é `marts_retorno_total_risco`: 
 `stddev_samp` da volatilidade, executado em paralelo, varia no último bit entre execuções da
 *própria consulta* (|Δ| ≤ 3e-14 em 3 tickers). Por isso a validação compara a tabela com o resultado
 capturado na mesma execução, e não com uma nova execução.
+
+## 13. Exclusões do universo dos rankings
+
+Os rankings e as recomendações usam o `INNER JOIN` da consulta-base
+(`refined.b3_empresas.empresa_emissora = SUBSTRING(ticker, 1, 4)`, ver `RANKINGS.md` §1). Os
+tickers do Fundamentus sem emissora correspondente ficam fora. Dois marts explicam essa saída:
+
+| Arquivo | Grão | Conteúdo |
+|---|---|---|
+| `marts_exclusoes_universo.sql` | 1 linha por ticker excluído | `ticker`, `emissora` (4 primeiras letras), `motivo`, `detalhe` e indicadores do Fundamentus (`cotacao`, `liquidez_2_meses`, `patrimonio_liquido`, `preco_lucro`, `roe`) |
+| `marts_painel_exclusoes_motivo.sql` | 1 linha por motivo | `ordem`, `motivo`, `descricao`, `quantidade`, `quantidade_negociada` (liquidez > 0). Lê `marts.marts_exclusoes_universo`; todas as categorias aparecem, inclusive com zero |
+
+O motivo é uma categoria fechada. Vale a primeira regra que se aplica, pelo sufixo do ticker:
+
+| Ordem | Motivo | Regra | Tickers (2026-11-02) |
+|---:|---|---|---:|
+| 1 | Fracionário | termina em `F` | 0 |
+| 2 | BDR | sufixo 32 a 35 | 9 |
+| 3 | Unit | sufixo 11 | 19 |
+| 4 | Não identificado | negociado nos últimos 2 meses (`liquidez_2_meses > 0`) | 6 |
+| 5 | Deslistada ou cancelada | ON/PN (sufixo 3 a 8) sem negociação | 411 |
+| 6 | Outro código | demais sufixos (12, 13, 31, 41, 42) sem negociação | 9 |
+| | **Total** | | **454** |
+
+Exemplos: BDR `AGEN33`, `CZLT33`, `WSON33`; Unit `KROT11`, `SULA11`, `TIET11`; Não identificado
+`ADHM3`, `BLUT3`, `BLUT4`, `IGBR3`, `RPMG3`, `SHOW3`; Deslistada ou cancelada `AMBV4`, `ABYA3`,
+`AELP3`; Outro código `BBTG12`, `RCTB31`, `TMGC13`.
+
+**Diagnóstico (2026-11-02, conexão `read_only`).** A causa comum aos 454 é a mesma: a emissora não
+está em `refined.b3_empresas`, que vem de `GetInitialCompanies` e só traz empresas ativas (as
+3.548 linhas têm `situacao = 'A'`). Nenhum dos 454 aparece em `otherCodes` (os 609 tickers de
+`refined.yfinance_cotacoes`), e todo ticker de `otherCodes` tem o prefixo de uma emissora
+cadastrada. Por isso, usar `otherCodes` no join não recuperaria nenhum ticker. A busca por nome nos
+6 negociados também não encontrou emissora com outro código. O join por prefixo não tem defeito
+para esta fonte.
+
+**Por que não recuperar.** Trocar o `INNER JOIN` por `LEFT JOIN` colocaria nos rankings 01–10,
+que não filtram liquidez, tickers sem negociação e sem empresa, segmento ou CNPJ. Os elegíveis a
+mais seriam: Valor 225, Proventos 20, Eficiência 181, Retorno 300, Pechincha 172, Patrimônio 198,
+Crescimento 131, Operacional 244, Seguro 173 e Rentabilidade 221. Só os 6 "Não identificado"
+são negociados. Eles entrariam em Retorno (2), Crescimento (1), Seguro (1) e Rentabilidade (1),
+e em `marts_50` (391 → 397), sem atributos de cadastro. Ficam fora e são acompanhados pela
+qualidade.
+
+**Qualidade** (`pipeline/qualidade.py`): ERRO se universo + exclusões ≠ tickers do Fundamentus
+(`EXCEPT ALL` nos dois sentidos, então ticker nas duas partes também é erro), se a contagem por
+motivo divergir das exclusões ou se o motivo sair da categoria fechada. AVISO acima de
+`LIMITE_NAO_IDENTIFICADO` (10) tickers "Não identificado".

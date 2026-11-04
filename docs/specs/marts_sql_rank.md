@@ -135,6 +135,32 @@ LEFT JOIN refined.minhareceita_empresas c
 
 Os joins não deverão ser modificados sem autorização.
 
+### 4.1. Exclusões do universo (adendo de 2026-11-04)
+
+Os tickers do Fundamentus que o `INNER JOIN` deixa fora (sem `b.empresa_emissora =
+SUBSTRING(a.ticker, 1, 4)`) deverão ser explicados em `marts_exclusoes_universo.sql`, com uma
+linha por ticker excluído: `ticker`, `emissora`, `motivo`, `detalhe` e indicadores básicos do
+Fundamentus (`cotacao`, `liquidez_2_meses`, `patrimonio_liquido`, `preco_lucro`, `roe`).
+
+`motivo` é uma categoria fechada. Vale a primeira regra que se aplica:
+
+1. `Fracionário`: termina em `F`.
+2. `BDR`: sufixo 32 a 35.
+3. `Unit`: sufixo 11.
+4. `Não identificado`: `liquidez_2_meses > 0` (negociado, mas sem emissora no cadastro).
+5. `Deslistada ou cancelada`: ON/PN (sufixo 3 a 8) sem negociação.
+6. `Outro código`: demais casos.
+
+A contagem por motivo para o painel fica em `marts_painel_exclusoes_motivo.sql` (uma linha por
+motivo, inclusive com zero), lida de `marts.marts_exclusoes_universo`.
+
+Validação obrigatória (`pipeline/qualidade.py`): universo + exclusões = todos os tickers do
+Fundamentus, sem sobreposição (ERRO), e AVISO quando `Não identificado` passar de 10 tickers.
+
+Os joins da consulta-base continuam como estão. O diagnóstico de 2026-11-02 está em
+`sql/marts/README.md` §13: o cadastro da B3 só traz emissoras ativas, `otherCodes` não recupera
+nenhum ticker, e o `LEFT JOIN` colocaria até 300 tickers sem negociação num ranking.
+
 A consulta-base deverá disponibilizar, quando existentes e validados:
 
 - `ticker`
@@ -725,6 +751,7 @@ A documentação final deverá deixar explícito:
 5. O Rank Seguro não representa análise completa de solvência ou risco de crédito.
 6. Os rankings individuais são classificações relativas entre empresas elegíveis.
 7. As recomendações `Compra`, `Manter` e `Venda` são um sinal relativo e mecânico derivado dos 10 rankings (seção 7.6) e não constituem recomendação de investimento.
+8. Tickers do Fundamentus sem emissora ativa no cadastro da B3 ficam fora dos rankings; o motivo de cada um está em `marts_exclusoes_universo` (seção 4.1).
 
 ## 12. Entrega final
 

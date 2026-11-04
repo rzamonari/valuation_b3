@@ -288,11 +288,13 @@ Fotografia atual: 391 tickers — 95 Compra, 20 Manter, 276 Venda.
 | `marts_card_05_termometro_mercado` | 1 linha | `recomendacao` predominante (empate → Manter), `quantidade`, `total`, `percentual` |
 | `marts_painel_data_referencia` | 1 linha | `data_referencia` (`MAX(_timestamp_ingestao)` em `America/Sao_Paulo`) |
 | `marts_painel_indicadores` | `ticker` | recomendação + indicadores do Fundamentus, `payout`, `earnings_yield` |
+| `marts_exclusoes_universo` | `ticker` | tickers do Fundamentus fora do universo: `emissora`, `motivo` (categoria fechada), `detalhe`, indicadores básicos |
+| `marts_painel_exclusoes_motivo` | `motivo` | `ordem`, `motivo`, `descricao`, `quantidade`, `quantidade_negociada` (lê `marts_exclusoes_universo`) |
 
 Dependências entre marts: `marts_50` lê `marts.marts_01` … `marts_10` (ticker e rank), e os cards
 01–05 e `marts_painel_indicadores` leem `marts.marts_50_rank_recomendacoes`. A elegibilidade e o
 `DENSE_RANK` de cada tema vivem só no arquivo do ranking, e a regra de recomendação só no
-`marts_50`. A materialização extrai as referências `marts.<nome>` do `.sql`, prepara os marts em
+`marts_50`. `marts_painel_exclusoes_motivo` lê `marts.marts_exclusoes_universo`. A materialização extrai as referências `marts.<nome>` do `.sql`, prepara os marts em
 ordem topológica e troca cada referência pela temporária da mesma execução (`dependencias`,
 `ordenar`).
 
@@ -343,10 +345,11 @@ verificação de **erro** falhar.
 | Camada | O que confere | Severidade |
 |---|---|---|
 | raw → refined | chaves distintas da Bronze = registros da Silver; mesma `_timestamp_ingestao` (4 fontes) | erro |
-| refined → marts | marts do Fundamentus com os mesmos tickers; `marts_cotacao` com as mesmas chaves; rankings dentro do universo; `marts_50` = universo negociado; painel e cards = `marts_50` | erro |
+| refined → marts | marts do Fundamentus com os mesmos tickers; `marts_cotacao` com as mesmas chaves; rankings dentro do universo; `marts_50` = universo negociado; painel e cards = `marts_50`; universo + exclusões = Fundamentus, sem sobreposição; contagem por motivo = exclusões | erro |
 | domínio refined | DY ≥ 0, liquidez ≥ 0, crescimento ≥ −100%, fechamento > 0, volume/dividendos/desdobramentos ≥ 0 | erro |
 | domínio refined | cotação > 0 (zero = ausência), percentuais em faixas plausíveis (`FAIXAS_PLAUSIVEIS`), máxima ≥ mínima, fechamento ajustado > 0 | aviso |
-| domínio marts | `marts_50`: cotação > 0, saldo em [−10, 10], faixas somam 10, recomendação coerente com o saldo, faixas válidas; rank ≥ 1; termômetro em [0, 100]; data de referência informada | erro |
+| domínio marts | `marts_50`: cotação > 0, saldo em [−10, 10], faixas somam 10, recomendação coerente com o saldo, faixas válidas; rank ≥ 1; termômetro em [0, 100]; data de referência informada; motivo de exclusão na categoria fechada | erro |
+| domínio marts | mais de `LIMITE_NAO_IDENTIFICADO` (10) exclusões com motivo "Não identificado" | aviso |
 
 As faixas plausíveis são aviso porque o Fundamentus publica extremos reais (ROE acima de
 1.000.000%, margem líquida de 144.637%) e a Silver preserva o dado como veio. Nulo não viola
@@ -405,7 +408,7 @@ mart novo**.
 
 ### Gráficos e tabelas (Plotly, template `b3` em modo escuro)
 
-`tabela_consolidado`, `fig_valor_qualidade` (linhas de referência ROIC 15% e EV/EBIT 10x),
+`tabela_consolidado`, `tabela_exclusoes` (exclusões por motivo, na ordem das regras), `fig_valor_qualidade` (linhas de referência ROIC 15% e EV/EBIT 10x),
 `fig_ranking_tematico`, `tabela_ranking_tematico`, `fig_radar` (faixa nos 10 rankings),
 `fig_cotacao` (fechamento ajustado + volume + 💰 proventos; preços ≤ 0 ficam fora),
 `html_cartao`, `html_termometro`.
@@ -419,7 +422,8 @@ Constantes visuais: `REC` (ícone + rótulo + cor por recomendação, para acess
 
 Cinco seções:
 
-1. **Pulso do mercado** — seis cartões (analisadas, Compra, Manter, Venda, sem indicação, termômetro).
+1. **Pulso do mercado** — seis cartões (analisadas, Compra, Manter, Venda, sem indicação, termômetro) e
+   expander com os tickers fora dos rankings por motivo.
 2. **Ranking de oportunidades** — tabela consolidada com saldo e faixas por tema.
 3. **Valor × qualidade** — dispersão EV/EBIT × ROIC, tamanho = liquidez.
 4. **Rankings temáticos** — uma aba por tema (top 15 em gráfico e tabela).
@@ -448,11 +452,11 @@ para uma pasta vazia: nenhum teste toca o banco real, a fotografia versionada ne
 | [test/test_db.py](test/test_db.py) | 10 | conexão, `caminho_banco` (`VALUATIONB3_DB`), schema, `gravar` |
 | [test/test_ingestao.py](test/test_ingestao.py) | 38 | retry/backoff, 4xx definitivo, cada fonte, `FalhaExtracao`, rollback da gravação |
 | [test/test_transformacao.py](test/test_transformacao.py) | 50 | conversões, deduplicação, chaves, JSON, publicação |
-| [test/test_sql_marts.py](test/test_sql_marts.py) | 14 | SQLs dos marts com dados fictícios; `marts_50` sobre os rankings; cards × `marts_50`; empate do termômetro |
+| [test/test_sql_marts.py](test/test_sql_marts.py) | 19 | SQLs dos marts com dados fictícios; `marts_50` sobre os rankings; cards × `marts_50`; empate do termômetro; exclusões por motivo |
 | [test/test_marts.py](test/test_marts.py) | 24 | inventário, dependências entre marts, preparação, publicação e rollback |
-| [test/test_qualidade.py](test/test_qualidade.py) | 16 | pipeline de ponta a ponta + cada tipo de violação; código de saída |
+| [test/test_qualidade.py](test/test_qualidade.py) | 23 | pipeline de ponta a ponta + cada tipo de violação (inclusive partição universo/exclusões); código de saída |
 | [test/test_fotografia.py](test/test_fotografia.py) | 22 | exportação, determinismo do hash, portão de qualidade, adulteração, painel sobre a fotografia |
-| [test/test_painel.py](test/test_painel.py) | 25 | leitura, filtros, formatação e gráficos |
+| [test/test_painel.py](test/test_painel.py) | 26 | leitura, filtros, formatação e gráficos |
 | [test/test_log.py](test/test_log.py) | 4 | destino das mensagens (`stdout`/`stderr`) e configuração idempotente |
 | [test/test_docs_hooks.py](test/test_docs_hooks.py) | 6 | hook do MkDocs: inclusão de documentos e reescrita de links |
 

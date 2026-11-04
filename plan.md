@@ -337,7 +337,7 @@ fotografia versionada.
 | Zeros do Fundamentus significando ausência | Rankings distorcidos | Preservados e excluídos pelos critérios `> 0` |
 | Payout estimado (`DY × P/L`) acima de 100% | Proventos favorece pagadora insustentável | Desempate por menor payout; documentado (56 de 256 elegíveis) |
 | `fechamento_ajustado` negativo (8 tickers) | Métricas de risco erradas | Tratado como inválido no mart e no gráfico |
-| 454 tickers sem emissora na B3 | Ficam fora dos rankings | Documentado; avaliar join alternativo |
+| 454 tickers sem emissora na B3 | Ficam fora dos rankings | Explicado por motivo em `marts_exclusoes_universo` e no painel; join alternativo avaliado e descartado (cadastro só de ativas; `otherCodes` não recupera nenhum) |
 | Classes ON/PN da mesma emissora | Aparecem empatadas | Documentado como limitação |
 | Arquivo DuckDB bloqueado | Etapa não grava | Fechar a UI; painel usa `read_only` |
 | Volume de `marts_cotacao` (~1,9 mi linhas) | Memória no painel | Filtro no banco por ticker com parâmetro vinculado |
