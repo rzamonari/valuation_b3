@@ -1,11 +1,11 @@
 {
   "formato": 1,
   "data_referencia": "2026-11-02",
-  "gerada_em": "2026-11-04T14:16:06+00:00",
+  "gerada_em": "2026-11-04T15:16:33+00:00",
   "duckdb": "2.0.0",
-  "hash": "8cb85eb7125b9b4bf262b3769a5d7bd385e76e81ca954d149ccd611286be9137",
+  "hash": "563f7980d407d52635b15fe40a228e5f458dd531217e384e9aedbfc6fef2c6b7",
   "qualidade": {
-    "verificacoes": 71,
+    "verificacoes": 75,
     "avisos": 10
   },
   "tabelas": {
@@ -141,6 +141,12 @@
       "bytes": 5497,
       "sha256": "56a9371a37836620c5ff5e3d36d979299b35593843aef4c964d74ae7f7562a86"
     },
+    "marts_exclusoes_universo": {
+      "arquivo": "marts_exclusoes_universo.parquet",
+      "registros": 454,
+      "bytes": 10303,
+      "sha256": "ee331d0a438a2a8538b35f5e281f1cf1731d1f87c8ab4747b49ff8c3517e6084"
+    },
     "marts_margens": {
       "arquivo": "marts_margens.parquet",
       "registros": 995,
@@ -159,6 +165,12 @@
       "bytes": 230,
       "sha256": "6906a587a21e955b05ca2aa512450aef48df800d92ec2d7c239b429fbede733f"
     },
+    "marts_painel_exclusoes_motivo": {
+      "arquivo": "marts_painel_exclusoes_motivo.parquet",
+      "registros": 6,
+      "bytes": 1274,
+      "sha256": "1685bf5885d219ccc903159163daacbfa8ec46d92671a335df379d8ef43aec80"
+    },
     "marts_painel_indicadores": {
       "arquivo": "marts_painel_indicadores.parquet",
       "registros": 391,
@@ -175,7 +187,7 @@
       "arquivo": "marts_retorno_total_risco.parquet",
       "registros": 609,
       "bytes": 22007,
-      "sha256": "1dc49c37cf2c204e3ba1a25faa9a1bb4423edeb5d3efe884a8644f1bd9792f4e"
+      "sha256": "809f568fab61f9b8decf806caa0a964cd56cfada3a354f0de67012551c304f7c"
     },
     "marts_roe": {
       "arquivo": "marts_roe.parquet",
