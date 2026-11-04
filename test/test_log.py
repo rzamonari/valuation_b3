@@ -39,3 +39,17 @@ def test_configurar_de_novo_nao_duplica_mensagens(logger, capsys):
 def test_logger_de_outra_biblioteca_nao_e_afetado(logger, capsys):
     logging.getLogger("yfinance").warning("ruído externo")
     assert "ruído externo" not in capsys.readouterr().err
+
+
+def test_capturar_separa_avisos_e_erros_do_bloco(logger, capsys):
+    modulo = logging.getLogger("pipeline.qualquer")
+    modulo.warning("antes")
+    with log.capturar() as captura:
+        modulo.info("progresso")
+        modulo.warning("  [retry 1/2] lento  ")
+        modulo.error("\nERRO DE EXTRAÇÃO")
+        logging.getLogger("yfinance").warning("de fora do pipeline")
+    modulo.warning("depois")
+    assert captura.avisos == ["[retry 1/2] lento"]
+    assert captura.erros == ["ERRO DE EXTRAÇÃO"]
+    capsys.readouterr()

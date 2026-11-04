@@ -25,7 +25,11 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["test"]
 pythonpath = ["."]
-addopts = "--cov"
+# Os testes de contrato (rede real) ficam fora do padrão: uv run pytest test/contrato -m contrato --no-cov
+addopts = '--cov -m "not contrato"'
+markers = [
+    "contrato: chamada real a uma fonte externa, contra o formato esperado (test/contrato/)",
+]
 
 [tool.coverage.run]
 source = ["."]
@@ -48,6 +52,7 @@ max-line-length = 100
 
 [tool.taskipy.tasks]
 test = { cmd = "pytest", help = "testes com cobertura (fail_under 85)" }
+contrato = { cmd = "pytest test/contrato -m contrato --no-cov", help = "contrato das 4 fontes (rede real)" }
 lint = { cmd = "ruff check . && ruff format . --check", help = "lint e verificação de formatação" }
 format = { cmd = "ruff check . --fix && ruff format .", help = "corrige lint (inclui imports) e formata" }
 docs = { cmd = "mkdocs serve", help = "documentação em http://127.0.0.1:8000" }

@@ -34,14 +34,19 @@ Spec: docs/specs/marts_materializacao.md (ajuste "Materialização dos resultado
    duplicações. Qualquer divergência faz ROLLBACK: a versão anterior das tabelas permanece.
    A comparação é com a temporária, e não com uma nova execução da consulta, porque agregações
    em DOUBLE executadas em paralelo (desvio-padrão, somas) podem variar no último bit.
-7. Somente o schema marts é criado ou alterado; raw e refined são apenas lidos. Tabelas em marts
-   sem .sql correspondente não são apagadas: aparecem no relatório como órfãs para decisão manual.
+7. Somente o schema marts é criado ou alterado; raw e refined são apenas lidos. Exceção: a tabela
+   meta.execucoes é criada vazia se ainda não existir, porque o mart de saúde a lê (o registro de
+   cada execução é de pipeline.execucao). Tabelas em marts sem .sql correspondente não são
+   apagadas: aparecem no relatório como órfãs para decisão manual.
 8. Dependências entre marts: um .sql pode ler outro mart como marts.<nome> (ex.: marts_50 lê os
    rankings 01 a 10 em vez de repetir as regras). As referências são extraídas do texto sem
    comentários; os marts são preparados em ordem topológica (empate = ordem alfabética) e cada
    referência é trocada pela temporária já preparada da dependência. Motivo: o resultado
    publicado é coerente com a mesma execução, e não com a versão anterior de marts.<nome>.
    Dependência não declarada em MARTS ou ciclo interrompem no inventário.
+9. Atualização parcial (atualizar): o mesmo preparo e a mesma publicação para um subconjunto de
+   marts sem dependência fora dele. Uso: o registro de execução republica só
+   marts_painel_saude_pipeline ao fim de cada etapa.
 """
 
 import contextlib
@@ -54,7 +59,7 @@ from pathlib import Path
 
 import duckdb
 
-from pipeline import db
+from pipeline import db, execucao
 from pipeline.db import _ident
 from pipeline.log import configurar as configurar_logging
 
@@ -112,6 +117,7 @@ MARTS = [
     Mart("marts_painel_data_referencia", (), LINHA_UNICA),
     Mart("marts_painel_exclusoes_motivo", ("motivo",), AGREGADO),
     Mart("marts_painel_indicadores", ("ticker",), FOTOGRAFIA),
+    Mart("marts_painel_saude_pipeline", ("etapa",), AGREGADO),
     Mart("marts_preco_lucro", ("ticker",), FOTOGRAFIA),
     Mart("marts_retorno_total_risco", ("ticker",), FOTOGRAFIA),
     Mart("marts_roe", ("ticker",), FOTOGRAFIA),
@@ -493,15 +499,40 @@ def executar(
 ) -> dict:
     """Inventaria, prepara e valida todos os marts e só então os publica atomicamente."""
     marts = inventariar(pasta, marts)
+    execucao.garantir_tabela(con)
     preparadas = []
     try:
-        for mart in ordenar(marts, pasta):
-            temporarias = {p.mart.nome: p.temporaria for p in preparadas}
-            preparadas.append(preparar(con, mart, pasta, temporarias))
-        publicar(con, preparadas)
+        _preparar_e_publicar(con, marts, pasta, preparadas)
         return _coletar_relatorio(con, preparadas, marts)
     finally:
         _remover_temporarias(con, preparadas)
+
+
+def atualizar(
+    con: duckdb.DuckDBPyConnection,
+    nomes: list[str],
+    pasta: Path = PASTA_MARTS,
+    marts: list[Mart] = MARTS,
+) -> None:
+    """Prepara e publica só os marts indicados (decisão 9), com as mesmas validações."""
+    selecionados = [m for m in inventariar(pasta, marts) if m.nome in nomes]
+    faltando = sorted(set(nomes) - {m.nome for m in selecionados})
+    if faltando:
+        raise ErroMaterializacao(
+            "inventário", "mart não declarado em MARTS", exemplo=", ".join(faltando)
+        )
+    preparadas = []
+    try:
+        _preparar_e_publicar(con, selecionados, pasta, preparadas)
+    finally:
+        _remover_temporarias(con, preparadas)
+
+
+def _preparar_e_publicar(con, marts, pasta, preparadas):
+    for mart in ordenar(marts, pasta):
+        temporarias = {p.mart.nome: p.temporaria for p in preparadas}
+        preparadas.append(preparar(con, mart, pasta, temporarias))
+    publicar(con, preparadas)
 
 
 def main() -> None:
@@ -509,20 +540,25 @@ def main() -> None:
     sys.stderr.reconfigure(encoding="utf-8")
     configurar_logging()
 
-    try:
-        con = db.conectar()
-    except duckdb.Error as exc:
-        log.error(f"\nERRO DE MATERIALIZAÇÃO\n  Etapa:   conexão\n  Motivo:  {exc}")
-        sys.exit(1)
-    try:
-        relatorio = executar(con)
-    except ErroMaterializacao as exc:
-        log.error(f"\nERRO DE MATERIALIZAÇÃO\n{exc}")
-        log.error("Nenhuma tabela Gold foi alterada.")
-        sys.exit(1)
-    finally:
-        con.close()
-    _imprimir_relatorio(relatorio)
+    with execucao.registrada("materializacao") as registro:
+        try:
+            con = db.conectar()
+        except duckdb.Error as exc:
+            log.error(f"\nERRO DE MATERIALIZAÇÃO\n  Etapa:   conexão\n  Motivo:  {exc}")
+            sys.exit(1)
+        try:
+            relatorio = executar(con)
+        except ErroMaterializacao as exc:
+            log.error(f"\nERRO DE MATERIALIZAÇÃO\n{exc}")
+            log.error(
+                "Nenhuma tabela Gold foi alterada (o registro da falha atualiza só "
+                "marts_painel_saude_pipeline)."
+            )
+            sys.exit(1)
+        finally:
+            con.close()
+        registro.tabelas = {r["tabela"]: r["registros"] for r in relatorio["tabelas"]}
+        _imprimir_relatorio(relatorio)
 
 
 if __name__ == "__main__":

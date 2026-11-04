@@ -47,7 +47,7 @@ from dataclasses import dataclass
 
 import duckdb
 
-from pipeline import db
+from pipeline import db, execucao
 from pipeline.db import _ident
 from pipeline.log import configurar as configurar_logging
 from pipeline.transformacao import ORIGEM_MINHARECEITA, TABELAS_SQL
@@ -619,6 +619,15 @@ def erros(resultados: list[Resultado]) -> list[Resultado]:
     return [r for r in resultados if r.status == "ERRO"]
 
 
+def avisos(resultados: list[Resultado]) -> list[str]:
+    """Verificações com AVISO no formato do registro de execução: "<nome>: <n> violação(ões)"."""
+    return [
+        f"{r.verificacao.nome}: {_fmt(r.violacoes)} violação(ões)"
+        for r in resultados
+        if r.status == "AVISO"
+    ]
+
+
 def exigir(con: duckdb.DuckDBPyConnection) -> list[Resultado]:
     """Executa e levanta ErroQualidade se alguma verificação de ERRO falhar."""
     resultados = executar(con)
@@ -669,21 +678,24 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     sys.stderr.reconfigure(encoding="utf-8")
     configurar_logging()
-    try:
-        con = duckdb.connect(str(db.caminho_banco()), read_only=True)
-    except duckdb.Error as exc:
-        log.error(f"\nERRO DE QUALIDADE\n  Etapa:   conexão\n  Motivo:  {exc}")
-        sys.exit(1)
-    try:
-        resultados = executar(con)
-    finally:
-        con.close()
-    imprimir_relatorio(resultados)
-    if erros(resultados):
-        log.error(
-            "\nQualidade reprovada: corrija os erros antes de gerar a fotografia."
-        )
-        sys.exit(1)
+    # Só lê: o registro da execução é gravado depois, com o banco já fechado (pipeline.execucao).
+    with execucao.registrada("qualidade") as registro:
+        try:
+            con = duckdb.connect(str(db.caminho_banco()), read_only=True)
+        except duckdb.Error as exc:
+            log.error(f"\nERRO DE QUALIDADE\n  Etapa:   conexão\n  Motivo:  {exc}")
+            sys.exit(1)
+        try:
+            resultados = executar(con)
+        finally:
+            con.close()
+        registro.avisos = avisos(resultados)
+        imprimir_relatorio(resultados)
+        if erros(resultados):
+            log.error(
+                "\nQualidade reprovada: corrija os erros antes de gerar a fotografia."
+            )
+            sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -69,6 +69,13 @@ Spec: docs/specs/dashboard_apresentacao.md (v1.5). Resumo das regras, com o moti
 
 8. APARÊNCIA: Modo Escuro Profissional (paleta abaixo, espelhada em .streamlit/config.toml).
    Motivo: análise intensiva; fundo escuro reduz a fadiga visual e destaca números e séries.
+
+9. SAÚDE DO PIPELINE (aba própria): marts.marts_painel_saude_pipeline (última execução de cada
+   etapa, de meta.execucoes) e, na fotografia, a linha da própria fotografia no manifesto.
+   O mart é opcional: sem ele (fotografia ou banco anteriores ao registro) a aba explica o
+   motivo e as demais seguem. A idade dos dados vem de pipeline.execucao.idade(): depende do
+   dia em que o painel é aberto, por isso não está em mart; o alerta passa de
+   execucao.LIMITE_DIAS_UTEIS dias úteis.
 """
 
 import math
@@ -82,7 +89,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 from plotly.subplots import make_subplots
 
-from pipeline import db, fotografia
+from pipeline import db, execucao, fotografia
 
 # Mesmo arquivo do pipeline (fundamentalistas.duckdb ou VALUATIONB3_DB), lido na importação.
 ARQUIVO_DB = db.caminho_banco()
@@ -121,6 +128,8 @@ MARTS_RANKINGS = [
 MART_RECOMENDACOES = "marts_50_rank_recomendacoes"
 MART_RISCO = "marts_retorno_total_risco"
 MART_COTACAO = "marts_cotacao"
+# Opcional: lido só pela aba "Saúde do pipeline" (ler_saude).
+MART_SAUDE = execucao.MART_SAUDE
 
 # Lidos de uma vez no carregamento da página (a cotação é lida por ticker).
 MARTS_CARREGAR = (
@@ -608,6 +617,8 @@ def _layout(fig, titulo, altura):
 # Ficha: 10 métricas em 5 × 2 ou 2 × 5, sem linha incompleta.
 GRADE_PULSO = ((0, 2), (30, 3), (54, 6))
 GRADE_FICHA = ((0, 2), (40, 5))
+# Saúde: 4 métricas em 4 × 1 ou 2 × 2.
+GRADE_SAUDE = ((0, 2), (40, 4))
 
 
 def css_grade(nome, grade):
@@ -638,6 +649,7 @@ CSS = f"""
 .b3-grade {{display:grid; gap:0.75rem;}}
 {css_grade("pulso", GRADE_PULSO)}
 {css_grade("ficha", GRADE_FICHA)}
+{css_grade("saude", GRADE_SAUDE)}
 .b3-card, .b3-metrica {{overflow-wrap:normal; word-break:normal; hyphens:manual;}}
 .b3-card {{background:{FUNDO_2}; border:1px solid {BORDA}; border-top:4px solid var(--cor);
   border-radius:8px; padding:14px 16px; min-height:150px; display:flex; flex-direction:column;
@@ -1015,3 +1027,220 @@ def fig_cotacao(cot):
     fig.update_yaxes(title="Volume (ações)", row=2, col=1)
     fig.update_layout(hovermode="x unified", showlegend=False, bargap=0)
     return _layout(fig, "5 · Cotação histórica", 520)
+
+
+# --------------------------------------------------------------------------------------------
+# 9. Saúde do pipeline (aba própria no app)
+# --------------------------------------------------------------------------------------------
+ETAPA_ROTULO = {
+    "ingestao": "1 · Ingestão",
+    "transformacao": "2 · Transformação",
+    "materializacao": "3 · Materialização",
+    "qualidade": "4 · Qualidade",
+    "fotografia": "5 · Fotografia",
+}
+CAMADA_ROTULO = {
+    "raw": "Bronze (raw)",
+    "refined": "Silver (refined)",
+    "marts": "Gold (marts)",
+}
+STATUS_EXECUCAO = {
+    execucao.SUCESSO: {"rotulo": "✅ Sucesso", "cor": REC["Compra"]["cor"]},
+    execucao.FALHA: {"rotulo": "❌ Falha", "cor": REC["Venda"]["cor"]},
+}
+SEM_REGISTRO = "⚪ Sem registro"
+
+
+def _existe(con, nome):
+    # information_schema cobre a tabela do banco e a view da fotografia
+    return (
+        con.execute(
+            "SELECT COUNT(*) FROM information_schema.tables "
+            "WHERE table_schema = ? AND table_name = ?",
+            [SCHEMA_MARTS, nome],
+        ).fetchall()[0][0]
+        > 0
+    )
+
+
+def ler_saude():
+    """marts.marts_painel_saude_pipeline, ou None se o mart não existe.
+
+    O mart é opcional (fora de MARTS_OBRIGATORIOS): fotografias e bancos anteriores ao
+    registro de execução não o têm, e isso não pode impedir o painel de abrir.
+    """
+    con = _conectar([MART_SAUDE])
+    try:
+        if not _existe(con, MART_SAUDE):
+            return None
+        try:
+            return con.execute(f"SELECT * FROM {_tabela(MART_SAUDE)}").df()
+        except duckdb.Error as erro:
+            raise ErroMart(_rotulo(MART_SAUDE), str(erro)) from erro
+    finally:
+        con.close()
+
+
+def execucao_fotografia():
+    """Registro da geração da fotografia lida (manifesto), ou None no banco local."""
+    if fonte() != FOTOGRAFIA:
+        return None
+    manifesto = fotografia.ler_manifesto(PASTA_FOTOGRAFIA)
+    for registro in manifesto.get("execucoes", []):
+        if registro["etapa"] == "fotografia":
+            return registro
+    return None
+
+
+def idade_dados(data_referencia, hoje=None):
+    """Idade da data de referência em dias corridos e úteis (pipeline.execucao.idade)."""
+    return execucao.idade(pd.Timestamp(data_referencia).date(), hoje)
+
+
+def data_hora(valor):
+    """Horário UTC do registro de execução: '02/11/2026 09:05 UTC'."""
+    if _nulo(valor):
+        return TRACO
+    if isinstance(valor, str):
+        valor = datetime.fromisoformat(valor)
+    return f"{pd.Timestamp(valor).strftime('%d/%m/%Y %H:%M')} UTC"
+
+
+def duracao(segundos):
+    """'8,4 s', '3 min 05 s' ou '1 h 02 min'."""
+    if _nulo(segundos):
+        return TRACO
+    s = float(segundos)
+    if s < 60:
+        return f"{_br(s, 1)} s"
+    minutos, resto = divmod(round(s), 60)
+    if minutos < 60:
+        return f"{minutos} min {resto:02d} s"
+    horas, minutos = divmod(minutos, 60)
+    return f"{horas} h {minutos:02d} min"
+
+
+def _status(valor):
+    return SEM_REGISTRO if _nulo(valor) else STATUS_EXECUCAO[valor]["rotulo"]
+
+
+def tabela_saude(saude):
+    """DataFrame de exibição da última execução de cada etapa (formatação, sem conta)."""
+    df = saude.sort_values("ordem")
+    return pd.DataFrame(
+        {
+            "etapa": df["etapa"].map(ETAPA_ROTULO),
+            "status": df["status"].map(_status),
+            "inicio": df["inicio_utc"].map(data_hora),
+            "duracao": df["duracao_s"].map(duracao),
+            "camada": df["camada"].map(lambda c: CAMADA_ROTULO.get(c, TRACO)),
+            "tabelas": df["tabelas"].map(numero),
+            "linhas": df["linhas"].map(numero),
+            "avisos": df["avisos"].map(numero),
+            "ultimo_sucesso": df["ultimo_sucesso_utc"].map(data_hora),
+        }
+    )
+
+
+def tabela_linhas_por_tabela(saude):
+    """Uma linha por tabela publicada na última execução de cada etapa."""
+    linhas = [
+        {
+            "etapa": ETAPA_ROTULO[etapa],
+            "tabela": item["tabela"],
+            "linhas": numero(item["linhas"]),
+        }
+        for etapa, itens in zip(saude["etapa"], saude["linhas_por_tabela"], strict=True)
+        if _lista(itens)
+        for item in itens
+    ]
+    return pd.DataFrame(linhas, columns=["etapa", "tabela", "linhas"])
+
+
+def fig_duracao_etapas(saude):
+    """Barras horizontais com a duração da última execução de cada etapa, cor pelo status."""
+    df = saude[saude["duracao_s"].notna()].sort_values("ordem", ascending=False)
+    fig = go.Figure(
+        go.Bar(
+            x=df["duracao_s"],
+            y=df["etapa"].map(ETAPA_ROTULO),
+            orientation="h",
+            marker_color=df["status"].map(lambda s: STATUS_EXECUCAO[s]["cor"]),
+            text=df["duracao_s"].map(duracao),
+            textposition="outside",
+            customdata=df["status"].map(_status),
+            hovertemplate="%{y}: %{text} · %{customdata}<extra></extra>",
+        )
+    )
+    fig.update_xaxes(title="Duração (s)", showgrid=True, gridcolor=BORDA)
+    fig.update_yaxes(showgrid=False)
+    return _layout(fig, "Duração da última execução por etapa", 320)
+
+
+def _linha_etapa(saude, etapa):
+    linhas = saude[saude["etapa"] == etapa]
+    return None if linhas.empty else linhas.iloc[0]
+
+
+def metricas_saude(saude, idade, registro_fotografia):
+    """[(rótulo, valor)] dos 4 mini cartões da aba: idade, ingestão, qualidade e fotografia."""
+    uteis = "dia útil" if idade.dias_uteis == 1 else "dias úteis"
+    metricas = [
+        (
+            f"Idade dos dados ({idade.dias_corridos} corridos)",
+            f"{idade.dias_uteis} {uteis}",
+        )
+    ]
+    ingestao = None if saude is None else _linha_etapa(saude, "ingestao")
+    qualidade = None if saude is None else _linha_etapa(saude, "qualidade")
+    metricas.append(
+        (
+            "Última ingestão",
+            TRACO if ingestao is None else data_br(ingestao["inicio_utc"]),
+        )
+    )
+    metricas.append(
+        (
+            "Avisos da qualidade",
+            TRACO if qualidade is None else numero(qualidade["avisos"]),
+        )
+    )
+    metricas.append(
+        (
+            "Fotografia gerada em",
+            (TRACO if fonte() == FOTOGRAFIA else "banco local")
+            if registro_fotografia is None
+            else data_br(registro_fotografia["fim_utc"]),
+        )
+    )
+    return metricas
+
+
+def falhas_saude(saude):
+    """[(etapa, início, último sucesso, erro)] das etapas cuja última execução falhou."""
+    df = saude[saude["status"] == execucao.FALHA].sort_values("ordem")
+    return [
+        (ETAPA_ROTULO[e], data_hora(i), data_hora(u), erro)
+        for e, i, u, erro in zip(
+            df["etapa"],
+            df["inicio_utc"],
+            df["ultimo_sucesso_utc"],
+            df["erro"],
+            strict=True,
+        )
+    ]
+
+
+def avisos_saude(saude):
+    """[(etapa, [avisos])] das etapas com aviso na última execução, na ordem do pipeline."""
+    df = saude.sort_values("ordem")
+    return [
+        (ETAPA_ROTULO[e], list(lista))
+        for e, lista in zip(df["etapa"], df["lista_avisos"], strict=True)
+        if _lista(lista)
+    ]
+
+
+def _lista(valor):
+    """Lista não vazia vinda do DuckDB (list ou array); NULL e lista vazia são falsos."""
+    return not _nulo(valor) and len(valor) > 0

@@ -20,6 +20,7 @@ painel Streamlit somente leitura.
 ## Por onde começar
 
 - [Instalação e uso](uso.md): preparar o ambiente e executar o pipeline e o painel.
+- [Operação](operacao.md): o que roda agendado, contrato das fontes e saúde do pipeline.
 - [Arquitetura](arquitetura.md): camadas Bronze → Silver → Gold e garantias de cada etapa.
 - [Referência da API](referencia/api.md): módulos, funções, tabelas e comandos.
 - [Marts](referencia/marts.md) e [Rankings](referencia/rankings.md): indicadores, rankings e a

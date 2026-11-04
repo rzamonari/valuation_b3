@@ -41,7 +41,9 @@ Progresso e relatórios saem em `stdout`; avisos e erros, em `stderr`.
 
 !!! note "Arquivo bloqueado"
     O DuckDB aceita um único processo gravando. Feche a DuckDB UI (`uv run python ui.py`) antes
-    das etapas 1 a 3. O painel pode ficar aberto: cada leitura abre e fecha uma conexão
+    das etapas 1 a 3. A qualidade e a fotografia só leem, mas gravam o registro de execução no
+    fim (`meta.execucoes`): com a UI aberta, elas terminam normalmente e só avisam que o registro
+    não foi gravado. O painel pode ficar aberto: cada leitura abre e fecha uma conexão
     `read_only`. Depois de materializar, clique em **Recarregar dados**.
 
 No VS Code, as mesmas etapas estão em **Terminal → Executar Tarefa** (`.vscode/tasks.json`),
@@ -116,6 +118,7 @@ assistentes de IA.
 uv run ruff check .            # lint
 uv run ruff format . --check   # formatação
 uv run pytest                  # testes, sempre com cobertura (mínimo 85%)
+uv run task contrato           # contrato das 4 fontes (rede real; fora do pytest padrão)
 uv run python -m pipeline.fotografia --verificar   # integridade da fotografia
 uv run mkdocs serve            # esta documentação em http://127.0.0.1:8000
 uv run mkdocs build --strict   # falha com link quebrado ou página fora da navegação
@@ -126,4 +129,6 @@ conferência de `requirements.txt` e da fotografia e o `pytest` (Ubuntu e Window
 `main` e em todo pull request.
 
 Os testes nunca tocam o banco real nem a rede: usam DuckDB em pasta temporária e substituem as
-chamadas HTTP e o yfinance por respostas mínimas.
+chamadas HTTP e o yfinance por respostas mínimas. A exceção são os testes de contrato
+(`test/contrato/`, marcados com `contrato`), que chamam as fontes de verdade e por isso ficam fora
+do `pytest` padrão e do CI de PR; ver [Operação](operacao.md#contrato-das-fontes).

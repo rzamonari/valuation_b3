@@ -455,3 +455,20 @@ def test_main_reprova_com_codigo_1(banco, tmp_path, monkeypatch, caplog):
 def test_main_sem_banco_encerra_com_codigo_1(tmp_path, monkeypatch):
     # read_only não cria o arquivo: banco inexistente é erro de conexão
     assert _main(tmp_path, monkeypatch) == 1
+
+
+def test_main_registra_a_execucao_com_os_avisos(banco, tmp_path, monkeypatch):
+    assert _main(tmp_path, monkeypatch) == 0
+    conexao = duckdb.connect(str(banco), read_only=True)
+    try:
+        [(status, avisos)] = conexao.execute(
+            "SELECT status, avisos FROM meta.execucoes WHERE etapa = 'qualidade'"
+        ).fetchall()
+        [(n_avisos,)] = conexao.execute(
+            "SELECT avisos FROM marts.marts_painel_saude_pipeline WHERE etapa = 'qualidade'"
+        ).fetchall()
+    finally:
+        conexao.close()
+    assert status == "sucesso"
+    assert avisos and all("violação(ões)" in a for a in avisos)
+    assert n_avisos == len(avisos)

@@ -19,7 +19,7 @@ import yfinance as yf
 from lxml import html
 from yfinance.exceptions import YFException, YFRateLimitError
 
-from pipeline import db
+from pipeline import db, execucao
 from pipeline.log import configurar as configurar_logging
 
 # explícito: sob python -m, __name__ é "__main__" e sairia da hierarquia "pipeline"
@@ -374,30 +374,33 @@ def main() -> None:
         False  # erros do yfinance viram exceções tratadas pelo retry
     )
 
-    try:
-        tabelas = _extrair_tudo()
-    except Exception as exc:  # noqa: BLE001 — qualquer falha de fonte aborta (E2)
-        log.error(f"\nERRO DE EXTRAÇÃO — {exc}")
-        log.error("Nenhuma tabela foi gravada.")
-        sys.exit(1)
-
-    con = db.conectar()
-    try:
-        db.criar_schema(con, SCHEMA)
-        con.begin()
+    with execucao.registrada("ingestao") as registro:
         try:
-            contagens = {
-                nome: db.gravar(con, df, SCHEMA, nome) for nome, df in tabelas.items()
-            }
-            con.commit()
-        except Exception as exc:  # noqa: BLE001 — qualquer falha de gravação faz rollback (E3)
-            con.rollback()
-            log.error(f"\nERRO DE PERSISTÊNCIA — {exc}")
-            log.error("Rollback executado: nenhuma das tabelas foi alterada.")
+            tabelas = _extrair_tudo()
+        except Exception as exc:  # noqa: BLE001 — qualquer falha de fonte aborta (E2)
+            log.error(f"\nERRO DE EXTRAÇÃO — {exc}")
+            log.error("Nenhuma tabela foi gravada.")
             sys.exit(1)
-        _imprimir_relatorio(contagens)
-    finally:
-        con.close()
+
+        con = db.conectar()
+        try:
+            db.criar_schema(con, SCHEMA)
+            con.begin()
+            try:
+                contagens = {
+                    nome: db.gravar(con, df, SCHEMA, nome)
+                    for nome, df in tabelas.items()
+                }
+                con.commit()
+            except Exception as exc:  # noqa: BLE001 — qualquer falha de gravação faz rollback (E3)
+                con.rollback()
+                log.error(f"\nERRO DE PERSISTÊNCIA — {exc}")
+                log.error("Rollback executado: nenhuma das tabelas foi alterada.")
+                sys.exit(1)
+            registro.tabelas = {f"{SCHEMA}.{t}": n for t, n in contagens.items()}
+            _imprimir_relatorio(contagens)
+        finally:
+            con.close()
 
 
 if __name__ == "__main__":

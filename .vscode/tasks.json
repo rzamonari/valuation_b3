@@ -48,6 +48,13 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "Contrato das fontes (rede real)",
+			"type": "shell",
+			"command": "uv run pytest test/contrato -m contrato --no-cov -rf",
+			"group": "test",
+			"problemMatcher": []
+		},
+		{
 			"label": "Painel (Streamlit)",
 			"type": "shell",
 			"command": "uv run streamlit run app.py",

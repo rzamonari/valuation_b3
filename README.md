@@ -2,6 +2,7 @@
 
 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://valuationb3-zamonari.streamlit.app/)
 [![CI](https://github.com/rzamonari/valuation_b3/actions/workflows/ci.yml/badge.svg)](https://github.com/rzamonari/valuation_b3/actions/workflows/ci.yml)
+[![Contrato das fontes](https://github.com/rzamonari/valuation_b3/actions/workflows/contrato-fontes.yml/badge.svg)](https://github.com/rzamonari/valuation_b3/actions/workflows/contrato-fontes.yml)
 
 Pipeline de dados que consolida indicadores fundamentalistas das ações da B3 a partir de quatro
 fontes públicas, calcula 10 rankings temáticos e uma recomendação consolidada por ação, e exibe
@@ -54,10 +55,11 @@ flowchart LR
 |---|---|---|---|
 | Bronze | `raw` | [pipeline/ingestao.py](pipeline/ingestao.py) | Dado como veio, tudo `VARCHAR`, com carimbo de ingestão e origem |
 | Silver | `refined` | [pipeline/transformacao/](pipeline/transformacao/) | Tipagem estrita, deduplicação e chaves validadas; sem cálculo |
-| Gold | `marts` | [sql/marts/](sql/marts/) + [pipeline/materializacao.py](pipeline/materializacao.py) | Um `SELECT` por mart (30 marts); um mart lê outro (`marts.<nome>`) em vez de copiar a regra |
+| Gold | `marts` | [sql/marts/](sql/marts/) + [pipeline/materializacao.py](pipeline/materializacao.py) | Um `SELECT` por mart (33 marts); um mart lê outro (`marts.<nome>`) em vez de copiar a regra |
 | Qualidade | — | [pipeline/qualidade.py](pipeline/qualidade.py) | 71 verificações: reconciliação raw → refined → marts e regras de domínio |
 | Fotografia | `fotografia/` | [pipeline/fotografia.py](pipeline/fotografia.py) | Gold em Parquet + manifesto com data de referência e SHA-256 |
 | Apresentação | — | [painel.py](painel.py) + [app.py](app.py) | Só lê, filtra e formata: número novo exige mart novo |
+| Registro de execução | `meta` | [pipeline/execucao.py](pipeline/execucao.py) | Cada etapa grava início, fim, duração, linhas por tabela, status e avisos em `meta.execucoes` |
 
 Cada etapa publica numa única transação (falha = `ROLLBACK`, versão anterior preservada), é
 idempotente e termina com código `0` em sucesso e `1` em falha.
@@ -72,7 +74,7 @@ uv sync
 # pipeline completo (feche a DuckDB UI antes: um único processo grava no banco)
 uv run python -m pipeline.ingestao        # 1. Bronze: extrai as 4 fontes (rede)
 uv run python -m pipeline.transformacao   # 2. Silver
-uv run python -m pipeline.materializacao  # 3. Gold: 30 marts
+uv run python -m pipeline.materializacao  # 3. Gold: 33 marts
 uv run python -m pipeline.qualidade       # 4. reconciliação e regras de domínio
 uv run python -m pipeline.fotografia      # 5. fotografia versionada em fotografia/
 
@@ -94,6 +96,7 @@ Desenvolvimento (o mesmo roda no [GitHub Actions](.github/workflows/ci.yml) a ca
 uv run ruff check .
 uv run ruff format --check .
 uv run pytest                                      # cobertura mínima de 85%
+uv run task contrato                               # contrato das 4 fontes (rede real)
 uv run python -m pipeline.fotografia --verificar   # integridade da fotografia
 uv run mkdocs serve                                # documentação em http://127.0.0.1:8000
 ```
@@ -126,6 +129,57 @@ gh pr create --fill                       # merge com o CI verde; o Cloud refaz 
 Depois do redeploy, o cabeçalho do painel mostra a nova data de referência e o início do novo
 hash. Cada fotografia acrescenta cerca de 10 MB ao histórico do git (quase tudo `marts_cotacao`,
 exportado só com as colunas que o painel usa).
+
+## Operação
+
+Detalhes em [docs/operacao.md](docs/operacao.md).
+
+**Agendamento.** O que roda sozinho no GitHub Actions:
+
+| Workflow | Quando | Falha |
+|---|---|---|
+| [CI](.github/workflows/ci.yml): `ruff`, `pytest` (Ubuntu e Windows), `requirements.txt`, integridade da fotografia | todo push na `main` e todo PR | bloqueia o merge |
+| [Contrato das fontes](.github/workflows/contrato-fontes.yml): `pytest -m contrato` | toda segunda às 06:00 de Brasília, e sob demanda | abre uma issue `contrato-fontes` (ou comenta na aberta) |
+
+A atualização dos dados continua manual (ver [Atualizar os dados publicados](#painel-publicado-no-streamlit-community-cloud)):
+a execução agendada do pipeline está fora do escopo. O alerta de idade cobre esse risco: o painel
+avisa quando os dados passam de 5 dias úteis.
+
+**Contrato das fontes.** [test/contrato/](test/contrato/) faz uma chamada real e pequena a cada
+fonte e confere o formato contra o contrato da própria Silver:
+
+| Fonte | Confere |
+|---|---|
+| B3 | paginação (`pageNumber`, `pageSize`, `totalRecords`, `totalPages`), os 13 campos de `refined.b3_empresas`, formato de CNPJ e data, `otherCodes` com os tickers |
+| Fundamentus | cabeçalho da tabela com as 22 colunas mapeadas, números em notação brasileira, formato do ticker |
+| Minha Receita | as 45 propriedades e os 3 arrays do contrato JSON, com o tipo de cada uma (sem citar valores) |
+| Yahoo Finance | colunas do histórico, data com fuso e números no formato da Silver |
+
+A falha diz qual fonte mudou e o quê, por exemplo
+`[Fundamentus] campos novos, sem mapeamento na Silver: ['Cresc. Rec. 5a']`. Os testes ficam fora
+do `pytest` padrão (`addopts = -m "not contrato"`), porque o CI de PR não depende de rede.
+
+```powershell
+uv run pytest test/contrato -m contrato --no-cov -rf   # ou: uv run task contrato
+```
+
+**Saúde do pipeline.** Cada etapa grava, com sucesso ou falha, uma linha em `meta.execucoes`:
+etapa, início, fim, duração, linhas por tabela, status, avisos (na qualidade, as verificações com
+AVISO) e erro. O manifesto da fotografia leva a última execução de cada etapa e a da própria
+fotografia. O registro nunca muda o resultado da etapa: com o banco bloqueado, só avisa.
+O mart `marts_painel_saude_pipeline` alimenta a aba **🩺 Saúde do pipeline** do painel:
+
+- última execução e duração de cada etapa;
+- linhas por camada e por tabela;
+- avisos e erros;
+- idade dos dados em dias úteis, com alerta acima de 5.
+
+O mart fica fora do hash total da fotografia, que continua mudando só quando os dados mudam.
+
+```sql
+SELECT etapa, status, inicio_utc, duracao_s, len(avisos) AS avisos
+FROM meta.execucoes ORDER BY inicio_utc DESC LIMIT 10;
+```
 
 ## Painel
 
@@ -213,7 +267,8 @@ retorno ou risco é calculado a partir desses preços: os 6 tickers com um dos d
 de 5 anos (PPAR3, AZUL3, FIGE3, MMAQ3, MMAQ4, PINE3) ficam sem cálculo, e a qualidade dá ERRO se
 isso mudar.
 
-**Testes:** 243 casos, cobertura de 93%, sem rede e sem tocar o banco real.
+**Testes:** 296 casos, cobertura de 94%, sem rede e sem tocar o banco real, mais 5 testes de
+contrato contra as fontes reais (fora do `pytest` padrão).
 
 ## Limitações
 
