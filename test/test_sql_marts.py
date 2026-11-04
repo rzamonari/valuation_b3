@@ -488,23 +488,25 @@ def test_contagem_por_motivo_mostra_zero_sem_exclusoes(tmp_path):
 
 
 def banco_cotacoes(tmp_path, cotacoes):
-    """cotacoes: (ticker, data, fechamento, fechamento_ajustado, dividendos)."""
+    """cotacoes: (ticker, data, fechamento, fechamento_ajustado, dividendos,
+    desdobramentos)."""
     con = duckdb.connect(str(tmp_path / "teste.duckdb"))
     con.execute("CREATE SCHEMA refined")
     con.execute(
         "CREATE TABLE refined.yfinance_cotacoes (ticker VARCHAR, data TIMESTAMPTZ, "
-        "fechamento DOUBLE, fechamento_ajustado DOUBLE, dividendos DOUBLE)"
+        "fechamento DOUBLE, fechamento_ajustado DOUBLE, dividendos DOUBLE, "
+        "desdobramentos DOUBLE)"
     )
     con.executemany(
-        "INSERT INTO refined.yfinance_cotacoes VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?)",
+        "INSERT INTO refined.yfinance_cotacoes VALUES (?, ?::TIMESTAMPTZ, ?, ?, ?, ?)",
         cotacoes,
     )
     return con
 
 
 def serie(ticker, *pontos):
-    """pontos: (data, fechamento, fechamento_ajustado[, dividendos])."""
-    return [(ticker, d, f, a, p[0] if p else 0.0) for d, f, a, *p in pontos]
+    """pontos: (data, fechamento, fechamento_ajustado[, dividendos[, desdobramentos]])."""
+    return [(ticker, d, f, a, *(list(p) + [0.0, 0.0])[:2]) for d, f, a, *p in pontos]
 
 
 def risco_por_ticker(con):
@@ -616,3 +618,107 @@ def test_risco_sem_calculo_nao_contamina_outro_ticker(tmp_path):
     assert linhas["RUIM3"]["cagr"] is None
     assert linhas["BOAS3"]["cagr"] is not None
     assert linhas["BOAS3"]["motivo_sem_calculo"] is None
+
+
+SALTO = "Salto sem evento no fechamento (razão diária > 5 ou < 0,2)"
+
+
+def test_risco_calcula_salto_com_desdobramento_registrado(tmp_path):
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "DESD3",
+            ("2025-01-02", 10, 10),
+            ("2025-06-02", 60, 60, 0.0, 0.1),
+            ("2026-01-02", 66, 66),
+        ),
+    )
+    linha = risco_por_ticker(con)["DESD3"]
+    assert linha["motivo_sem_calculo"] is None
+    assert linha["cagr"] is not None
+
+
+def test_risco_fica_sem_calculo_com_salto_sem_evento_na_janela(tmp_path):
+    # grupamento não registrado: 3,00 -> 2.550,01 (razão 850), como MMAQ3 em 2024-12-27
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "SALT3",
+            ("2025-01-02", 3, 3),
+            ("2025-06-02", 2550.01, 2550.01),
+            ("2026-01-02", 2600, 2600),
+        )
+        + serie(
+            "QUED3",
+            ("2025-01-02", 10, 10),
+            ("2025-06-02", 1.9, 1.9),
+            ("2026-01-02", 2, 2),
+        ),
+    )
+    linhas = risco_por_ticker(con)
+    for ticker in ("SALT3", "QUED3"):
+        linha = linhas[ticker]
+        assert linha["motivo_sem_calculo"] == SALTO
+        for coluna in (
+            "cagr",
+            "volatilidade_anualizada",
+            "max_drawdown",
+            "preco_inicial",
+            "preco_final",
+        ):
+            assert linha[coluna] is None
+        assert linha["qtd_precos_validos"] == 3
+
+
+def test_risco_calcula_queda_forte_abaixo_do_limite(tmp_path):
+    # razão 0,227 (como AMER3 em 2023-01-12): movimento real, acima de 0,2
+    con = banco_cotacoes(
+        tmp_path,
+        serie("AMEX3", ("2025-01-02", 1200, 1200), ("2025-01-03", 272, 272)),
+    )
+    assert risco_por_ticker(con)["AMEX3"]["motivo_sem_calculo"] is None
+
+
+def test_risco_calcula_com_salto_sem_evento_fora_da_janela(tmp_path):
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "VELH3",
+            ("2015-01-02", 3, 3),
+            ("2015-01-05", 30, 30),
+            ("2025-01-02", 30, 30),
+            ("2026-01-02", 33, 33),
+        ),
+    )
+    linha = risco_por_ticker(con)["VELH3"]
+    assert linha["motivo_sem_calculo"] is None
+    assert linha["cagr"] is not None
+
+
+def test_risco_salto_no_primeiro_dia_da_janela_conta(tmp_path):
+    # o pregão anterior está fora da janela; a razão do 1º dia ainda é verificada
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "BORS3",
+            ("2021-01-01", 1, 1),
+            ("2021-01-04", 10, 10),
+            ("2026-01-04", 12, 12),
+        ),
+    )
+    assert risco_por_ticker(con)["BORS3"]["motivo_sem_calculo"] == SALTO
+
+
+def test_risco_motivo_combina_ajuste_invalido_e_salto(tmp_path):
+    con = banco_cotacoes(
+        tmp_path,
+        serie(
+            "DUPL3",
+            ("2025-01-02", 3, -1),
+            ("2025-01-03", 3, 3, 5.0),
+            ("2025-06-02", 2550.01, 2550.01),
+        ),
+    )
+    motivo = risco_por_ticker(con)["DUPL3"]["motivo_sem_calculo"]
+    assert motivo.startswith("Ajuste retroativo inválido")
+    assert motivo.endswith("salto sem evento no fechamento (razão diária > 5 ou < 0,2)")

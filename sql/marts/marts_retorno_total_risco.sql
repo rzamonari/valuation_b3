@@ -17,6 +17,13 @@
 --   CÁLCULO: cagr, volatilidade_anualizada, max_drawdown, preco_inicial e preco_final NULL e
 --   motivo_sem_calculo preenchido. Datas e contagens da janela continuam para rastreio.
 --
+-- Salto sem evento (decisão D2 da spec de indicadores, aprovada em 2026-11-04):
+--   O fechamento do Yahoo já vem ajustado por desdobramento (razão mediana 1,0 nos dias com
+--   desdobramento). Uma razão diária fechamento / fechamento anterior > 5 ou < 0,2 num dia sem
+--   desdobramento nem provento é grupamento ou desdobramento não registrado, ou cotação
+--   errada, e contamina o fechamento_ajustado. Com um salto assim na janela, o ticker também
+--   fica SEM CÁLCULO; motivo_sem_calculo distingue D1, D2 ou os dois.
+--
 -- Indicadores (todos DERIVADOS na Gold, percentual na escala 0–100):
 --   cagr                   = ((preco_final / preco_inicial) ^ (1 / anos) - 1) * 100
 --                            preco_inicial/final = primeiro/último preço válido da janela;
@@ -36,6 +43,27 @@ WITH limites AS (
         MAX(data) AS data_fim_janela
     FROM refined.yfinance_cotacoes
     GROUP BY ticker
+),
+saltos AS (
+    -- razão calculada antes do corte da janela: o salto do primeiro dia da janela conta
+    SELECT ticker, data
+    FROM (
+        SELECT
+            ticker,
+            data,
+            fechamento / LAG(fechamento) OVER (PARTITION BY ticker ORDER BY data) AS razao,
+            desdobramentos > 0 OR dividendos > 0 AS evento
+        FROM refined.yfinance_cotacoes
+        WHERE fechamento > 0
+    )
+    WHERE NOT evento AND (razao > 5 OR razao < 0.2)
+),
+saltos_janela AS (
+    SELECT DISTINCT s.ticker
+    FROM saltos AS s
+    JOIN limites AS l
+        ON l.ticker = s.ticker
+    WHERE s.data >= l.data_fim_janela - INTERVAL 5 YEAR
 ),
 historico AS (
     -- fechamento anterior calculado antes do corte da janela: o provento do primeiro dia
@@ -92,9 +120,13 @@ resumo AS (
 ),
 calculo AS (
     SELECT
-        *,
-        (EPOCH(data_final) - EPOCH(data_inicial)) / 86400.0 / 365.25 AS anos
-    FROM resumo
+        r.*,
+        sj.ticker IS NOT NULL AS salto_sem_evento,
+        r.ajuste_invalido OR sj.ticker IS NOT NULL AS sem_calculo,
+        (EPOCH(r.data_final) - EPOCH(r.data_inicial)) / 86400.0 / 365.25 AS anos
+    FROM resumo AS r
+    LEFT JOIN saltos_janela AS sj
+        ON sj.ticker = r.ticker
 )
 SELECT
     ticker,
@@ -103,19 +135,24 @@ SELECT
     anos,
     qtd_precos_validos,
     qtd_retornos,
-    CASE WHEN NOT ajuste_invalido THEN preco_inicial END AS preco_inicial,
-    CASE WHEN NOT ajuste_invalido THEN preco_final END AS preco_final,
+    CASE WHEN NOT sem_calculo THEN preco_inicial END AS preco_inicial,
+    CASE WHEN NOT sem_calculo THEN preco_final END AS preco_final,
     CASE
-        WHEN NOT ajuste_invalido AND anos > 0
+        WHEN NOT sem_calculo AND anos > 0
             THEN (POWER(preco_final / preco_inicial, 1.0 / anos) - 1) * 100
     END AS cagr,
     CASE
-        WHEN NOT ajuste_invalido THEN desvio_retorno_diario * SQRT(252) * 100
+        WHEN NOT sem_calculo THEN desvio_retorno_diario * SQRT(252) * 100
     END AS volatilidade_anualizada,
-    CASE WHEN NOT ajuste_invalido THEN drawdown_minimo * 100 END AS max_drawdown,
+    CASE WHEN NOT sem_calculo THEN drawdown_minimo * 100 END AS max_drawdown,
     CASE
+        WHEN ajuste_invalido AND salto_sem_evento
+            THEN 'Ajuste retroativo inválido do Yahoo (provento >= fechamento anterior); '
+                || 'salto sem evento no fechamento (razão diária > 5 ou < 0,2)'
         WHEN ajuste_invalido
             THEN 'Ajuste retroativo inválido do Yahoo (provento >= fechamento anterior)'
+        WHEN salto_sem_evento
+            THEN 'Salto sem evento no fechamento (razão diária > 5 ou < 0,2)'
     END AS motivo_sem_calculo
 FROM calculo
 ORDER BY ticker;

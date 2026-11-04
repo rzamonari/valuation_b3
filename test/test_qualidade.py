@@ -327,6 +327,65 @@ def test_ajustado_negativo_com_ticker_sem_calculo_nao_e_erro(con):
     assert linha[0] is None and linha[1] is not None
 
 
+SALTO_SILVER = f"YFinance: fechamento sem salto > {q.LIMITE_SALTO}x sem evento"
+RISCO_COM_SALTO = "marts_retorno_total_risco: nenhum indicador calculado com salto sem evento na janela"
+
+
+def _saltar_ultimo_pregao(con, desdobramentos):
+    # 1,5 -> 100 no último pregão (razão 66,7)
+    con.execute(
+        "UPDATE refined.yfinance_cotacoes SET fechamento = 100, fechamento_ajustado = 100, "
+        f"desdobramentos = {desdobramentos} "
+        "WHERE data = (SELECT MAX(data) FROM refined.yfinance_cotacoes)"
+    )
+
+
+def test_salto_sem_evento_e_aviso_na_silver_e_erro_se_o_mart_calcula(con):
+    _saltar_ultimo_pregao(con, 0)
+    resultados = por_nome(q.executar(con))
+    silver = resultados[SALTO_SILVER]
+    assert silver.status == "AVISO"
+    assert silver.violacoes == 1
+    r = resultados[RISCO_COM_SALTO]
+    assert r.status == "ERRO"
+    assert r.exemplos == (("BOAS3", 1),)
+
+
+def test_salto_sem_evento_com_ticker_sem_calculo_nao_e_erro(con):
+    _saltar_ultimo_pregao(con, 0)
+    m.executar(con)
+    resultados = q.executar(con)
+    assert por_nome(resultados)[RISCO_COM_SALTO].ok
+    assert q.erros(resultados) == []
+    linha = con.execute(
+        "SELECT cagr, motivo_sem_calculo FROM marts.marts_retorno_total_risco"
+    ).fetchone()
+    assert linha[0] is None and linha[1].startswith("Salto sem evento")
+
+
+def test_salto_com_desdobramento_nao_e_aviso_nem_erro(con):
+    _saltar_ultimo_pregao(con, 2.0)
+    m.executar(con)
+    resultados = por_nome(q.executar(con))
+    assert resultados[SALTO_SILVER].ok
+    assert resultados[RISCO_COM_SALTO].ok
+
+
+def test_salto_sem_evento_fora_da_janela_e_so_aviso(con):
+    con.execute(
+        "INSERT INTO refined.yfinance_cotacoes BY NAME "
+        "SELECT 'BOAS3' AS ticker, d::TIMESTAMPTZ AS data, f AS fechamento, "
+        "f AS fechamento_ajustado, 0.0 AS dividendos, 0.0 AS desdobramentos "
+        "FROM (VALUES ('2015-01-02', 0.1), ('2015-01-05', 1.5)) v(d, f)"
+    )
+    m.executar(con)
+    resultados = por_nome(q.executar(con))
+    assert resultados[SALTO_SILVER].status == "AVISO"
+    assert resultados[RISCO_COM_SALTO].ok
+    cagr = con.execute("SELECT cagr FROM marts.marts_retorno_total_risco").fetchone()[0]
+    assert cagr is not None
+
+
 def test_ticker_sem_calculo_com_indicador_e_erro(con):
     con.execute(
         "UPDATE marts.marts_retorno_total_risco SET motivo_sem_calculo = 'x' "
